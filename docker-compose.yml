@@ -1,0 +1,529 @@
+name: pqc-gw
+
+networks:
+ pqc-edge:
+  driver: bridge
+ pqc-internal:
+  driver: bridge
+ pqc-pki:
+  driver: bridge
+ pqc-mgmt:
+  driver: bridge
+
+volumes:
+ pqc-www-pki:
+ pqc-logs-audit:
+ pqc-logs-crl:
+ pqc-signals:
+ pqc-routes-cache:
+ pqc-mgmt-data:    # management-api route-persistence state (off the read-only CA tree)
+ pqc-redis-data:   # durable routing-policy + enrollment-token store
+
+services:
+ shadow-mock:
+  image: nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752
+  container_name: pqc-shadow-mock
+  # pqc-internal is the backend segment: the gateway proxies to registered
+  # backends here. A backend has no reason to reach the CA custodian, the OCSP
+  # responder or the CRL renewer, so it must not sit on pqc-pki beside them.
+  networks:
+   - pqc-internal
+  security_opt:
+   - no-new-privileges:true
+  cap_drop:
+   - ALL
+  # nginx binds :80 (NET_BIND_SERVICE), drops its workers to uid 101
+  # (SETGID/SETUID) and chowns /var/cache/nginx at startup (CHOWN). Without
+  # CHOWN the master exits with "chown(/var/cache/nginx/client_temp) failed".
+  cap_add:
+   - NET_BIND_SERVICE
+   - SETGID
+   - SETUID
+   - CHOWN
+  command: >
+   sh -c "mkdir -p /usr/share/nginx/html/api/v1 &&
+          echo '{\"status\": \"pqc-shadow-success\", \"pqc\": \"ML-DSA-65\"}' > /usr/share/nginx/html/api/v1/status &&
+          echo 'server { listen 80; large_client_header_buffers 4 32k; location / { root /usr/share/nginx/html; default_type application/json; } }' > /etc/nginx/conf.d/default.conf &&
+          nginx -g 'daemon off;'"
+  deploy:
+   resources:
+    limits:
+     memory: 128M
+     cpus: '0.5'
+    reservations:
+     memory: 32M
+     cpus: '0.125'
+
+ # One-shot: ensure the gateway audit log files exist on the pqc-logs-audit
+ # volume and are owned by the nginx worker uid (65534) BEFORE the gateway
+ # starts. The gateway runs read-only with workers as uid 65534 (nobody) and the
+ # volume dir is root-owned, so workers can APPEND to pre-existing files but
+ # cannot CREATE them. `touch` is create-if-missing and never truncates, so this
+ # is safe to re-run on every `docker compose up`, existing audit history (incl.
+ # the enrollment audit log) is preserved. Mirrors mgmt-volume-init: only
+ # this short-lived helper is privileged; the gateway itself stays non-root.
+ gateway-volume-init:
+  image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+  command: sh -c "touch /var/log/audit/enroll-audit.log && chown 65534:65534 /var/log/audit/enroll-audit.log && chmod 644 /var/log/audit/enroll-audit.log"
+  volumes:
+   - pqc-logs-audit:/var/log/audit:rw
+  restart: "no"
+  deploy:
+   resources:
+    limits:
+     memory: 128M
+     cpus: '0.5'
+    reservations:
+     memory: 32M
+     cpus: '0.125'
+
+ gateway:
+  build:
+   context: docker
+   dockerfile: gateway/Dockerfile
+  image: pqc-gateway:1.0.0
+  container_name: pqc-gateway
+  depends_on:
+   gateway-volume-init:
+    condition: service_completed_successfully
+  networks:
+   - pqc-edge
+   - pqc-internal
+   - pqc-pki
+   - pqc-mgmt    # Allows management-api to resolve 'gateway' for JWKS JWT key fetching
+  ports:
+   - "443:443"
+   - "8443:8443"
+  expose:
+   - "8081"
+  volumes:
+   - /etc/pki/pqc-ca:/etc/pki/pqc-ca:ro
+   # Edge data plane needs only the public CA chain + CRL (top-level files); it
+   # uses no CA private key. Mask EVERY key-bearing subdir with an empty dir so
+   # no CA private key is ever exposed at the edge (the most internet-facing
+   # component in the stack): the intermediate CA key, the OCSP delegated key,
+   # AND the root CA key. All three directories are masked below, so the gateway
+   # holds no CA private key of any kind.
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/intermediate/private:ro
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/ocsp:ro
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/root/private:ro
+   - /etc/ssl/pqc:/etc/ssl/pqc:ro
+   - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+   - ./config/nginx/security-headers.conf:/etc/nginx/security-headers.conf:ro
+   - ./config/nginx/lua:/etc/nginx/lua:ro
+   # Mount point for a public enrollment page, served read-only. ONLY an enrollment
+   # bundle belongs here, never the admin console.
+   - ./config/enroll-ui:/etc/nginx/enroll-ui:ro
+   # The reload-signal watcher lives in this entrypoint; bind-mounted so it is
+   # active without a gateway image rebuild (the Dockerfile also bakes it).
+   - ./docker/gateway/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
+   # Signs the /enroll -> management-api proxy hop
+   # (enroll_sign.lua). Regular bind mount (not the native `secrets:` list
+   # below) at host mode 644 so it's readable from both this container's
+   # root-owned nginx master AND management-api's non-root uid 1001, same
+   # workaround already used for control-plane-hmac/custodian-hmac.
+   - ./secrets/enroll-hmac.key:/run/secrets/enroll-hmac:ro
+   - pqc-logs-audit:/var/log/pqc-gw:rw
+   - pqc-routes-cache:/var/cache/pqc-gw/routes:rw
+   # Consume the crl-renewer's reload-nginx sentinel to refresh the static
+   # ssl_crl at the TLS-handshake layer without a full restart. Gateway only
+   # ever reads this signal, never writes it.
+   - pqc-signals:/signals:ro
+  extra_hosts:
+   - "host.docker.internal:host-gateway"
+  security_opt:
+   - no-new-privileges:true
+  read_only: true
+  tmpfs:
+   - /tmp
+   - /run
+   - /var/cache/nginx
+   - /etc/nginx/logs
+   - /var/log/nginx
+  cap_drop:
+   - ALL
+  cap_add:
+   - NET_BIND_SERVICE
+   - SETGID
+   - SETUID
+   - SYS_RESOURCE
+   - CHOWN
+   - DAC_OVERRIDE
+  restart: unless-stopped
+  healthcheck:
+   # Ask the gateway whether it is serving, not whether a binary runs.
+   # `openssl version` passed even with every worker dead: it proved the image
+   # was intact, never that nginx had loaded its config or bound a port.
+   # /healthz is the control-plane listener on :8081 (nginx.conf), and the
+   # container has no curl or wget, so s_client is the transport.
+   test: ["CMD-SHELL", "printf 'GET /healthz HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' | /opt/openssl/bin/openssl s_client -connect 127.0.0.1:8081 -CAfile /etc/pki/pqc-ca/internal-tls-ca.crt -verify_return_error -quiet 2>/dev/null | grep -q '200 OK'"]
+   interval: 30s
+   timeout: 5s
+   retries: 3
+   # Docker runs the FIRST health check one full `interval` after start, so a
+   # container ready in 2s still reported `starting` for 30s. With
+   # depends_on: service_healthy chaining them, that was ~87s of a 141s deploy.
+   # start_interval polls every 2s during start_period only; steady-state stays
+   # at 30s so production failure detection is unchanged. Measured 30s -> 2s.
+   # Requires Docker Engine 25.0+ (API 1.44); older engines ignore the field and
+   # simply fall back to the 30s first check.
+   start_period: 30s
+   start_interval: 2s
+  secrets:
+   - gateway-signing-key
+   - gateway-signing-key-admin
+   - gateway-signing-key-lookup
+   - control-plane-hmac
+  deploy:
+   resources:
+    limits:
+     memory: 512M
+     cpus: '1.0'
+    reservations:
+     memory: 128M
+     cpus: '0.25'
+
+ ocsp-pq:
+  # Verified with cap_drop ALL: the responder binds :9080 (unprivileged)
+  # and the renewer has no listener, so neither needs a capability back.
+  cap_drop:
+   - ALL
+  build: docker/ocsp-pq
+  container_name: pqc-ocsp-pq
+  networks:
+   - pqc-pki
+  volumes:
+   - /etc/pki/pqc-ca:/etc/pki/pqc-ca:ro
+  security_opt:
+   - no-new-privileges:true
+  read_only: true
+  restart: unless-stopped
+  deploy:
+   resources:
+    limits:
+     memory: 128M
+     cpus: '0.5'
+    reservations:
+     memory: 32M
+     cpus: '0.125'
+
+ pki-dist:
+  # Serves the CRL and CA distribution tree on :8090 (autoindex).
+  healthcheck:
+   test: ["CMD-SHELL", "curl -fsS -o /dev/null http://127.0.0.1:8090/"]
+   interval: 30s
+   timeout: 5s
+   retries: 3
+   start_period: 30s
+   start_interval: 2s
+  build: docker/pki-dist
+  container_name: pqc-pki-dist
+  networks:
+   - pqc-pki
+  volumes:
+   - pqc-www-pki:/var/www/pki:ro
+  restart: unless-stopped
+  security_opt:
+   - no-new-privileges:true
+  cap_drop:
+   - ALL
+  cap_add:
+   - NET_BIND_SERVICE
+   - SETGID
+   - SETUID
+   - CHOWN
+   - DAC_OVERRIDE
+  deploy:
+   resources:
+    limits:
+     memory: 128M
+     cpus: '0.5'
+    reservations:
+     memory: 32M
+     cpus: '0.125'
+
+ crl-renewer:
+  # Verified with cap_drop ALL: the responder binds :9080 (unprivileged)
+  # and the renewer has no listener, so neither needs a capability back.
+  cap_drop:
+   - ALL
+  build: docker/crl-renewer
+  container_name: pqc-crl-renewer
+  environment:
+   # Watch this sentinel (touched by management-api on revoke) for on-demand CRL regen.
+   - CRL_RENEW_SIGNAL_FILE=/signals/renew-crl
+  networks:
+   - pqc-pki
+  volumes:
+   - /etc/pki/pqc-ca:/etc/pki/pqc-ca:rw
+   - /usr/local/bin/pqc-crl-renew.sh:/usr/local/bin/pqc-crl-renew.sh:ro
+   - pqc-www-pki:/var/www/pki:rw
+   - pqc-logs-crl:/var/log/pqc-gw:rw
+   - pqc-signals:/signals:rw
+  security_opt:
+   - no-new-privileges:true
+  restart: unless-stopped
+  deploy:
+   resources:
+    limits:
+     memory: 256M
+     cpus: '0.5'
+    reservations:
+     memory: 64M
+     cpus: '0.125'
+
+ # The ONLY component with any access to the intermediate CA private key.
+ # management-api no longer mounts /etc/pki/pqc-ca at all (see below); it
+ # instead calls sign()/revoke()/index()/issued() here over the internal-only
+ # pqc-pki network, HMAC-authenticated with a dedicated secret (separate from
+ # control-plane-hmac, so a leaked route-push secret can't also mint/revoke
+ # certs). Left off pqc-mgmt on purpose, unreachable from anything
+ # internet-facing that isn't already on pqc-pki.
+ #
+ # crl-renewer (above) keeps its own separate broad CA :rw mount for CRL
+ # regeneration, a different, already-isolated concern, and is intentionally
+ # NOT consolidated into this service.
+ pqc-ca-custodian:
+  read_only: true
+  build:
+   context: .
+   dockerfile: docker/pqc-ca-custodian/Dockerfile
+  container_name: pqc-ca-custodian
+  # Same fixed service account as management-api. Host CA ownership from
+  # scripts/setup-pki.sh already grants 1001:1001 exactly this access
+  # (private/ group-readable, db/ + issued/ owned outright), no reason for
+  # the most sensitive process in the stack to run as root.
+  user: "1001:1001"
+  environment:
+   - CERT_VALIDITY_DAYS=${CERT_VALIDITY_DAYS:-365}
+  networks:
+   - pqc-pki
+  volumes:
+   - /etc/pki/pqc-ca:/etc/pki/pqc-ca:rw
+   # Docker standalone always mounts secrets as 0600/root, uid 1001 can't read
+   # them. Mount as a regular bind so host file permissions (0644) apply instead
+   # (same workaround already used for control-plane-hmac below).
+   - ./secrets/custodian-hmac.key:/run/secrets/custodian-hmac:ro
+  security_opt:
+   - no-new-privileges:true
+  cap_drop:
+   - ALL
+  restart: unless-stopped
+  healthcheck:
+   test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:8091/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
+   interval: 30s
+   timeout: 5s
+   retries: 3
+   # Docker runs the FIRST health check one full `interval` after start, so a
+   # container ready in 2s still reported `starting` for 30s. With
+   # depends_on: service_healthy chaining them, that was ~87s of a 141s deploy.
+   # start_interval polls every 2s during start_period only; steady-state stays
+   # at 30s so production failure detection is unchanged. Measured 30s -> 2s.
+   # Requires Docker Engine 25.0+ (API 1.44); older engines ignore the field and
+   # simply fall back to the 30s first check.
+   start_period: 30s
+   start_interval: 2s
+  deploy:
+   resources:
+    limits:
+     memory: 256M
+     cpus: '0.5'
+    reservations:
+     memory: 64M
+     cpus: '0.125'
+
+ # One-shot: ensure the route-persistence + signal volumes are owned by the
+ # management-api service account (uid:gid 1001) BEFORE it starts. This makes
+ # `docker compose up` self-healing, ownership is correct even if a volume was
+ # recreated (e.g. `docker compose down -v`) without re-running init-volumes.sh,
+ # so route persistence never silently breaks on EACCES. Runs as root by design;
+ # only this short-lived helper is privileged, the API itself stays non-root.
+ mgmt-volume-init:
+  image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+  command: sh -c "chown -R 1001:1001 /var/lib/pqc-mgmt /signals && chmod 775 /var/lib/pqc-mgmt /signals"
+  volumes:
+   - pqc-mgmt-data:/var/lib/pqc-mgmt:rw
+   - pqc-signals:/signals:rw
+  restart: "no"
+  deploy:
+   resources:
+    limits:
+     memory: 128M
+     cpus: '0.5'
+    reservations:
+     memory: 32M
+     cpus: '0.125'
+
+ redis:
+  image: redis:7.4-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+  container_name: pqc-redis
+  # Durable routing-policy + enrollment-token store for management-api. Without
+  # it the API falls back to in-process memory (lost on restart) and refuses to
+  # start under NODE_ENV=production. The official entrypoint starts as root only
+  # to fix /data ownership, then execs the server as the unprivileged 'redis'
+  # user (uid 999). AOF on for durability across restarts.
+  command: ["redis-server", "--appendonly", "yes", "--save", "", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction"]
+  networks:
+   - pqc-mgmt
+  volumes:
+   - pqc-redis-data:/data:rw
+  security_opt:
+   - no-new-privileges:true
+  cap_drop:
+   - ALL
+  cap_add:
+   - SETUID          # entrypoint drops root -> redis(999)
+   - SETGID
+   - CHOWN
+   - DAC_OVERRIDE
+  restart: unless-stopped
+  healthcheck:
+   test: ["CMD", "redis-cli", "ping"]
+   interval: 30s
+   timeout: 3s
+   retries: 3
+   # Docker runs the FIRST health check one full `interval` after start, so a
+   # container ready in 2s still reported `starting` for 30s. With
+   # depends_on: service_healthy chaining them, that was ~87s of a 141s deploy.
+   # start_interval polls every 2s during start_period only; steady-state stays
+   # at 30s so production failure detection is unchanged. Measured 30s -> 2s.
+   # Requires Docker Engine 25.0+ (API 1.44); older engines ignore the field and
+   # simply fall back to the 30s first check.
+   start_period: 30s
+   start_interval: 2s
+  deploy:
+   resources:
+    limits:
+     memory: 256M
+     cpus: '0.5'
+
+ management-api:
+  # The app has no unauthenticated health route: /api/admin/health returns 401
+  # without an admin JWT. A 401 still proves the HTTP server is up, routing, and
+  # running the auth layer, so both 200 and 401 count as alive. Anything else,
+  # including a connection failure, does not.
+  healthcheck:
+   test: ["CMD-SHELL", "curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/admin/health | grep -qE '^(200|401)'"]
+   interval: 30s
+   timeout: 5s
+   retries: 3
+   start_period: 30s
+   start_interval: 2s
+  read_only: true
+  # Pulled, not built. The image is built and published by the repo that owns its
+  # source (pqc-mtls-management-api). This is what makes a clean clone of THIS repo
+  # deployable: building it here would need its source as a git submodule, and a
+  # `git clone` without --recursive would then die on a missing pnpm-lock.yaml.
+  #
+  # Pinned by digest for the same reason base.lock is, a tag can be moved under
+  # you. To bump: take the digest from the publish run's job summary in
+  # pqc-mtls-management-api and change it here, in this one place.
+  image: ghcr.io/pqc-ra/pqc-mtls-management-api@sha256:0c0158311b8bf40f997c1b99054c4d76fb27f98c2eb5e6d594bcc55adaf3312f
+  # Dedicated non-root account (matches the image + setup-pki.sh host perms).
+  user: "1001:1001"
+  depends_on:
+   mgmt-volume-init:
+    condition: service_completed_successfully
+   pqc-ca-custodian:
+    condition: service_healthy
+   redis:
+    condition: service_healthy
+  environment:
+   - HOST=0.0.0.0
+   - PORT=3000
+   # Durable routing-policy + enrollment-token store (see the redis service).
+   # Without this the API uses in-process memory, which is lost on restart.
+   - REDIS_URL=redis://redis:6379
+   # Internal-only pqc-pki-network address of the CA custodian sidecar, the
+   # only component with any access to the intermediate private key.
+   - CUSTODIAN_URL=http://pqc-ca-custodian:8091
+   # Deploy-specific (per-environment web origins). Real value in gitignored .env.
+   - CORS_ALLOWED_ORIGINS=${CORS_ALLOWED_ORIGINS}
+   # Console origin for CSRF / anti-forgery enforcement on mutating routes. Takes
+   # PRECEDENCE over CORS_ALLOWED_ORIGINS for write protection. CRITICAL: if
+   # empty/unset the CSRF guard fails closed and ALL console mutations are denied.
+   # Set to the console origin (e.g. https://localhost:8443) in the gitignored .env.
+   - CONSOLE_ORIGIN=${CONSOLE_ORIGIN}
+   # Authorization allowlist: SHA-256 fingerprint(s), 64 hex chars, as from
+   # `openssl x509 -fingerprint -sha256`, of certificates permitted to perform
+   # admin operations. The gateway derives the JWT fpr claim as SHA-256(DER), so
+   # this MUST be SHA-256 (a 40-char SHA-1 value causes a permanent 403).
+   # Decoupled from any cert subject field, so an enrollee cannot self-authorize
+   # by requesting OU=admin/CN=admin in a CSR. Comma-separated for multiple
+   # admins. Rotate by re-issuing + updating here.
+   # Deploy-specific (changes when the admin cert is re-issued): the real value
+   # lives in the gitignored .env (see .env.example). Fails closed if unset/empty.
+   - ADMIN_CERT_FINGERPRINTS=${ADMIN_CERT_FINGERPRINTS}
+   # Read-only auditor role: SHA-256 fingerprint(s), same format as
+   # ADMIN_CERT_FINGERPRINTS, granted GET-only access to admin/audit routes.
+   # Per-deployment; real value in the gitignored .env. Empty = no auditors.
+   - AUDITOR_CERT_FINGERPRINTS=${AUDITOR_CERT_FINGERPRINTS}
+   - JWT_EXPECTED_ISSUER=pqc-gateway
+   - JWT_EXPECTED_AUDIENCE=pqc-mtls-management-api
+   - OPENSSL_CONF=/etc/ssl/openssl.cnf
+   # pqc-logs-audit is mounted read-only here; redirect CRL renewal logs to /tmp
+   - CRL_LOG_FILE=/tmp/crl-renewal.log
+   # Decouple CRL regeneration: signal the crl-renewer instead of running the
+   # broad CRL script in-process, so this worker needs no CA write beyond db/issued.
+   - CRL_RENEW_SIGNAL_FILE=/signals/renew-crl
+   # Route persistence on a dedicated volume (not the read-only CA tree).
+   - ROUTES_FILE=/var/lib/pqc-mgmt/routes.json
+   # Admin-action audit trail (NDJSON), appended on the writable app volume.
+   # Data-plane audit log read by GET /audit and the audit_log_entries metric.
+   # Points at the log that is actually written (enroll_audit.lua, log phase of
+   # the public /enroll), not a path nothing writes to.
+   - AUDIT_LOG_PATH=/var/log/pqc-gw/enroll-audit.log
+   - ADMIN_AUDIT_LOG=/var/lib/pqc-mgmt/admin-actions.log
+   # Reach the gateway control plane over TLS (JWKS fetch + route push). The
+   # gateway presents a classical RSA cert there (Node cannot validate ML-DSA);
+   # NODE_EXTRA_CA_CERTS pins the internal CA so a spoofed JWKS is rejected.
+   - GATEWAY_JWKS_URI=https://gateway:8081/.well-known/jwks.json
+   - GATEWAY_CONTROL_URL=https://gateway:8081/update-routes
+   - NODE_EXTRA_CA_CERTS=/etc/pki/internal-tls-ca.crt
+  container_name: pqc-mtls-management-api
+  networks:
+   - pqc-mgmt
+   - pqc-pki
+  volumes:
+   # No CA-tree mount at all: management-api has zero filesystem access to any
+   # CA material (signing key, CA config, index, issued certs). Everything it
+   # needs from the CA subsystem goes through pqc-ca-custodian's HTTP API. The one
+   # exception is a single narrow file below, the internal-TLS CA cert used to
+   # verify the gateway's control-plane TLS cert, which is public CA material,
+   # not the tree, and not reachable from any path to the intermediate key.
+   - pqc-signals:/signals:rw
+   - pqc-mgmt-data:/var/lib/pqc-mgmt:rw
+   - pqc-logs-audit:/var/log/pqc-gw:ro
+   # Docker standalone always mounts secrets as 0600/root, uid 1001 can't read them.
+   # Mount as a regular bind so the host file permissions (0644) apply instead.
+   - ./secrets/control-plane-hmac.key:/run/secrets/control-plane-hmac:ro
+   - ./secrets/custodian-hmac.key:/run/secrets/custodian-hmac:ro
+   # Verifies the /enroll -> /api/admin/certs/sign proxy hop
+   # (EnrollHmacGuard). Same 0644 bind-mount workaround as the two secrets above.
+   - ./secrets/enroll-hmac.key:/run/secrets/enroll-hmac:ro
+   - /etc/pki/pqc-ca/internal-tls-ca.crt:/etc/pki/internal-tls-ca.crt:ro
+  ports:
+   - "127.0.0.1:3000:3000"
+  security_opt:
+   - no-new-privileges:true
+  cap_drop:
+   - ALL
+  restart: unless-stopped
+  deploy:
+   resources:
+    limits:
+     memory: 512M
+     cpus: '1.0'
+    reservations:
+     memory: 128M
+     cpus: '0.25'
+
+secrets:
+ gateway-signing-key:
+  file: ./secrets/gateway-signing.key
+ gateway-signing-key-admin:
+  file: ./secrets/gateway-signing-key-admin.key
+ gateway-signing-key-lookup:
+  file: ./secrets/gateway-signing-key-lookup.key
+ control-plane-hmac:
+  file: ./secrets/control-plane-hmac.key

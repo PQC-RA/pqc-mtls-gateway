@@ -1,0 +1,113 @@
+# =============================================================
+# PQC Root CA. Certificate profile for a three-tier ML-DSA-65 PKI.
+# RFC 9881 (ML-DSA in X.509) + NIST FIPS 204 + RFC 5280
+# =============================================================
+# 
+# Standards referenced:
+# - eIDAS Regulation (EU) 910/2014 + amendments
+# - ETSI EN 319 411-1 (NCP+) / EN 319 411-2 (LCP)
+# - NIS2 Directive (EU) 2022/2555
+# - CAB Forum Baseline Requirements v2.0+
+# - GDPR (EU) 2016/679: personal-data minimisation
+# =============================================================
+#
+# DISTRIBUTION URLs ARE DEPLOYMENT-SPECIFIC AND MUST BE SET
+#   The crlDistributionPoints and authorityInfoAccess entries below are written
+#   into every certificate this CA issues, and tell a third-party verifier where
+#   to fetch the CRL and the issuing certificate. `pqc-gw.local` is a PLACEHOLDER
+#   and will not resolve on your network: replace the host with wherever this
+#   deployment publishes them before issuing certificates anyone else validates.
+#   The pki-dist service serves that tree on :8090 if you want to front it.
+#
+#   Internal revocation does not depend on these. The gateway staples via
+#   ssl_stapling_responder, and crl_worker.lua reads a local CRL file, so both
+#   keep working whether or not the URLs resolve. They matter to external
+#   verifiers, which is why they are kept rather than dropped: eIDAS §24(2)(g)
+#   and §24(2)(h) require a reachable OCSP responder and CRL distribution point.
+
+[ ca ]
+default_ca = CA_default
+
+[ CA_default ]
+dir               = /etc/pki/pqc-ca/root
+certs             = $dir/certs
+crl_dir           = $dir/crl
+new_certs_dir     = $dir/newcerts
+database          = $dir/db/index.txt
+serial            = $dir/db/serial
+crlnumber         = $dir/db/crlnumber
+private_key       = $dir/private/root-ca.key
+certificate       = $dir/certs/root-ca.crt
+crl               = $dir/crl/root-ca.crl
+crl_extensions    = crl_ext
+default_crl_days  = 180               # eIDAS: 6 months maximum for a Root CRL
+default_md        = default           # ML-DSA is self-hashing (FIPS 204)
+default_days      = 3650              # 10 years for the Root (eIDAS permits up to 20)
+preserve          = no
+policy            = policy_strict
+unique_subject    = yes
+copy_extensions   = none              # Safety: never copy extensions from the CSR
+
+# eIDAS strict policy: CA chain integrity
+[ policy_strict ]
+countryName             = match       # must match: BG
+organizationName        = match       # must match: QS-CAP
+organizationalUnitName  = optional
+commonName              = supplied
+emailAddress            = optional
+
+[ req ]
+default_keyfile     = /etc/pki/pqc-ca/root/private/root-ca.key
+distinguished_name  = req_distinguished_name
+x509_extensions     = v3_root_ca
+string_mask         = utf8only
+prompt              = no
+utf8                = yes
+
+[ req_distinguished_name ]
+C                   = BG
+O                   = QS-CAP
+OU                  = Certificate Authority Operations
+CN                  = QS-CAP PQC Root CA G1
+
+# ───────────────────────────────────────
+# ROOT CA Extensions (RFC 9881 + RFC 5280 + eIDAS §24)
+# ───────────────────────────────────────
+[ v3_root_ca ]
+subjectKeyIdentifier   = hash
+basicConstraints       = critical, CA:TRUE
+keyUsage               = critical, keyCertSign, cRLSign
+certificatePolicies    = @root_policy
+
+[ root_policy ]
+policyIdentifier       = 1.3.6.1.4.1.99999.1.1.1
+CPS                    = "https://example.invalid/x"
+userNotice.1           = @root_notice
+
+[ root_notice ]
+explicitText           = "Root CA for post-quantum machine-to-machine certificate authentication"
+
+# ───────────────────────────────────────
+# INTERMEDIATE CA Extensions
+# ───────────────────────────────────────
+[ v3_intermediate_ca ]
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always,issuer:always
+basicConstraints       = critical, CA:TRUE, pathlen:0
+keyUsage               = critical, keyCertSign, cRLSign
+certificatePolicies    = @intermediate_policy
+crlDistributionPoints  = URI:http://crl.pqc-gw.local/root-ca.crl
+
+[ intermediate_policy ]
+policyIdentifier       = 1.3.6.1.4.1.99999.1.2.1
+CPS                    = "https://example.invalid/x"
+userNotice.1           = @intermediate_notice
+
+[ intermediate_notice ]
+explicitText           = "Machine-to-machine client certificate policy (ML-DSA)."
+
+# ─────────────────────────────────────────
+# CRL Extensions
+# ───────────────────────────────────────
+[ crl_ext ]
+authorityKeyIdentifier = keyid:always

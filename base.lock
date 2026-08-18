@@ -1,0 +1,11 @@
+{
+  "_comment": "Pinned PQ-OpenSSL and PQ-OpenResty base images. In the upstream repository this file is CI output: base-images.yml builds the images and commits the resulting digests to an orphan deploy-locks branch, which nothing watches, so writing it cannot re-trigger the pipeline that produced it. This snapshot never runs that workflow, so the file is carried in the tree instead, where it records exactly which base images the published measurements were taken against. scripts/fetch-base-image.sh and scripts/build-all.sh prefer this copy and fall back to the branch, then to building from source.",
+  "image": "ghcr.io/pqc-ra/pqc-mtls-openssl-base",
+  "digest": "sha256:75891bb207c655b00a04d20f9baf9010087a720eb07c3ccd3c9313103d8812d0",
+  "openssl_version": "3.6.2",
+  "openresty_image": "ghcr.io/pqc-ra/pqc-mtls-openresty-base",
+  "openresty_digest": "sha256:4d37a46dd429061a62220135842cc88ba47a95434bf51b9a32c6cdec0b8aa5a4",
+  "openresty_version": "1.27.1.2",
+  "builtFrom_sha": "8ecfe1068c66f116b4c68e7244d1ca08802df537",
+  "created": "2026-08-05T09:19:53Z"
+}

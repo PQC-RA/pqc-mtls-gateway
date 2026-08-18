@@ -1,0 +1,43 @@
+# Pre-commit hooks, run the same fast static checks CI enforces, LOCALLY on
+# each commit, so lint issues are fixed in place instead of coming back as a
+# CI failure and a fixup commit. Install once:
+#
+#     pip install pre-commit && pre-commit install
+#
+# These are `language: system` hooks: they invoke tools that must be on your
+# PATH. CI installs them for you (see .github/workflows/checks.yml, which is the
+# AUTHORITATIVE gate, these local hooks are convenience, not enforcement):
+#     hadolint     https://github.com/hadolint/hadolint/releases
+#     shellcheck   apt install shellcheck   /   brew install shellcheck
+#     actionlint   https://github.com/rhysd/actionlint/releases
+#
+# The check set here is kept in lockstep with checks.yml.
+repos:
+  - repo: local
+    hooks:
+      - id: hadolint
+        name: hadolint (Dockerfiles)
+        entry: hadolint
+        language: system
+        files: (^|/)Dockerfile$
+
+      - id: shellcheck
+        name: shellcheck (shell scripts)
+        entry: shellcheck
+        args: ["--severity=warning"]
+        language: system
+        files: \.sh$
+
+      - id: actionlint
+        name: actionlint (GitHub workflows)
+        entry: actionlint
+        language: system
+        files: ^\.github/workflows/.*\.ya?ml$
+        pass_filenames: false
+
+      - id: openssl-version-consistency
+        name: openssl version consistency (versions.env vs /opt/openssl-*)
+        entry: scripts/check-version-consistency.sh
+        language: system
+        pass_filenames: false
+        files: (Dockerfile|versions\.env|\.js$|\.sh$)

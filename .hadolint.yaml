@@ -1,0 +1,11 @@
+# hadolint configuration.  Lint with:  hadolint docker/*/Dockerfile
+#
+# DL3008 (pin versions in apt-get install) is intentionally ACCEPTED, not fixed.
+# Exact apt version pins are brittle, the pinned version is removed from the
+# Ubuntu repositories the moment a security update ships, which breaks the
+# build. Our reproducibility comes from the pins that actually matter: every
+# base image is pinned by @sha256 digest and Node is pinned to an exact
+# version; the remaining apt packages are low-risk system libraries. The only
+# non-brittle way to pin apt is a snapshot mirror, revisit if we adopt one.
+ignored:
+  - DL3008

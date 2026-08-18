@@ -1,0 +1,127 @@
+# checks.yml: fast static-analysis gate on every PR and push to main.
+#
+# Needs no GHCR and no submodule (this repo's own files only; the
+# management-api unit/e2e tests + its own lint run in the management-api repo's
+# CI). This is the authoritative version of the same checks .pre-commit-config
+# runs locally; keep the two in lockstep.
+name: checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Install linters (pinned)
+        run: |
+          set -euo pipefail
+          curl -fsSL https://github.com/hadolint/hadolint/releases/download/v2.14.0/hadolint-Linux-x86_64 -o /tmp/hadolint
+          sudo install -m 0755 /tmp/hadolint /usr/local/bin/hadolint
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends shellcheck
+          curl -fsSL https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz \
+            | tar -xz -C /tmp actionlint
+          sudo install -m 0755 /tmp/actionlint /usr/local/bin/actionlint
+
+      # `find`, not a glob. This was `docker/*/Dockerfile`, which is one level
+      # deep, so docker/base/openresty/Dockerfile was never linted at all, it
+      # escaped the gate rather than failing it. The BuildKit --check step below
+      # had the identical bug and was widened; this one was missed, so the same
+      # file went unlinted for longer.
+      #
+      # A glob silently stops covering whatever is added outside its depth. find
+      # picks up new Dockerfiles wherever they land, and -print0/xargs -0 keeps
+      # it correct for paths with spaces.
+      - name: hadolint (Dockerfiles)
+        run: |
+          set -euo pipefail
+          count=$(find docker -name Dockerfile | wc -l | tr -d ' ')
+          echo "linting $count Dockerfile(s):"
+          find docker -name Dockerfile | sort | sed 's/^/  /'
+          # Guard against find matching nothing and this step passing vacuously.
+          [ "$count" -ge 6 ] || { echo "::error::expected >=6 Dockerfiles, found $count"; exit 1; }
+          find docker -name Dockerfile -print0 | xargs -0 hadolint
+
+      - name: shellcheck (shell scripts)
+        run: shellcheck --severity=warning scripts/*.sh
+
+      - name: actionlint (GitHub workflows)
+        run: actionlint
+
+
+      # A shell script committed 100644 is invoked as ./script.sh by build-all.sh
+      # and deploy.sh, fails with exit 126, and -- where the caller uses `|| true`
+      # -- is swallowed silently, leaving the script a no-op on every fresh clone
+      # while the caller reports success.
+      - name: Every committed shell script is executable
+        run: |
+          set -euo pipefail
+          nonexec=$(git ls-files -s 'scripts/*.sh' 'bench/*.sh' 'bench/*/*.sh' \
+                      | awk '$1=="100644"{print $4}')
+          if [ -n "$nonexec" ]; then
+            echo "::error::committed without the executable bit:"
+            echo "$nonexec"
+            echo "fix with: git update-index --chmod=+x <file>"
+            exit 1
+          fi
+          echo "all committed shell scripts are executable"
+
+      - name: OpenSSL version consistency
+        run: ./scripts/check-version-consistency.sh
+
+      - name: Dockerfile BuildKit checks (catches what hadolint cannot)
+        run: |
+          set -euo pipefail
+          # BuildKit's own linter finds a class hadolint does not, e.g. UndefinedVar,
+          # which caught `ENV LD_LIBRARY_PATH=...:${LD_LIBRARY_PATH}` expanding to a
+          # trailing colon (an empty element = the CWD in the loader search path).
+          # `--check` exits non-zero on any warning, so this is a real gate.
+          #
+          # It must RESOLVE every FROM. The base-consuming Dockerfiles use
+          # `ARG BASE_OPENSSL_IMAGE` (default `pqc-mtls-openssl-base:local`), which does not
+          # exist on a clean runner and is private on GHCR. Substitute a public stand-in:
+          # --check lints the Dockerfile text and never executes COPY/RUN, so the
+          # stand-in cannot change the result, and this keeps the gate GHCR-free
+          # (see the header note). Contexts are minimized for the same reason.
+          # Glob BOTH levels: the openresty base lives a level deeper, and a
+          # single-level glob would have skipped it silently, a new Dockerfile
+          # escaping the gate rather than failing it.
+          for f in docker/*/Dockerfile docker/base/*/Dockerfile; do
+            [ -f "$f" ] || continue
+            ctx="$(dirname "$f")"
+            [ "$f" = "docker/gateway/Dockerfile" ] && ctx=docker
+            echo "--- $f (context: $ctx)"
+            # Retry: --check still resolves the FROM image manifest from Docker Hub, so
+            # this step depends on registry reachability even though it never builds.
+            # One i/o timeout to registry-1.docker.io failed the whole workflow on
+            # 47aec925 and passed on a plain re-run with no code change. Three attempts
+            # turn a transient blip into a slower green; a real lint error still fails
+            # all three, so nothing is masked.
+            for attempt in 1 2 3; do
+              if docker buildx build --check \
+                   --build-arg BASE_OPENSSL_IMAGE=ubuntu:24.04 \
+                   --build-arg BASE_OPENRESTY_IMAGE=ubuntu:24.04 \
+                   -f "$f" "$ctx"; then
+                break
+              fi
+              if [ "$attempt" = 3 ]; then
+                echo "::error::BuildKit --check failed for $f after 3 attempts"
+                exit 1
+              fi
+              echo "attempt $attempt failed (possibly a registry timeout); retrying"
+              sleep $((attempt * 5))
+            done
+          done

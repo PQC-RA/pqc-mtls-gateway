@@ -1,0 +1,469 @@
+# =============================================================================
+# base-images.yml: Publish the PQC-OpenSSL multi-arch base image to GHCR
+# =============================================================================
+#
+# WHAT THIS DOES
+#   Builds ghcr.io/pqc-ra/pqc-mtls-openssl-base, the compiled PQ-OpenSSL
+#   (/opt/openssl) runtime tree used as the foundation image by the
+#   gateway/management-api Dockerfiles, and publishes it as a signed,
+#   attested, multi-arch (linux/amd64 + linux/arm64) manifest list.
+#
+# WHY IT IS SEPARATE / RARE / SLOW
+#   The heavy lifting is docker/base/openssl/Dockerfile's own OpenSSL compile: a ~5 min
+#   from-source OpenSSL compile. The base Dockerfile fetches its own source by
+#   clean checkout has NONE of them, the workflow MUST run that script before
+#   `docker build`. Because it is slow and its inputs change rarely, this is
+#   deliberately NOT part of per-commit CI: it only runs on pushes that touch
+#   the base-image inputs, or on manual dispatch. The compile is CACHED
+#   (actions/cache, keyed on the compile inputs), so only a genuine
+#   openssl/nginx/njs version bump pays the full cost, a workflow- or
+#   Dockerfile-only change restores the artifacts and finishes in ~1-2 min.
+#
+# NATIVE RUNNERS, NOT QEMU
+#   Multi-arch is produced by building each architecture on its OWN native
+#   runner (ubuntu-24.04 for amd64, ubuntu-24.04-arm for arm64) and pushing
+#   each by digest, then stitching a manifest list with `imagetools create`.
+#   This avoids QEMU emulation, which would make the already-slow OpenSSL
+#   compile pathologically slow (and occasionally miscompile).
+#
+# THE DIGEST IS THE IDENTITY
+#   Human-readable tags (:openssl-3.6.2, :sha-<sha>, :src-<hash>) are
+#   convenience POINTERS only. The identity that descendant images/deployments
+#   pin is the manifest-list DIGEST recorded in base.lock. The cosign signature
+#   and the cosign SBOM attestation are both bound to that digest, not any tag.
+#   (Attestations are produced with cosign/Sigstore rather than the
+#   GitHub-native attestation API.)
+# =============================================================================
+
+name: base-images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - docker/base/**
+      - docker/base/versions.env
+      - .github/workflows/base-images.yml
+  workflow_dispatch:
+
+# Workflow-wide least privilege. Individual jobs widen this where needed
+# (e.g. the lock-commit job needs contents: write).
+permissions:
+  contents: read
+  packages: write
+  id-token: write
+
+# Serialize runs: a from-source OpenSSL build plus a shared registry
+# buildcache must never race against itself.
+concurrency:
+  group: base-images
+  cancel-in-progress: false
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # prepare: derive the lowercased image name and tag inputs once, up front.
+  # ---------------------------------------------------------------------------
+  prepare:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      owner: ${{ steps.vars.outputs.owner }}
+      image: ${{ steps.vars.outputs.image }}
+      openssl_version: ${{ steps.vars.outputs.openssl_version }}
+      openssl_sha256: ${{ steps.vars.outputs.openssl_sha256 }}
+      openresty_image: ${{ steps.vars.outputs.openresty_image }}
+      openresty_version: ${{ steps.vars.outputs.openresty_version }}
+      short_sha: ${{ steps.vars.outputs.short_sha }}
+      src_hash: ${{ steps.vars.outputs.src_hash }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Compute image name, version pins and content hash
+        id: vars
+        run: |
+          set -euo pipefail
+
+          # GHCR paths must be lowercase; never interpolate the raw owner.
+          OWNER="${GITHUB_REPOSITORY_OWNER,,}"
+          IMAGE="ghcr.io/${OWNER}/pqc-mtls-openssl-base"
+
+          # Read the pinned versions (OPENSSL_VERSION, OPENRESTY_VERSION, ...).
+          set -a
+          # shellcheck disable=SC1091
+          source docker/base/versions.env
+          set +a
+
+          SHORT_SHA="${GITHUB_SHA:0:12}"
+
+          # Content hash over the build inputs: docker/base/** (which already
+          # includes versions.env) plus the artifact-build script. Deterministic
+          # ordering so the same source always yields the same :src-<hash> tag.
+          SRC_HASH="$(
+            {
+              find docker/base -type f -print0 | sort -z | xargs -0 sha256sum
+            } | sha256sum | cut -c1-16
+          )"
+
+          {
+            echo "owner=${OWNER}"
+            echo "image=${IMAGE}"
+            echo "openssl_version=${OPENSSL_VERSION}"
+            echo "openssl_sha256=${OPENSSL_SHA256}"
+            echo "openresty_image=ghcr.io/${OWNER}/pqc-mtls-openresty-base"
+            echo "openresty_version=${OPENRESTY_VERSION}"
+            echo "short_sha=${SHORT_SHA}"
+            echo "src_hash=${SRC_HASH}"
+          } >> "$GITHUB_OUTPUT"
+
+  # ---------------------------------------------------------------------------
+  # build: one native-runner job per architecture. Compiles the artifacts,
+  # builds the image for its single platform, and pushes it BY DIGEST.
+  # ---------------------------------------------------------------------------
+  build:
+    needs: prepare
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            platform: linux/amd64
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            platform: linux/arm64
+            arch: arm64
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Docker metadata (labels)
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ needs.prepare.outputs.image }}
+          # metadata-action supplies image.revision (full SHA), image.source
+          # (repo URL) and image.created (RFC3339) automatically; we add the
+          # rest, including the PQC-specific org.pqc-ra.* labels.
+          labels: |
+            org.opencontainers.image.title=pqc-mtls-openssl-base
+            org.opencontainers.image.description=PQC-enabled OpenSSL ${{ needs.prepare.outputs.openssl_version }} runtime base image for the pqc-mtls-gateway
+            org.opencontainers.image.version=openssl-${{ needs.prepare.outputs.openssl_version }}
+            org.pqc-ra.openssl.version=${{ needs.prepare.outputs.openssl_version }}
+            org.pqc-ra.tls.group=X25519MLKEM768
+            org.pqc-ra.tls.sig=ML-DSA-65
+
+      - name: Build and push by digest (${{ matrix.platform }})
+        id: build
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/base/openssl
+          file: docker/base/openssl/Dockerfile
+          # docker/base/openssl/Dockerfile compiles OpenSSL itself now; these come from
+          # docker/base/versions.env (sourced above) so the pin lives in one place.
+          build-args: |
+            OPENSSL_VERSION=${{ needs.prepare.outputs.openssl_version }}
+            OPENSSL_SHA256=${{ needs.prepare.outputs.openssl_sha256 }}
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # Per-arch registry buildcache so amd64 and arm64 don't clobber each
+          # other's cache manifest.
+          cache-from: type=registry,ref=${{ needs.prepare.outputs.image }}:buildcache-${{ matrix.arch }}
+          cache-to: type=registry,ref=${{ needs.prepare.outputs.image }}:buildcache-${{ matrix.arch }},mode=max
+          # push-by-digest: no tag is written here; the assembly job stitches
+          # the per-arch digests into a manifest list.
+          outputs: type=image,name=${{ needs.prepare.outputs.image }},push-by-digest=true,name-canonical=true,push=true
+
+      # OpenResty is built AFTER OpenSSL and consumes the digest just pushed, so
+      # the two are provably from the same OpenSSL, and the compile happens once
+      # here rather than in every gateway build.
+      - name: Build and push openresty base by digest (${{ matrix.platform }})
+        id: build_openresty
+        uses: docker/build-push-action@v7
+        with:
+          context: docker/base/openresty
+          file: docker/base/openresty/Dockerfile
+          platforms: ${{ matrix.platform }}
+          build-args: |
+            BASE_OPENSSL_IMAGE=${{ needs.prepare.outputs.image }}@${{ steps.build.outputs.digest }}
+          cache-from: type=registry,ref=${{ needs.prepare.outputs.openresty_image }}:buildcache-${{ matrix.arch }}
+          cache-to: type=registry,ref=${{ needs.prepare.outputs.openresty_image }}:buildcache-${{ matrix.arch }},mode=max
+          outputs: type=image,name=${{ needs.prepare.outputs.openresty_image }},push-by-digest=true,name-canonical=true,push=true
+
+      - name: Export per-arch digest
+        run: |
+          set -euo pipefail
+          mkdir -p "${RUNNER_TEMP}/digests"
+          digest="${{ steps.build.outputs.digest }}"
+          touch "${RUNNER_TEMP}/digests/${digest#sha256:}"
+          mkdir -p "${RUNNER_TEMP}/digests-openresty"
+          ordigest="${{ steps.build_openresty.outputs.digest }}"
+          touch "${RUNNER_TEMP}/digests-openresty/${ordigest#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: digests-openssl-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Upload openresty digest
+        uses: actions/upload-artifact@v7
+        with:
+          name: digests-openresty-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests-openresty/*
+          if-no-files-found: error
+          retention-days: 1
+
+  # ---------------------------------------------------------------------------
+  # merge: assemble the two per-arch digests into a single multi-arch manifest
+  # list, apply the human tags, and capture the resulting index digest.
+  # ---------------------------------------------------------------------------
+  merge:
+    needs: [prepare, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      digest: ${{ steps.digest.outputs.digest }}
+      openresty_digest: ${{ steps.digest_openresty.outputs.digest }}
+    steps:
+      - name: Download per-arch digests
+        uses: actions/download-artifact@v8
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digests-openssl-*
+          merge-multiple: true
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Docker metadata (tags)
+        id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ needs.prepare.outputs.image }}
+          # NOTE: these tags are convenience POINTERS. The identity that gets
+          # pinned downstream is the manifest-list digest captured below.
+          #   :openssl-<ver>  stable, human-readable tag
+          #   :sha-<sha>      exact commit that produced the image
+          #   :src-<hash>     content hash of the base-image build inputs
+          tags: |
+            type=raw,value=openssl-${{ needs.prepare.outputs.openssl_version }}
+            type=raw,value=sha-${{ needs.prepare.outputs.short_sha }}
+            type=raw,value=src-${{ needs.prepare.outputs.src_hash }}
+
+      - name: Create and push multi-arch manifest list
+        working-directory: ${{ runner.temp }}/digests
+        run: |
+          set -euo pipefail
+          # Word splitting is intentional here: the command substitutions expand
+          # into separate argv, the -t <tag> flags and the per-arch
+          # image@sha256:<digest> references that imagetools stitches together.
+          # shellcheck disable=SC2046
+          docker buildx imagetools create \
+            $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            $(printf '${{ needs.prepare.outputs.image }}@sha256:%s ' *)
+
+      - name: Download per-arch openresty digests
+        uses: actions/download-artifact@v8
+        with:
+          path: ${{ runner.temp }}/digests-openresty
+          pattern: digests-openresty-*
+          merge-multiple: true
+
+      - name: Capture manifest-list (index) digest
+        id: digest
+        run: |
+          set -euo pipefail
+          DIGEST="$(docker buildx imagetools inspect \
+            "${{ needs.prepare.outputs.image }}:openssl-${{ needs.prepare.outputs.openssl_version }}" \
+            --format '{{ .Manifest.Digest }}')"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "Manifest-list digest: ${DIGEST}"
+
+      - name: Create and push the openresty manifest list
+        working-directory: ${{ runner.temp }}/digests-openresty
+        run: |
+          set -euo pipefail
+          # Tagged by the OpenResty version, not the OpenSSL one, a different
+          # artifact with its own upstream cadence.
+          # shellcheck disable=SC2046
+          docker buildx imagetools create \
+            -t "${{ needs.prepare.outputs.openresty_image }}:openresty-${{ needs.prepare.outputs.openresty_version }}" \
+            $(printf "${{ needs.prepare.outputs.openresty_image }}@sha256:%s " *)
+
+      - name: Capture the openresty manifest-list digest
+        id: digest_openresty
+        run: |
+          set -euo pipefail
+          DIGEST="$(docker buildx imagetools inspect \
+            "${{ needs.prepare.outputs.openresty_image }}:openresty-${{ needs.prepare.outputs.openresty_version }}" \
+            --format '{{ .Manifest.Digest }}')"
+          echo "digest=${DIGEST}" >> "$GITHUB_OUTPUT"
+          echo "OpenResty manifest-list digest: ${DIGEST}"
+
+  # ---------------------------------------------------------------------------
+  # sign-attest-lock: keyless-sign + attest the manifest-list digest, then
+  # record base.lock (artifact + commit to the orphan deploy-locks branch).
+  # ---------------------------------------------------------------------------
+  sign-attest-lock:
+    needs: [prepare, merge]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write        # push base.lock to the deploy-locks orphan branch
+      packages: write         # push the cosign signature + SBOM attestation to GHCR
+      id-token: write         # keyless cosign (Sigstore OIDC)
+    env:
+      IMAGE: ${{ needs.prepare.outputs.image }}
+      DIGEST: ${{ needs.merge.outputs.digest }}
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install cosign
+        # No floating v4 major tag is published (unlike v2/v3), pin the full tag.
+        uses: sigstore/cosign-installer@v4.1.2
+
+      - name: Keyless sign the manifest-list digest
+        run: |
+          set -euo pipefail
+          cosign sign --yes "${IMAGE}@${DIGEST}"
+
+      - name: Generate SBOM (SPDX JSON)
+        uses: anchore/sbom-action@v0
+        with:
+          image: ${{ env.IMAGE }}@${{ env.DIGEST }}
+          format: spdx-json
+          output-file: ${{ runner.temp }}/sbom.spdx.json
+
+      - name: Attest the SBOM with cosign
+        run: |
+          set -euo pipefail
+          # The SBOM is attached as a cosign attestation, the same Sigstore
+          # keyless path as the signature above (id-token OIDC + a registry
+          # push). Deploy-time verification uses `cosign verify` +
+          # `cosign verify-attestation` accordingly. The cosign signature's
+          # Rekor-logged workflow identity binds image -> build source.
+          cosign attest --yes \
+            --type spdxjson \
+            --predicate "${RUNNER_TEMP}/sbom.spdx.json" \
+            "${IMAGE}@${DIGEST}"
+
+      - name: Write base.lock
+        run: |
+          set -euo pipefail
+          CREATED="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          cat > "${RUNNER_TEMP}/base.lock" <<EOF
+          {
+            "image": "${IMAGE}",
+            "digest": "${DIGEST}",
+            "openssl_version": "${{ needs.prepare.outputs.openssl_version }}",
+            "openresty_image": "${{ needs.prepare.outputs.openresty_image }}",
+            "openresty_digest": "${{ needs.merge.outputs.openresty_digest }}",
+            "openresty_version": "${{ needs.prepare.outputs.openresty_version }}",
+            "builtFrom_sha": "${GITHUB_SHA}",
+            "created": "${CREATED}"
+          }
+          EOF
+          echo "----- base.lock -----"
+          cat "${RUNNER_TEMP}/base.lock"
+
+          # Assert the lock actually contains what consumers read. base.lock shipped
+          # for a full publish cycle with no openresty fields at all: every job was
+          # green, both images were built, signed and manifest-listed, and the artifact
+          # was still wrong, because nothing checked it. A workflow that writes an
+          # artifact should assert the artifact's shape, not just its own exit code.
+          for key in image digest openssl_version openresty_image openresty_digest openresty_version; do
+            jq -e --arg k "$key" 'has($k) and (.[$k] | type == "string") and (.[$k] | length > 0)' \
+              "${RUNNER_TEMP}/base.lock" >/dev/null \
+              || { echo "::error::base.lock is missing or has an empty '$key'"; exit 1; }
+          done
+          echo "base.lock shape verified: all six required keys present and non-empty"
+
+      - name: Upload base.lock artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: base-lock
+          path: ${{ runner.temp }}/base.lock
+          if-no-files-found: error
+
+      - name: Commit base.lock to the deploy-locks orphan branch
+        env:
+          # No workflow watches deploy-locks, so committing there does NOT
+          # re-trigger any pipeline (unlike a push to main, which would).
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          LOCK_DIR="${RUNNER_TEMP}/deploy-locks"
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+
+          # Clone the existing orphan branch, or create a fresh orphan history.
+          if git clone --depth 1 --branch deploy-locks "${REMOTE}" "${LOCK_DIR}" 2>/dev/null; then
+            echo "Fetched existing deploy-locks branch."
+          else
+            echo "deploy-locks branch not found; creating a new orphan branch."
+            git clone --depth 1 "${REMOTE}" "${LOCK_DIR}"
+            git -C "${LOCK_DIR}" checkout --orphan deploy-locks
+            git -C "${LOCK_DIR}" rm -rf . >/dev/null 2>&1 || true
+          fi
+
+          cd "${LOCK_DIR}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Fetch-rebase-retry push loop. This workflow serializes against itself
+          # (concurrency: base-images), but OTHER pipelines also write their own
+          # lock files to this same orphan branch, so a concurrent push can be
+          # rejected non-fast-forward. On each attempt we re-sync to the remote
+          # tip (preserving every other writer's files, since they are committed
+          # there), re-apply ONLY base.lock, and retry. Different writers touch
+          # different files, so this converges without content conflicts.
+          for attempt in 1 2 3 4 5; do
+            if git fetch --depth 1 origin deploy-locks 2>/dev/null; then
+              git reset --hard FETCH_HEAD
+            fi
+            cp "${RUNNER_TEMP}/base.lock" ./base.lock
+            git add base.lock
+            if git diff --cached --quiet; then
+              echo "base.lock unchanged; nothing to commit."
+              exit 0
+            fi
+            git commit -m "deploy: base.lock for ${IMAGE}@${DIGEST}"
+            if git push origin HEAD:deploy-locks; then
+              echo "base.lock pushed (attempt ${attempt})."
+              exit 0
+            fi
+            echo "push rejected (attempt ${attempt}/5), re-syncing and retrying." >&2
+            sleep $(( attempt * 3 ))
+          done
+          echo "ERROR: failed to push base.lock after 5 attempts." >&2
+          exit 1

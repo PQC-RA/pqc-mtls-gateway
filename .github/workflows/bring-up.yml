@@ -1,0 +1,291 @@
+# bring-up.yml: stand the whole stack up on a clean machine, from nothing.
+#
+# This is the gate that answers "can someone who is not us deploy this?". A GitHub
+# runner is the only environment guaranteed to have no cached image layers, no
+# leftover docker/base/*.tar.gz, and no PKI already on disk, which is exactly the
+# state a stranger cloning the repo is in, and exactly the state none of our lab
+# hosts can reproduce.
+#
+# What it CANNOT prove, deliberately stated so nobody over-reads a green tick:
+# real-host networking, persistence across restarts on real storage, multi-host
+# topology, or anything about performance. Those still need a real deployment.
+# This proves the artifacts and the compose graph work from zero.
+name: bring-up
+
+on:
+  # Documentation cannot change what gets deployed. Verified before adding this:
+  # no Dockerfile COPY/ADDs a .md, no compose file mounts one, and neither
+  # deploy.sh, test-stack-smoke.sh, setup-pki.sh nor verify-suite.sh reads one.
+  # Re-check that if a .md ever becomes a build input.
+  #
+  # paths-ignore skips only when EVERY changed file matches, so a PR touching
+  # docs plus code still runs the full gate.
+  #
+  # static-checks is deliberately NOT filtered: it takes ~40s, and leaving it
+  # means a docs PR still shows a green check rather than no checks at all,
+  # which reads as "CI didn't run" to anyone glancing at the PR.
+  pull_request:
+    paths-ignore:
+      - '**.md'
+  # Pushes to main that do NOT touch a base image run immediately, nothing is
+  # being republished, so base.lock is already correct for them.
+  #
+  # Pushes that DO touch docker/base/** are deliberately excluded here and come
+  # back via workflow_run below, once base-images has finished publishing. A
+  # bring-up racing its own base publish pulls the OLD digest from base.lock and
+  # reports green for an image the merge just replaced.
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docker/base/**'
+      - '**.md'
+  # The other half of that: run after base-images completes on main, so the
+  # deploy tests the digests that run just published.
+  workflow_run:
+    workflows: [base-images]
+    types: [completed]
+    branches: [main]
+  # Weekly, because this gate can break with no commit at all: a moved upstream
+  # image digest, an expired cert in a fixture, a GHCR permission change.
+  schedule:
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read          # pulling ghcr.io/pqc-ra/pqc-mtls-openssl-base
+
+concurrency:
+  group: bring-up-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    # A failed or cancelled base-images run has nothing worth deploying against,
+    # base.lock still names the previous digest, so this would silently re-test
+    # what the last run already covered.
+    if: >-
+      github.event_name != 'workflow_run' ||
+      github.event.workflow_run.conclusion == 'success'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          # Needed by the base-image change detection below: a shallow clone has
+          # no merge base, so `git diff base...HEAD` would find nothing and the
+          # gate would silently take the "no base changes" branch, passing while
+          # testing the wrong thing.
+          fetch-depth: 0
+
+      # scripts/fetch-base-image.sh resolves base.lock from the working tree,
+      # falling back to a deploy-locks branch where one exists. Assert the
+      # in-tree file is present and readable: without it the pull is skipped and
+      # the run falls back to compiling OpenSSL from source, turning a 10-minute
+      # gate into a 40-minute one that still passes.
+      - name: Resolve base.lock
+        run: |
+          set -euo pipefail
+          test -f base.lock || { echo "::error::base.lock missing from the tree"; exit 1; }
+          python3 -c "import json;d=json.load(open('base.lock'));print('base.lock digest:',d['digest'])"
+
+      - name: Gate against this PR's base images, not the published ones
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          base="origin/${{ github.base_ref }}"
+          git rev-parse --verify "$base" >/dev/null 2>&1 \
+            || { echo "::error::cannot resolve $base, base-image change detection would silently pass"; exit 1; }
+          changed=$(git diff --name-only "${base}...HEAD")
+
+          # Per image, not per directory. Forcing BOTH from source on any
+          # docker/base/** change was wrong in both directions:
+          #
+          #   - a PR touching only openresty recompiled OpenSSL for ~5 minutes
+          #     although OpenSSL had not changed, and
+          #   - it did NOT force openresty from source, because PQC_SKIP_BASE_PULL
+          #     is read only by fetch-base-image.sh (the OpenSSL base).
+          #     build-all.sh pulled the PUBLISHED openresty base instead, so the
+          #     PR's actual change was never built or tested. The same failure
+          #     mode applies to the second base image.
+          #
+          # versions.env drives the OpenSSL compile, so it counts as an OpenSSL change.
+          if grep -qE '^docker/base/(openssl/|versions\.env)' <<< "$changed"; then
+            echo "PQC_SKIP_BASE_PULL=1" >> "$GITHUB_ENV"
+            echo "::notice::OpenSSL base changed, building it from source."
+          else
+            echo "OpenSSL base unchanged, using the published image."
+          fi
+          # OpenResty is FROM the OpenSSL base and links dynamically against it, so
+          # an OpenSSL change forces OpenResty too. Otherwise the gate would pair a
+          # freshly-built OpenSSL with a published OpenResty linked against the
+          # previous one, which is the mismatch this whole gate exists to catch.
+          # The reverse does not hold: OpenSSL does not depend on OpenResty.
+          if grep -qE '^docker/base/(openresty/|openssl/|versions\.env)' <<< "$changed"; then
+            echo "PQC_SKIP_OPENRESTY_PULL=1" >> "$GITHUB_ENV"
+            echo "::notice::OpenResty base rebuilt from source (it changed, or the OpenSSL it links against did)."
+          else
+            echo "OpenResty base unchanged, using the published image."
+          fi
+
+      # There is no disk-reclaim step, deliberately, measured, not assumed.
+      #
+      # GitHub runners DO reset: every job gets a fresh VM. But the image ships
+      # with ~25-30G of preinstalled toolchains (Android SDK/NDK, .NET, GHC,
+      # CodeQL) on a ~75G disk, leaving ~15G free. Deleting four of those trees
+      # frees ~17G but costs ~57s on EVERY run, and doing it concurrently measures
+      # the same 57s: it is bound by filesystem metadata operations that do not
+      # parallelise. Not worth it while ~15G suffices.
+      #
+      # It was never needed. Measured on a FROM-SOURCE run (the heaviest case:
+      # full OpenSSL + OpenResty compiles), immediately after deploy:
+      #
+      #     Images        2.968GB
+      #     Build Cache   1.39GB
+      #     ---------------------
+      #     total        ~4.4GB   against 15G free on an untouched runner
+      #
+      # It was presumably defensive from the era of three OpenSSL compiles and
+      # staged tarballs; that world is gone. The headroom step below keeps the
+      # number visible, so if it ever creeps toward 15G this decision gets
+      # revisited from data rather than rediscovered by a failure.
+      - name: Authenticate docker to GHCR
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+          DOCKER_CONFIG: ${{ runner.temp }}/docker
+        run: |
+          set -euo pipefail
+          mkdir -p "$DOCKER_CONFIG"
+          printf '%s' "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          # Fail here, in seconds, rather than 15 minutes later at the pull.
+          # Runs under `sudo -E` deliberately, that is exactly how deploy.sh
+          # runs, so this proves the credential reaches the context that needs it
+          # and not merely that `docker login` returned 0.
+          lock=$(git show origin/deploy-locks:base.lock)
+          base=$(jq -er '.image + "@" + .digest' <<< "$lock")
+          sudo -E docker pull --quiet "$base" > /dev/null
+          echo "GHCR auth verified as root: pulled $base"
+
+      # A PR that changes a base image was, until now, gated against the base
+      # image ALREADY PUBLISHED, fetch-base-image.sh reads base.lock and pulls
+      # that digest, and base-images.yml only runs on push to main. So the gate
+      # tested the already-published base, not the one the PR produces: a PR that
+      # moves the OpenSSL compile into the Dockerfile would never exercise it
+      # until after merge.
+      #
+      # When the PR touches docker/base/**, force the from-source path so the
+      # whole stack is deployed against THIS PR's base images. Same path filter
+      # base-images.yml triggers on, so the two cannot drift.
+      - name: Deploy from scratch
+        id: deploy
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/docker
+        run: sudo -E ./scripts/deploy.sh
+
+      # Assert the ARTIFACT, not the recipe. The base image carries its own
+      # PATH assertion, but that runs where the ENV is set: it can prove the base
+      # correct while a descendant resolves bare `openssl` to the distro's 3.0.13,
+      # because ENV does not cross COPY --from.
+      #
+      # This derives its own list: any image that SHIPS /opt/openssl must resolve
+      # bare `openssl` to it. Images without it (pki-dist, the openresty base,
+      # whose final stage carries OpenResty alone) drop out on their own, so a
+      # new image cannot escape the check by being added to a list nobody updated.
+      - name: Every image shipping /opt/openssl must resolve bare openssl to it
+        run: |
+          set -euo pipefail
+          checked=0
+          for img in $(sudo docker compose config --images 2>/dev/null | sort -u) \
+                     pqc-mtls-openssl-base:local pqc-mtls-openresty-base:local; do
+            sudo docker image inspect "$img" >/dev/null 2>&1 || continue
+            ships=$(sudo docker run --rm --entrypoint sh "$img" -c \
+                      '[ -x /opt/openssl/bin/openssl ] && echo yes || echo no' 2>/dev/null || echo skip)
+            [ "$ships" = "yes" ] || { echo "  -- $img: no /opt/openssl, skipped"; continue; }
+            got=$(sudo docker run --rm --entrypoint sh "$img" -c 'command -v openssl' 2>/dev/null || echo none)
+            if [ "$got" != "/opt/openssl/bin/openssl" ]; then
+              echo "::error::$img ships /opt/openssl but bare openssl resolves to '$got'"
+              exit 1
+            fi
+            echo "  ok $img -> $got"
+            checked=$((checked + 1))
+          done
+          # A loop that inspected nothing would pass silently. At least the
+          # gateway and custodian must be covered.
+          [ "$checked" -ge 2 ] || { echo "::error::only $checked image(s) checked; expected >=2"; exit 1; }
+          echo "asserted bare-openssl resolution on $checked image(s)"
+
+      - name: Disk headroom after deploy
+        if: always()
+        run: |
+          echo "free disk after deploy: $(df --output=avail -BG / | tail -1 | tr -dc '0-9')G"
+          docker system df || true
+
+      # scripts/scan-image-secrets.sh is a hard gate: it extracts the built image
+      # rootfs and looks for key material baked into a layer. GitHub's own secret
+      # scanning reads the git tree, so a key a Dockerfile copies in but nobody
+      # commits is invisible to it and caught only here.
+      #
+      # Runs in this job rather than checks.yml because it needs BUILT images, and
+      # this is the only job that has them.
+      - name: Scan built images for leaked secrets
+        run: |
+          set -euo pipefail
+          # Only images WE build. `docker compose config --images` also lists
+          # third-party images we merely pull, and a finding in stock alpine would
+          # fail this gate for an artifact we neither produced nor can fix.
+          # Compose names built images <project>-<service>, the pqc-gw-* prefix,
+          # plus pqc-gateway which sets an explicit image:.
+          scanned=0
+          for img in $(sudo docker images --format '{{.Repository}}:{{.Tag}}' \
+                       | grep -E '^(pqc-gateway|pqc-gw-)' | sort -u); do
+            sudo docker image inspect "$img" >/dev/null 2>&1 || continue
+            echo "--- $img"
+            sudo ./scripts/scan-image-secrets.sh "$img"
+            scanned=$((scanned + 1))
+          done
+          # An empty loop must not pass silently: a selector that matches nothing
+          # would otherwise report a clean scan of zero images.
+          [ "$scanned" -ge 3 ] || { echo "::error::only $scanned image(s) scanned; expected >=3"; exit 1; }
+          echo "scanned $scanned image(s) for leaked secrets"
+
+      - name: Smoke test
+        run: ./scripts/test-stack-smoke.sh
+
+      - name: Negative controls (the checks that must FAIL closed)
+        run: |
+          set -euo pipefail
+          if [ -x bench/verify-suite.sh ]; then
+            sudo -E bench/verify-suite.sh
+          else
+            echo "bench/verify-suite.sh absent, skipping"
+          fi
+
+      # Logs are the only forensics a failed run leaves; capture before teardown.
+      - name: Capture diagnostics
+        if: failure()
+        run: |
+          set +e
+          {
+            echo "=== compose ps ==="
+            sudo docker compose ps -a
+            echo "=== unhealthy/exited containers ==="
+            sudo docker ps -a --filter status=exited --filter health=unhealthy
+            echo "=== logs (tail 80 per service) ==="
+            sudo docker compose logs --tail 80
+          } > /tmp/diagnostics.txt 2>&1
+          tail -200 /tmp/diagnostics.txt
+
+      - name: Upload diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: bring-up-diagnostics
+          path: /tmp/diagnostics.txt
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Tear down
+        if: always()
+        run: sudo docker compose down -v --remove-orphans || true
