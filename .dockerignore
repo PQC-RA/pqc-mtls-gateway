@@ -1,0 +1,61 @@
+# ── Default-deny (allowlist) build context ───────────────────────────────────
+# The build context is the repo ROOT (docker-compose `context: .`). Two images
+# build from here:
+#   management-api    docker/management-api/Dockerfile
+#   pqc-ca-custodian  docker/pqc-ca-custodian/Dockerfile
+#
+# RATIONALE, this is a PKI/CA product, so the context is treated default-DENY.
+# A blocklist-style .dockerignore is unsafe here: any new secret path (a stray
+# *.key, a new secrets/ file, .env, admin-cert/, certs/, pki/) is otherwise
+# uploaded into the build context and baked into the registry build cache by
+# default, until someone remembers to add it. Instead we ignore EVERYTHING (`*`),
+# re-include ONLY the paths the two root-context builds actually COPY, then
+# RE-EXCLUDE secret material even under those re-included roots. dockerignore
+# evaluates patterns in order and the LAST match wins, so the re-excludes are
+# placed AFTER the re-includes to guarantee they win.
+#
+# What the builds actually need (verified against both Dockerfiles' COPY lines):
+#   management-api    pqc-mtls-management-api/ source, package.json, pnpm-lock.yaml,
+#                     pnpm-workspace.yaml, tsconfig*, nest-cli.json, src/. It runs
+#                     `pnpm install` + `pnpm build` INSIDE the image, so the host's
+#                     node_modules/ and dist/ are NOT needed and MUST be excluded:
+#                     pnpm lays out node_modules with symlinks that buildkit cannot
+#                     COPY-merge over the image's freshly installed ones. Plus
+#                     docker/base/openssl-compiled.tar.gz.
+#   pqc-ca-custodian  docker/base/openssl-compiled.tar.gz and
+#                     docker/pqc-ca-custodian/custodian.js.
+# NOTE: docker/base/openssl-compiled.tar.gz is gitignored/untracked but IS a
+# required build input, so none of the re-excludes below may match it.
+
+# 1) Ignore everything by default.
+*
+
+# 2) Re-include ONLY the two roots the builds COPY from. Re-including a directory
+#    pulls in its whole subtree; step 3 carves the secrets back out.
+!docker
+!pqc-mtls-management-api
+
+# 3) RE-EXCLUDE secret / non-build material. Most of these are top-level and thus
+#    already denied by `*`; they are listed explicitly as defense-in-depth and
+#    documentation, so that no future `!`-re-include can accidentally leak them.
+secrets/
+admin-cert/
+certs/
+.env
+**/.env
+pki/out/
+pki/
+**/*.key
+**/*.pem
+
+# Host dev-machine artifacts living inside the re-included submodule. These are
+# rebuilt inside the image; the host copies must never overwrite them (see the
+# node_modules symlink note above).
+pqc-mtls-management-api/.git
+pqc-mtls-management-api/node_modules
+pqc-mtls-management-api/dist
+
+# Bulky, non-build junk that would only bloat the context and the build cache.
+*.pptx
+*.pdf
+**/.DS_Store

@@ -1,0 +1,44 @@
+==============================================================
+ Envoy post-quantum authentication probe – 2026-08-04T15:38:25Z
+ certificates: mk-matched-pki.sh (identical DNs, serials, extensions)
+ tags: v1.35-latest v1.37-latest v1.39-latest
+==============================================================
+
+### Envoy 1.35.13 (BoringSSL)
+  A present downstream   classical: STARTED
+                         ML-DSA-65: Failed to load certificate chain from /c/pq.crt
+  B present upstream     classical: STARTED
+                         ML-DSA-65: Failed to load certificate chain from /c/pq-client.crt
+  C validate (trust ML-DSA CA)
+                         classical CA: STARTED
+                         ML-DSA-65 CA: STARTED
+                         live handshake, classical client: HTTP 200
+                         live handshake, ML-DSA-65 client: HTTP 000
+
+### Envoy 1.37.5 (BoringSSL)
+  A present downstream   classical: STARTED
+                         ML-DSA-65: Failed to load certificate chain from /c/pq.crt
+  B present upstream     classical: STARTED
+                         ML-DSA-65: Failed to load certificate chain from /c/pq-client.crt
+  C validate (trust ML-DSA CA)
+                         classical CA: STARTED
+                         ML-DSA-65 CA: STARTED
+                         live handshake, classical client: HTTP 200
+                         live handshake, ML-DSA-65 client: HTTP 000
+
+### Envoy 1.39.0 (BoringSSL)
+  A present downstream   classical: STARTED
+                         ML-DSA-65: Failed to load certificate chain from /c/pq.crt
+  B present upstream     classical: STARTED
+                         ML-DSA-65: Failed to load certificate chain from /c/pq-client.crt
+  C validate (trust ML-DSA CA)
+                         classical CA: STARTED
+                         ML-DSA-65 CA: STARTED
+                         live handshake, classical client: HTTP 200
+                         live handshake, ML-DSA-65 client: HTTP 000
+
+Legend: STARTED = Envoy accepted the configuration. Anything else is the
+first failure it reported. A classical control that does not say STARTED
+invalidates its row: the cause is the harness, not the algorithm.
+
+evidence -> /root/pqc-mtls-gateway/bench/2026-08/results/envoy/envoy-probe.txt

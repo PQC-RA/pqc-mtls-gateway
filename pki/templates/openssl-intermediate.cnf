@@ -1,0 +1,163 @@
+# =============================================================
+# PQC Intermediate CA. Issues ML-DSA-65 leaves for M2M identities.
+# RFC 9881 (ML-DSA in X.509) + NIST FIPS 204 + RFC 5280
+# =============================================================
+#
+# DISTRIBUTION URLs ARE DEPLOYMENT-SPECIFIC AND MUST BE SET
+#   The crlDistributionPoints and authorityInfoAccess entries below are written
+#   into every certificate this CA issues, and tell a third-party verifier where
+#   to fetch the CRL and the issuing certificate. `pqc-gw.local` is a PLACEHOLDER
+#   and will not resolve on your network: replace the host with wherever this
+#   deployment publishes them before issuing certificates anyone else validates.
+#   The pki-dist service serves that tree on :8090 if you want to front it.
+#
+#   Internal revocation does not depend on these. The gateway staples via
+#   ssl_stapling_responder, and crl_worker.lua reads a local CRL file, so both
+#   keep working whether or not the URLs resolve. They matter to external
+#   verifiers, which is why they are kept rather than dropped: eIDAS §24(2)(g)
+#   and §24(2)(h) require a reachable OCSP responder and CRL distribution point.
+
+[ ca ]
+default_ca = CA_default
+
+[ CA_default ]
+dir               = /etc/pki/pqc-ca/intermediate
+certs             = $dir/certs
+crl_dir           = $dir/crl
+new_certs_dir     = $dir/issued
+database          = $dir/db/index.txt
+serial            = $dir/db/serial
+crlnumber         = $dir/db/crlnumber
+private_key       = $dir/private/intermediate-ca.key
+certificate       = $dir/certs/intermediate-ca.crt
+crl               = $dir/crl/intermediate-ca.crl
+crl_extensions    = crl_ext
+default_crl_days  = 7                 # eIDAS §24(2)(h): online CA, weekly CRL
+default_md        = default
+default_days      = 365               # M2M client cert: 1 year
+preserve          = no
+policy            = policy_loose
+copy_extensions   = copy              # Copy the SAN from the CSR
+unique_subject    = yes               # Reissue via revoke-then-reenroll; blocks duplicate active CNs (defence in depth)
+
+# GDPR-compliant: no personal data is required for M2M
+[ policy_loose ]
+countryName             = optional
+stateOrProvinceName     = optional
+localityName            = optional
+organizationName        = optional
+organizationalUnitName  = optional
+commonName              = supplied
+emailAddress            = optional
+
+[ req ]
+distinguished_name  = req_distinguished_name
+string_mask         = utf8only
+prompt              = no
+utf8                = yes
+
+[ req_distinguished_name ]
+C  = BG
+O  = PQC-GW
+OU = M2M Certificate Issuing CA
+CN = PQC-GW PQC Intermediate CA G1
+
+# ─────────────────────────────────
+# M2M CLIENT Certificate Profile (eIDAS + ETSI EN 319 411-2)
+# ────────
+[ v3_client ]
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always,issuer:always
+basicConstraints       = critical, CA:FALSE
+# RFC 9881 §3: an ML-DSA leaf carries digitalSignature ONLY
+keyUsage               = critical, digitalSignature
+# eIDAS Article 3(38), Electronic seal for M2M
+# clientAuth OID = 1.3.6.1.5.5.7.3.2
+extendedKeyUsage       = clientAuth
+
+# eIDAS §24(2)(c), Certificate Policy
+certificatePolicies    = @client_policy
+
+crlDistributionPoints  = URI:http://crl.pqc-gw.local/intermediate-ca.crl  # eIDAS §24(2)(h): CRL Distribution Points (required)
+
+# RFC 5280 §4.2.2.1, Authority Information Access
+# eIDAS §24(2)(g): OCSP responder (required for qualified certificates)
+authorityInfoAccess    = OCSP;URI:http://ocsp.pqc-gw.local,caIssuers;URI:http://crt.pqc-gw.local/intermediate-ca.crt
+
+# NIS2 Directive, audit logging identifier
+# subjectAltName = @client_san
+
+[ client_policy ]
+policyIdentifier       = 1.3.6.1.4.1.99999.1.2.1
+CPS                    = "https://example.invalid/x"
+userNotice.1           = @client_notice
+
+[ client_notice ]
+explicitText           = "Certificate for machine-to-machine authentication, issued under this client-leaf policy."
+
+# [ client_san ]
+# URI.1                 = urn:uuid:$ENV::CLIENT_UUID
+# otherName             = 1.3.6.1.4.1.99999.2.1;UTF8:$ENV::CLIENT_ID
+
+# ──────────────────
+# SERVER Certificate Profile (for the nginx gateway)
+# ──────
+[ v3_server ]
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always,issuer:always
+basicConstraints       = critical, CA:FALSE
+keyUsage               = critical, digitalSignature
+# serverAuth OID = 1.3.6.1.5.5.7.3.1
+extendedKeyUsage       = serverAuth
+certificatePolicies    = @server_policy
+subjectAltName         = @server_alt_names
+crlDistributionPoints  = URI:http://crl.pqc-gw.local/intermediate-ca.crl
+authorityInfoAccess    = OCSP;URI:http://ocsp.pqc-gw.local,caIssuers;URI:http://crt.pqc-gw.local/intermediate-ca.crt
+
+[ server_policy ]
+policyIdentifier       = 1.3.6.1.4.1.99999.1.2.2
+CPS                    = "https://example.invalid/x"
+
+[ server_alt_names ]
+# Names the gateway's server certificate is valid for. Add any additional
+# hostname this deployment is reached by before running setup-pki.sh.
+#
+# IP.2 is a PLACEHOLDER, rewritten by scripts/setup-pki.sh with the value of
+# SERVER_IP at deploy time (it defaults to the host's first address). Do not
+# delete the line: the substitution is a sed match, so removing it silently
+# produces a certificate with no IP SAN, and every client connecting by IP
+# literal then fails hostname verification.
+DNS.1 = pqc-gw.local
+DNS.2 = localhost
+IP.1  = 127.0.0.1
+IP.2  = 0.0.0.0
+
+# ─────────────────────────────────────────
+# OCSP Responder Certificate Profile
+# eIDAS §24(2)(g), mandatory real-time cert status
+# RFC 6960 §4.2.2.2, OCSP Authorized Responder
+# ETSI EN 319 411-1 §6.2.4, OCSP responder requirements
+# ─────────────────────────────────────────
+[ v3_ocsp_responder ]
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always,issuer:always
+basicConstraints       = critical, CA:FALSE
+keyUsage               = critical, digitalSignature
+# RFC 6960 §4.2.2.2, id-kp-OCSPSigning (1.3.6.1.5.5.7.3.9)
+extendedKeyUsage       = OCSPSigning
+# RFC 6960 §4.2.2.2.1, OCSP No Check extension
+# Prevents recursive OCSP checking of the responder cert itself
+noCheck                = ignored
+certificatePolicies    = @ocsp_policy
+
+[ ocsp_policy ]
+policyIdentifier       = 1.3.6.1.4.1.99999.1.2.1
+CPS                    = "https://example.invalid/x"
+
+# ──────────────────────────────────────────
+# CRL Extensions (eIDAS §24(2)(h) compliance)
+# 
+[ crl_ext ]
+authorityKeyIdentifier = keyid:always
+# eIDAS §24(2)(h), full-scope CRL (all revocation reasons)
+# Note: onlysomereasons removed, causes OpenSSL partial CRL rejection

@@ -1,0 +1,48 @@
+# Dependabot keeps the pinned @sha256 base-image digests current.
+#
+# Every upstream `FROM` is pinned to an immutable digest, for
+# reproducibility. The cost of pinning is
+# that we stop auto-receiving upstream base patches, this config buys them
+# back: when an upstream tag (ubuntu:24.04, node:22-bookworm-slim,
+# python:3.12-slim, nginx:alpine) is republished, Dependabot opens a PR
+# bumping the digest, so a base patch arrives as a reviewed, testable,
+# revertable change instead of a silent swap.
+#
+# The three compose image pins (redis/nginx/alpine in docker-compose*.yml) are
+# not covered by Dependabot's docker ecosystem (Dockerfile-focused); they are
+# low-churn and bumped manually or via a follow-up until we decide otherwise.
+version: 2
+updates:
+  - package-ecosystem: "docker"
+    directories:
+      - "/docker/base/openssl"
+      - "/docker/base/openresty"
+      - "/docker/gateway"
+      - "/docker/pki-dist"
+      - "/docker/pqc-ca-custodian"
+    schedule:
+      interval: "weekly"
+    # Held at 0 so the pinned digests stay fixed for anyone reproducing from
+    # this tree. Raise it if the repository becomes maintained rather than
+    # archived.
+    open-pull-requests-limit: 0
+    commit-message:
+      prefix: "build(deps)"
+    labels:
+      - "dependencies"
+      - "docker"
+    # DIGEST-REFRESH ONLY. We deliberately pin tested base versions (ubuntu
+    # 24.04, node 22, python 3.12); the value Dependabot adds is bumping the
+    # @sha256 when upstream RE-PUBLISHES that same tag. Version UPGRADES
+    # (ubuntu 24.04->26.04, node 22->26, python 3.12->3.14) are ABI-sensitive
+    # migrations, the PQ-OpenSSL tree is glibc-bound, and a base bump without a
+    # coordinated, tested recompile can break the COPY --from'd openssl at
+    # runtime, so they must be done by hand via docker/base/versions.env + the
+    # FROM pins, never a rubber-stamped bot PR. Ignoring the version-update
+    # types leaves digest updates (a separate category) flowing.
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
+          - "version-update:semver-patch"

@@ -1,0 +1,26 @@
+OCSP staple size decomposition – 2026-08-04
+Conditions: SNI sent, loopback MTU 1500, same handshake as the byte budget
+(deployed configuration, 33,496 B total).
+
+server flight, no staple                     11,071 B
+server flight, staple (responder leaf)       20,540 B
+  => staple adds                              9,469 B   9.5 kB   28.3% of the handshake
+
+OCSP response, responder leaf only            9,498 B
+  embedded signer certificate (DER)           5,882 B
+  => signed status alone                      3,616 B   3.6 kB
+
+OCSP response, full signer chain             15,514 B
+  difference vs leaf-only                     6,016 B   = the intermediate's DER size, exactly
+  => staple would add                        15,485 B  15.5 kB   +46% of the handshake
+
+Method: the leaf-only staple was read from the live gateway with
+`s_client -status`. The full-chain variant was measured from a SECOND responder
+started on port 19080 with `openssl ocsp -rother <intermediate>`, so the
+production responder was never reconfigured; it was stopped immediately after.
+Response size tracks staple size to within 29 B of TLS extension framing
+(9,498 vs 9,469), which is what licenses deriving the full-chain staple from the
+response.
+
+Cross-check after teardown: the live path still returns Cert Status: good with
+Signature Algorithm: ML-DSA-65.

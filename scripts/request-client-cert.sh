@@ -1,0 +1,157 @@
+#!/bin/bash
+
+set -euo pipefail
+
+OPENSSL_BIN=${OPENSSL_BIN:-/opt/openssl/bin/openssl}
+API_BASE=${API_BASE:-http://127.0.0.1:3000}
+# The management API mounts every route under a global "api" prefix. Requests
+# through the gateway do not show it because nginx rewrites /admin/ to
+# /api/admin/; this script talks to the API directly, so it spells it out.
+API_ROOT="${API_BASE}/api"
+TTL_SECONDS=${TTL_SECONDS:-3600}
+OUT_DIR=${OUT_DIR:-$PWD/client-cert-artifacts}
+COUNTRY=${COUNTRY:-BG}
+ORG=${ORG:-ACME Corp}
+OU=${OU:-M2M-Client}
+
+CN=${1:-}
+
+usage() {
+  cat <<'EOF'
+Usage:
+  ./scripts/request-client-cert.sh <common-name> [backend-url]
+
+Examples:
+  ./scripts/request-client-cert.sh service-new
+  ./scripts/request-client-cert.sh service-new http://127.0.0.1:8081
+
+Behavior:
+  1. Generates an ML-DSA-65 private key and CSR.
+  2. Requests an enrollment token from the management API.
+  3. Submits the CSR for signing.
+  4. Saves the signed certificate to disk.
+  5. Optionally creates/updates a gateway route if backend-url is provided.
+
+Environment overrides:
+  OPENSSL_BIN   Path to PQ OpenSSL binary (default: /opt/openssl/bin/openssl)
+  API_BASE      Management API base URL (default: http://127.0.0.1:3000)
+  TTL_SECONDS   Enrollment token TTL (default: 3600)
+  OUT_DIR       Output directory (default: ./client-cert-artifacts)
+  COUNTRY       CSR C= field (default: BG)
+  ORG           CSR O= field (default: ACME Corp)
+  OU            CSR OU= field (default: M2M-Client)
+EOF
+}
+
+if [[ -z "$CN" || "$CN" == "-h" || "$CN" == "--help" ]]; then
+  usage
+  exit 1
+fi
+
+# Validate CN before it reaches the certificate DN, the shell, or the JSON
+# tooling below. A restricted charset prevents DN injection (e.g. CN with '/')
+# and shell/argument injection. M2M service identifiers fit comfortably here.
+if [[ ! "$CN" =~ ^[A-Za-z0-9._-]{1,64}$ ]]; then
+  echo "ERROR: invalid CN '$CN', allowed: letters, digits, '.', '_', '-' (max 64 chars)." >&2
+  exit 1
+fi
+
+BACKEND_URL=${2:-}
+# Validate the optional backend URL, reject any character outside a safe URL
+# subset (blocks quotes, spaces, ';', '&', '$', backticks, ... injection chars).
+BACKEND_BADCHARS='[^A-Za-z0-9._~:/?#@%=-]'
+if [[ -n "$BACKEND_URL" && "$BACKEND_URL" =~ $BACKEND_BADCHARS ]]; then
+  echo "ERROR: backend URL '$BACKEND_URL' contains disallowed characters." >&2
+  exit 1
+fi
+
+SUBJECT="/C=${COUNTRY}/O=${ORG}/OU=${OU}/CN=${CN}"
+CLIENT_DIR="${OUT_DIR}/${CN}"
+KEY_PATH="${CLIENT_DIR}/${CN}.key"
+CSR_PATH="${CLIENT_DIR}/${CN}.csr"
+CRT_PATH="${CLIENT_DIR}/${CN}.crt"
+PAYLOAD_PATH="${CLIENT_DIR}/sign-payload.json"
+TOKEN_RESPONSE_PATH="${CLIENT_DIR}/token-response.json"
+SIGN_RESPONSE_PATH="${CLIENT_DIR}/sign-response.json"
+ROUTE_RESPONSE_PATH="${CLIENT_DIR}/route-response.json"
+
+mkdir -p "$CLIENT_DIR"
+
+echo "[1/6] Checking management API health..."
+curl -fsS "${API_ROOT}/admin/health" >/dev/null
+
+echo "[2/6] Generating ML-DSA-65 key and CSR for CN=${CN}..."
+"$OPENSSL_BIN" genpkey -algorithm ML-DSA-65 -out "$KEY_PATH"
+"$OPENSSL_BIN" req -new -key "$KEY_PATH" -out "$CSR_PATH" -subj "$SUBJECT"
+"$OPENSSL_BIN" req -verify -in "$CSR_PATH" -noout >/dev/null
+
+echo "[3/6] Requesting enrollment token..."
+curl -fsS -X POST \
+  "${API_ROOT}/admin/certs/enrollment-tokens?cn=${CN}&ttl=${TTL_SECONDS}" \
+  > "$TOKEN_RESPONSE_PATH"
+
+# Values are passed via the environment and read with os.environ so the shell
+# never expands untrusted content into the Python source (note the quoted 'PY').
+TOKEN=$(TOKEN_RESPONSE_PATH="$TOKEN_RESPONSE_PATH" python3 - <<'PY'
+import json, os
+print(json.load(open(os.environ["TOKEN_RESPONSE_PATH"]))["token"])
+PY
+)
+
+echo "[4/6] Building sign request payload..."
+CSR_PATH="$CSR_PATH" ENROLL_TOKEN="$TOKEN" PAYLOAD_PATH="$PAYLOAD_PATH" python3 - <<'PY'
+import json, os
+csr = open(os.environ["CSR_PATH"], "r").read()
+payload = {
+    "csr": csr,
+    "enrollmentToken": os.environ["ENROLL_TOKEN"],
+}
+json.dump(payload, open(os.environ["PAYLOAD_PATH"], "w"))
+PY
+
+echo "[5/6] Submitting CSR for signing..."
+curl -fsS -X POST \
+  -H "accept: application/json" \
+  -H "Content-Type: application/json" \
+  --data @"$PAYLOAD_PATH" \
+  "${API_ROOT}/admin/certs/sign" \
+  > "$SIGN_RESPONSE_PATH"
+
+SIGN_RESPONSE_PATH="$SIGN_RESPONSE_PATH" CRT_PATH="$CRT_PATH" python3 - <<'PY'
+import json, os
+resp = json.load(open(os.environ["SIGN_RESPONSE_PATH"]))
+open(os.environ["CRT_PATH"], "w").write(resp["certificate"])
+print(f"serial={resp['serialNumber']}")
+print(f"expiresAt={resp['expiresAt']}")
+PY
+
+if [[ -n "$BACKEND_URL" ]]; then
+  echo "[6/6] Updating gateway route for CN=${CN} -> ${BACKEND_URL}..."
+  ROUTE_ORG="$ORG" ROUTE_BACKEND="$BACKEND_URL" ROUTE_OUT="$CLIENT_DIR/route-payload.json" python3 - <<'PY'
+import json, os
+payload = {
+    "org": os.environ["ROUTE_ORG"],
+    "backend": os.environ["ROUTE_BACKEND"],
+    "rate_limit": {"rps": 200, "burst": 400},
+    "allowed_paths": ["/api/", "/data/", "/webhook/"],
+    "description": "Generated by request-client-cert.sh"
+}
+json.dump(payload, open(os.environ["ROUTE_OUT"], "w"))
+PY
+  curl -fsS -X PUT \
+    -H "Content-Type: application/json" \
+    --data @"$CLIENT_DIR/route-payload.json" \
+    "${API_ROOT}/admin/policy/routes/${CN}" \
+    > "$ROUTE_RESPONSE_PATH"
+else
+  echo "[6/6] Skipping gateway route update (no backend URL provided)."
+fi
+
+echo
+echo "Artifacts written to: ${CLIENT_DIR}"
+echo "Private key: ${KEY_PATH}"
+echo "CSR:         ${CSR_PATH}"
+echo "Certificate: ${CRT_PATH}"
+if [[ -n "$BACKEND_URL" ]]; then
+  echo "Route set to: ${BACKEND_URL}"
+fi

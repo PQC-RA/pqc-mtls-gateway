@@ -1,0 +1,10 @@
+{
+  "_comment": "Pinned PQ-OpenSSL and PQ-OpenResty base images. base-images.yml builds them, publishes them to GHCR by digest, and records the digests here and on an orphan deploy-locks branch that nothing watches, so writing it cannot re-trigger the pipeline that produced it. scripts/fetch-base-image.sh and scripts/build-all.sh prefer this in-tree copy, fall back to the branch, then to building from source. The digests below are what the published images resolve to; the OpenSSL version and its source checksum are what fix the measured behaviour.",
+  "image": "ghcr.io/pqc-ra/pqc-mtls-openssl-base",
+  "digest": "sha256:700d3dba69e22fb604b9254b0ac4d2093e828d466507fb5255a8589480775173",
+  "openssl_version": "3.6.2",
+  "openresty_image": "ghcr.io/pqc-ra/pqc-mtls-openresty-base",
+  "openresty_digest": "sha256:cc1e54b28000269ccb757cad0dcb94e175e47ef94af1bbb52a22c8705fbfec47",
+  "openresty_version": "1.27.1.2",
+  "created": "2026-08-18T14:08:55Z"
+}

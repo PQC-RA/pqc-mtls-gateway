@@ -1,0 +1,61 @@
+==============================================================
+ Clean re-measurement – 2026-08-04T11:54:41Z
+ host QS-GW-LXC5  repeats=3  N=220  windows=3x10s
+ lo MTU 1500 (was 65536)   initcwnd 10
+==============================================================
+
+### 1. Certificate sizes (DER bytes) – identical DNs, pinned serials
+| role | ML-DSA-65 | ECDSA P-256 | ratio |
+|---|---:|---:|---:|
+| root | 5637 | 513 | 10.99x |
+| int | 5675 | 550 | 10.32x |
+| server | 5708 | 583 | 9.79x |
+| client | 5659 | 534 | 10.60x |
+
+### 2a. Handshake bytes, leaf-only – s_client counters (handshake ONLY)
+| arm | read | written | total |
+|---|---:|---:|---:|
+| classical | 1247.000 +/- 1.000 | 1038.000 +/- 1.000 | 2285 |
+| hybrid | 10698.000 +/- 0.000 | 10579.000 +/- 0.000 | 21277 |
+| pure | 10666.000 +/- 0.000 | 10547.000 +/- 0.000 | 21213 |
+
+### 2b. Transmit policy – driven with curl + tcpdump
+s_client -cert ALWAYS sends only the leaf regardless of file contents, so the
+policy must be driven with curl (SSL_CTX_use_certificate_chain_file) and counted
+on the wire. These totals include the constant HTTP request/response, so compare
+the DELTA against leaf-only, not the absolute.
+| arm | policy | s->c | c->s | total | delta vs leaf |
+|---|---|---:|---:|---:|---:|
+| classical | leaf | 1768 | 1662 | 3429.667 +/- 0.577 | +0 |
+| classical | int | 1769 | 1661 | 3429.000 +/- 1.000 | +-1 |
+| classical | full | 1769 | 2179 | 3947.333 +/- 0.577 | +517 |
+| hybrid | leaf | 11219 | 16327 | 27546.000 +/- 0.000 | +0 |
+| hybrid | int | 11219 | 16327 | 27546.000 +/- 0.000 | +0 |
+| hybrid | full | 11219 | 21991 | 33210.000 +/- 0.000 | +5664 |
+| pure | leaf | 11187 | 16295 | 27482.000 +/- 0.000 | +0 |
+| pure | int | 11187 | 16295 | 27482.000 +/- 0.000 | +0 |
+| pure | full | 11187 | 21959 | 33146.000 +/- 0.000 | +5664 |
+
+### 3. Handshake latency – 3 independent runs of N=220 (first 20 discarded)
+| arm | run means (ms) | mean of means | spread |
+|---|---|---:|---:|
+| classical | 2.329 2.871 2.895  | 2.698 +/- 0.320 | |
+| hybrid | 4.598 4.621 4.576  | 4.598 +/- 0.023 | |
+| pure | 4.573 4.508 4.455  | 4.512 +/- 0.059 | |
+
+### 4. Throughput – 3 repeats x 3 windows of 10s
+| arm | conn/CPU-s | conn/wall-s | ms CPU/HS | ms wall/HS | windows |
+|---|---:|---:|---:|---:|---:|
+| classical | 1347.353 +/- 35.903 | 791.130 +/- 18.234 | 0.742 | 1.264 | 9 |
+| hybrid | 464.494 +/- 10.580 | 262.711 +/- 5.718 | 2.153 | 3.807 | 9 |
+| pure | 484.123 +/- 14.368 | 266.244 +/- 7.521 | 2.066 | 3.757 | 9 |
+
+### 5. WAN sweep – median handshake, 3 repeats per point
+| one-way | RTT | classical | hybrid | pure |
+|---:|---:|---:|---:|---:|
+| 0 ms | 0.0 ms | 2.274 +/- 0.037 | 4.480 +/- 0.184 | 4.663 +/- 0.195 |
+| 5 ms | 10.1 ms | 12.474 +/- 0.061 | 14.262 +/- 0.054 | 14.240 +/- 0.094 |
+| 25 ms | 50.1 ms | 52.941 +/- 0.051 | 54.802 +/- 0.090 | 54.781 +/- 0.177 |
+
+raw CSVs -> /root/remeasure/results/{wirebytes,latency,throughput,netem}.csv
+log      -> /root/remeasure/results/run.txt
