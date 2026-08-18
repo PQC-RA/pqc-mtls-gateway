@@ -43,7 +43,7 @@
 ARG OPENSSL_VERSION
 ARG OPENSSL_SHA256=aaf51a1fe064384f811daeaeb4ec4dce7340ec8bd893027eee676af31e83a04f
 
-FROM ubuntu:24.04@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90 AS build
+FROM ubuntu:24.04@sha256:561618e2c15bf2397621dd04f96926663a3b5616c189cf7e38db7e82f5c538ea AS build
 
 ARG OPENSSL_VERSION
 ARG OPENSSL_SHA256
@@ -114,7 +114,7 @@ RUN set -eux; \
     chmod -R 755 "/stage/opt/openssl-${OPENSSL_VERSION}"
 
 
-FROM ubuntu:24.04@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90
+FROM ubuntu:24.04@sha256:561618e2c15bf2397621dd04f96926663a3b5616c189cf7e38db7e82f5c538ea
 
 # NO `ARG OPENSSL_VERSION` here, deliberately: this stage never names a version.
 # It copies the whole of /stage/opt, which already carries both the versioned
