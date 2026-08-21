@@ -6,7 +6,7 @@ the shipped system, so its numbers had to be measured on the shipped system.
 
 | | |
 |---|---|
-| Host | LXC guest, i9-11950H, 8 GiB |
+| Host | `lxc5`, an LXC guest: i9-11950H, 8 GiB. The same guest as `../EXPECTED-RESULTS.md`, so the two campaigns are comparable |
 | Measured | 2026-08-04 |
 | Images | the pinned digests were rebuilt 2026-08-18 for publication. The
   OpenSSL version and its source checksum are unchanged, and those fix the

@@ -1,7 +1,14 @@
 # Expected results
 
-Reference values measured 2026-07-30 on a clean tree.
+Reference values measured 2026-07-30 on a clean tree, on the LXC guest `lxc5`.
 Testbed: i9-11950H, 8 cores, 8192 MiB, AVX-512, LXC guest, OpenSSL 3.6.2, curl 8.5.0.
+
+**`lxc5` is also the host for the `2026-08/` campaign**, so the two are comparable to each
+other. Timings are not comparable across machines; ratios are.
+
+Unless a row says otherwise it was measured on that guest on that date; the rows that were
+not, such as the second-host latency arm below, say so. Certificate configuration is carried
+per row, because a byte count without it is not reproducible.
 
 Use this to check a re-run rather than trusting it. **Expect timings within ~10% on this
 hardware, and only ratios to transfer to different hardware.**
