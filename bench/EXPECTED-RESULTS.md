@@ -76,6 +76,26 @@ changed.
 > Observed at both 624 and 626 on the same tree. The ML-DSA and RSA rows are fixed-length and
 > must match exactly.
 
+### Header-buffer and staple figures
+
+These three are quoted on the poster and were not recorded here before.
+
+| Figure | Value | What it is |
+|---|---:|---|
+| escaped client cert | **~9,050** | the `CN=gateway-admin` leaf as nginx `$ssl_client_escaped_cert` |
+| staple addition | **9,469** | 20,540 - 11,071, the bytes `ssl_stapling on` adds to the server flight |
+| nginx default buffer | **8,192** | `large_client_header_buffers 4 8k`, the stock nginx default the escaped cert overruns |
+
+> **The escaped size is content-dependent and does not reproduce to the byte.** It is the PEM
+> (8,362 B for a 6,134 B DER leaf) plus two bytes for every character percent-encoding escapes:
+> 130 newlines, 2 spaces, the `=` pad, and every `+` and `/` in the base64. That last count
+> depends on the key and serial bytes, so two certificates with identical DER length give escaped
+> sizes a few bytes apart. Measured 9,062 B on the deployment's current admin leaf against the
+> 9,050 B reported in the paper; both are correct for the certificate in front of them. This is
+> the same class of variance as the ECDSA row above. **The conclusion does not depend on it:**
+> either figure is roughly 870 B over the 8,192 B buffer.
+
+
 ### Handshake wire bytes, `wirebytes.sh`
 
 MTU forced to 1500. Live gateway, connected by hostname so **SNI is sent**:
