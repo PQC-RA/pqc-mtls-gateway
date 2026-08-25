@@ -1,9 +1,9 @@
 # Expected results
 
-Reference values measured 2026-07-30 on a clean tree, on the LXC guest `lxc5`.
+Reference values measured 2026-07-30 on a clean tree, on a single LXC guest.
 Testbed: i9-11950H, 8 cores, 8192 MiB, AVX-512, LXC guest, OpenSSL 3.6.2, curl 8.5.0.
 
-**`lxc5` is also the host for the `2026-08/` campaign**, so the two are comparable to each
+**The `2026-08/` campaign ran on that same guest**, so the two are comparable to each
 other. Timings are not comparable across machines; ratios are.
 
 Unless a row says otherwise it was measured on that guest on that date; the rows that were

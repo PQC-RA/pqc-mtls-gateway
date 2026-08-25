@@ -1,5 +1,5 @@
 #!/bin/bash
-# Remote client over a real VPN path -> the PQC gateway on .99.
+# Remote client over a real VPN path -> the deployed PQC gateway.
 # Client: this Mac, OpenSSL 3.6.2 via Homebrew curl 8.20.0, over utun4.
 # Metric: time_appconnect - time_connect, ms. Same metric as every other latency figure.
 # Arms are interleaved so a host-side perturbation cannot land on one arm.
@@ -18,7 +18,7 @@ H=${VPN_GW:?set VPN_GW to the gateway address over the tunnel}
 REPEATS=${REPEATS:-5}; N=${N:-120}
 
 # THIS MUST NOT RUN ON THE GATEWAY HOST. The entire point is a real routed path;
-# measuring .99 from .99 yields loopback numbers that would then be labelled
+# measuring the gateway host from itself yields loopback numbers that would then be labelled
 # "over VPN". That mislabelling is the same class of error as the s_server
 # -CAfile artifact, so fail closed rather than measure the wrong thing.
 _rtt=$(ping -c 3 -i 0.3 -W 2 "$H" 2>/dev/null | tail -1 | awk -F'/' '{print $5}')

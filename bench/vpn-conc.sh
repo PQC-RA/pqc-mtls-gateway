@@ -1,7 +1,7 @@
 #!/bin/bash
 # Concurrency from a genuinely off-host client (this Mac, over the VPN) against the
-# deployed gateway on .99:443. The earlier run drove load from .24, which shares a
-# hypervisor with .99, so its rising latency was client-side contention.
+# deployed gateway on :443. An earlier run drove load from another guest on the same
+# hypervisor as the gateway, so its rising latency was client-side contention.
 # Directory holding the client identity for the VPN probes:
 #   gateway-admin.crt/.key + ca-chain.crt, and classical/ and pqc/ subdirs
 #   each with client.crt/.key/ca-chain.crt. See env.sh.example.
