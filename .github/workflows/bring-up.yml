@@ -275,14 +275,15 @@ jobs:
       - name: End-to-end issuance (issue a cert, use it, revoke it)
         run: sudo -E ./scripts/test-issuance-e2e.sh
 
+      # The `if [ -x ]` guard this replaced meant a suite that went missing, or
+      # lost its executable bit, reported success. The suite is the negative
+      # control set; its absence is a failure, not a reason to skip.
       - name: Negative controls (the checks that must FAIL closed)
         run: |
           set -euo pipefail
-          if [ -x bench/verify-suite.sh ]; then
-            sudo -E bench/verify-suite.sh
-          else
-            echo "bench/verify-suite.sh absent, skipping"
-          fi
+          test -x bench/verify-suite.sh || {
+            echo "::error::bench/verify-suite.sh missing or not executable"; exit 1; }
+          sudo -E bench/verify-suite.sh
 
       # Logs are the only forensics a failed run leaves; capture before teardown.
       - name: Capture diagnostics
