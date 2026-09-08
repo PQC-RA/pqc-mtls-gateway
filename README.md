@@ -1,48 +1,126 @@
-# PQC TLS Gateway
+<div align="center">
 
-Post-quantum mutual-TLS API gateway: an OpenResty/nginx edge that terminates
-**TLS 1.3 with hybrid post-quantum key exchange (X25519MLKEM768)** and
-**ML-DSA-65 certificate authentication**, enforces mTLS + CRL revocation, and
-does per-client dynamic routing with a cryptographically-attested identity
-hand-off (RS256 JWT) to backends. Ships with a full PKI (ML-DSA root →
-intermediate), OCSP responders, a CRL renewer, and a NestJS
-management API.
+# PQC mTLS Gateway
 
-This repository is the **infrastructure** side (Docker, nginx/Lua config,
-PKI tooling). The management API lives in its own repository and is consumed as
-a published container image. A plain `git clone` of this repo is enough to
-deploy, with no `--recursive` and no submodule.
+**A production-shaped API gateway where the key exchange *and* both peers' authentication are post-quantum.**
 
-| Component | Repo | How it is consumed here |
-|-----------|------|-------------------------|
-| Infra (this repo) | https://github.com/PQC-RA/pqc-mtls-gateway | you are here |
-| Management API | https://github.com/PQC-RA/pqc-mtls-management-api | `ghcr.io/pqc-ra/pqc-mtls-management-api`, pinned by digest in `docker-compose.yml` |
+X25519MLKEM768 key agreement · ML-DSA-65 mutual authentication · native OpenSSL 3.6.2 · no OQS
 
-> ⚠️ **No secrets or private keys are committed.** The CA, server cert, JWT
-> signing key and control-plane HMAC are generated locally by the bootstrap
-> scripts.
+[![bring-up](https://github.com/PQC-RA/pqc-mtls-gateway/actions/workflows/bring-up.yml/badge.svg)](https://github.com/PQC-RA/pqc-mtls-gateway/actions/workflows/bring-up.yml)
+[![checks](https://github.com/PQC-RA/pqc-mtls-gateway/actions/workflows/checks.yml/badge.svg)](https://github.com/PQC-RA/pqc-mtls-gateway/actions/workflows/checks.yml)
+[![licence](https://img.shields.io/badge/licence-AGPL--3.0--only-A6391A)](LICENSE)
+[![OpenSSL](https://img.shields.io/badge/OpenSSL-3.6.2-37414E)](https://openssl-library.org/)
+[![FIPS 203/204](https://img.shields.io/badge/FIPS-203%20%C2%B7%20204-37414E)](https://csrc.nist.gov/pubs/fips/204/final)
 
-## Services
+*Artifact for the IEEE CSCN 2026 paper. Every figure below is reproducible from this repository.*
+
+</div>
+
+---
+
+ML-KEM and ML-DSA are finalised and native in OpenSSL 3.5 onward, so the components exist. What is
+poorly characterised is a **complete** deployment: post-quantum key exchange **and** post-quantum
+authentication on **both** peers, with those certificates traversing a production edge.
+
+This is one, measured. It terminates TLS 1.3 at an OpenResty edge linked against an unmodified,
+side-installed OpenSSL 3.6.2 — **no OQS provider, no patched library** — enforces mTLS with CRL
+revocation, and hands a short-lived attested identity to backends that do not need to be
+post-quantum capable at all.
+
+> [!NOTE]
+> **The cryptography is not the expensive part. Size is.** CPU cost is about 2.9× a classical
+> baseline; the handshake carries 9.3× the bytes. Everything that actually broke in this deployment
+> broke on size or on a silently unenforced policy — see [What breaks](#what-breaks).
+
+---
+
+## Results at a glance
+
+Measured **2026-08-04** on the reference testbed: one LXC guest, i9-11950H (8 cores), 8 GiB,
+Ubuntu 24.04, OpenSSL 3.6.2. Absolute timings scale with the host; **byte counts and enforcement
+behaviour do not**, and those are the figures to compare first.
+
+| | Value | Configuration it belongs to |
+|---|---:|---|
+| Median TLS handshake, full edge | **4.57 ms** | `time_appconnect − time_connect`, N=200, fresh process per connection |
+| Single-core CPU vs classical | **≈2.9×** | paired `s_server`/`s_time`, one core, resumption off |
+| Handshake bytes vs classical | **9.3×** | 21,277 vs 2,285 B, controlled arms, leaf-only both ways |
+| ML-DSA-65 client leaf | **6,134 B** | DER on the wire |
+| …URL-escaped into an HTTP header | **9,050 B** | past the 8,192 B default single-header buffer |
+| Server flight, no staple | **11,071 B** | fits TCP's initial window (IW10 = 14,480 B) |
+| Server flight, stapled | **20,540 B** | does not; costs **+51 ms ≈ 1 RTT** at 50.1 ms RTT |
+| Client chain as deployed | **22,481 B** | full chain *including the root* |
+| …leaf-only | **21,682 B** | RFC 8446 §4.4.2 permits omitting a trust anchor — a 35 % saving |
+
+The CPU ratio is run-dependent: seven measurements across three hosts span **2.1×–3.1×**, so read
+it as indicative. The mechanism behind it is not: swapping the hybrid group for standalone
+ML-KEM-768 moves the CPU-normalised rate by ≈4 %, so the cost is dominated by **ML-DSA-65
+authentication, not key exchange**.
+
+The staple penalty is deliberately stated as a duration and a round trip rather than a percentage —
+a ratio taken with a stopwatch that includes more shared network time reports a different number for
+the same system. Durations and round-trip counts survive a change of instrument.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart LR
+  C["mTLS client<br/>ML-DSA-65 certificate"]
+  GW["PQC Gateway<br/>OpenResty 1.27 · OpenSSL 3.6.2<br/>TLS termination · Lua policy"]
+  BE["Backend service<br/>need not be PQ-capable"]
+
+  subgraph CP["control plane"]
+    MA["management-api<br/>certs · policy · audit"]
+    RD[("redis<br/>policy + tokens")]
+  end
+
+  subgraph PK["PKI plane"]
+    CU["pqc-ca-custodian<br/>sole holder of the<br/>intermediate CA key"]
+    OC["ocsp-pq"]
+    CR["crl-renewer"]
+    PD["pki-dist"]
+  end
+
+  C -->|"X25519MLKEM768 · ML-DSA-65<br/>TLS 1.3 mutual auth"| GW
+  GW -->|"RS256 JWT<br/>CN · serial · fingerprint · 60 s"| BE
+  MA <-->|"HMAC control, no worker reload"| GW
+  MA --> RD
+  MA -->|"HMAC · sign · revoke"| CU
+  OC -.->|"OCSP staple"| GW
+  CR -.->|"CRL"| GW
+  PD -.->|"trust bundle"| GW
+
+  style GW fill:#37414E,stroke:#37414E,color:#ffffff
+```
+
+Eight services across four bridge networks. The management API holds **zero filesystem access to the
+CA tree**; every signing and revocation operation goes through the custodian sidecar over an
+HMAC-authenticated internal API. The gateway mounts the CA tree with the private-key subdirectories
+masked, so the internet-facing component never sees a CA private key either.
 
 | Service | Role |
 |---|---|
-| `gateway` | OpenResty edge, PQC TLS termination, mTLS, routing, JWT minting |
-| `management-api` | NestJS control plane, cert lifecycle, policy/routes, CRL, audit |
-| `pqc-ca-custodian` | Intermediate-CA signing sidecar, the **only** component with access to the intermediate private key; `management-api` reaches it over an HMAC-authenticated internal API (see [Security notes](#security-notes)) |
-| `redis` | Durable routing-policy + enrollment-token store for `management-api`. If absent, the API falls back to in-process memory (lost on restart) and refuses to start under `NODE_ENV=production` |
-| `ocsp-pq` | OCSP responder (ML-DSA-65 chain) |
+| `gateway` | OpenResty edge — PQC TLS termination, mTLS, CRL check, routing, JWT minting |
+| `management-api` | NestJS control plane — certificate lifecycle, routing policy, CRL, audit |
+| `pqc-ca-custodian` | Intermediate-CA signing sidecar, the **only** component with access to the intermediate private key |
+| `redis` | Durable routing-policy and enrollment-token store; refuses to start under `NODE_ENV=production` if absent |
+| `ocsp-pq` | OCSP responder over the ML-DSA-65 chain |
 | `crl-renewer` | Periodic CRL regeneration |
-| `pki-dist` | Serves CA certs / CRLs over HTTP |
-| `shadow-mock` | Test backend (returns `{"status":"pqc-shadow-success"}`), **dev only**, removed by `./scripts/teardown.sh --test-only` |
+| `pki-dist` | Serves CA certificates and CRLs over HTTP |
+| `shadow-mock` | Bundled test backend, **dev only** — removed by `./scripts/teardown.sh --test-only` |
 
-## Deployment
+The management API is a separate repository, consumed here as a digest-pinned image:
+[`PQC-RA/pqc-mtls-management-api`](https://github.com/PQC-RA/pqc-mtls-management-api). A plain
+`git clone` of this repo is enough to deploy — no submodules, no `--recursive`.
 
-### Prerequisites
+---
 
-- Linux host (Ubuntu 22.04 / 24.04 recommended)
-- Everything else (Docker, Docker Compose v2, build toolchain) is installed automatically by `deploy.sh` if missing
+## Quick start
 
-### One-command deploy
+**Prerequisites:** a Linux host (Ubuntu 22.04 / 24.04 recommended) and root. Docker, Compose v2 and
+the build toolchain are installed by the deploy script if missing.
 
 ```bash
 git clone https://github.com/PQC-RA/pqc-mtls-gateway.git
@@ -50,69 +128,115 @@ cd pqc-mtls-gateway
 sudo ./scripts/deploy.sh
 ```
 
-`deploy.sh` handles everything end-to-end (auto-installs any missing build packages):
+Then confirm the handshake is genuinely post-quantum on both sides:
 
-1. **Fetch the base images**, PQ OpenSSL 3.6.2 and OpenResty 1.27.1.2, pulled from the registry by the digests in `base.lock`. Falls back to compiling from source (~30 min) only when the pull is unavailable.
-2. **Install PQ OpenSSL** to `/opt/openssl-<ver>` on the host, aliased as `/opt/openssl`, the path everything else uses.
-3. **Bootstrap PKI**, ML-DSA-65 root CA → intermediate CA → gateway server cert + OCSP cert + CRLs. Server IP is auto-detected and embedded in the server cert SAN. Skipped if PKI already exists.
-4. **Issue bootstrap admin certificate**, saved to `./admin-cert/`. Writes its SHA-256 fingerprint into `ADMIN_CERT_FINGERPRINTS` in `.env` automatically (gitignored, per-deployment, see [Configuration & `.env`](#configuration-reference) below). No manual fingerprint step.
-5. **Generate gateway secrets**, RSA-2048 JWT signing key + control-plane HMAC.
-6. **Build Docker images** and start all services.
-7. Prints `scp` commands to copy the admin cert to a remote machine.
-
-Pass `--server-ip IP` to override the auto-detected IP (used in the server cert SAN):
 ```bash
-sudo ./scripts/deploy.sh --server-ip 10.0.0.5
+echo | OPENSSL_CONF=/etc/ssl/openssl.cnf /opt/openssl/bin/openssl s_client \
+  -connect 127.0.0.1:443 -CAfile /etc/pki/pqc-ca/ca-chain.crt \
+  -cert ./admin-cert/gateway-admin.crt -key ./admin-cert/gateway-admin.key -tls1_3 2>&1 \
+  | grep -E 'Negotiated|Peer signature'
+# Negotiated TLS1.3 group: X25519MLKEM768
+# Peer signature type: mldsa65
 ```
 
-Pass `--rebuild-artifacts` to ignore the published PQ-OpenSSL base image and build it from source:
-```bash
-sudo ./scripts/deploy.sh --rebuild-artifacts
+<details>
+<summary><b>What <code>deploy.sh</code> actually does</b></summary>
+
+1. **Fetches the base images** — PQ OpenSSL 3.6.2 and OpenResty 1.27.1.2, by the digests in
+   `base.lock`. Falls back to compiling from source (~30 min) only if the pull is unavailable.
+2. **Installs PQ OpenSSL** to `/opt/openssl-<ver>`, aliased `/opt/openssl` — the path everything
+   else resolves.
+3. **Bootstraps the PKI** — ML-DSA-65 root → intermediate → server cert, OCSP cert, CRLs. The
+   server IP is auto-detected into the certificate SAN. Skipped if a PKI already exists.
+4. **Issues a bootstrap admin certificate** to `./admin-cert/` and writes its SHA-256 fingerprint
+   into `ADMIN_CERT_FINGERPRINTS` in `.env`. No manual fingerprint step.
+5. **Generates gateway secrets** — RSA-2048 JWT signing keys and the control-plane HMAC.
+6. **Builds the images and starts the stack.**
+
+Useful flags: `--server-ip IP` overrides SAN auto-detection; `--rebuild-artifacts` ignores the
+published base image and builds PQ OpenSSL from source.
+
+</details>
+
+---
+
+## What breaks
+
+Three operational failure modes this deployment hit, all in the middleware rather than in the
+cryptography, and **all three invisible to a configuration test and a health check**. They are the
+subject of the paper; the harness in `bench/` reproduces the evidence for each.
+
+### 1 · Application — certificate size overruns default header buffers
+
+An ML-DSA-65 client certificate is 6,134 B. URL-escaped into a proxy header it becomes **9,050 B**,
+past the **8,192 B** default single-header buffer of nginx *and* of the nginx backend behind it.
+
+> **How it hides.** The TLS handshake succeeds. The failure surfaces only as a generic `HTTP 400`,
+> with no mention of size, before any application logic runs. 100 % of authenticated requests fail
+> while every component reports itself healthy.
+
+**Fix.** `large_client_header_buffers 4 32k` at *every* hop that parses the header, paired with a
+request-header timeout, since a larger buffer widens the slow-header DoS surface. The structural fix
+is to keep certificates out of headers entirely, which is what this deployment now does — the
+per-route `sendRawCert` option re-enables the old path for testing.
+
+This is not an nginx quirk. Apache's `LimitRequestFieldSize` defaults to 8190, and comparable limits
+across proxies, load balancers, WAFs and API gateways were all calibrated for 1–2 KB classical
+certificates.
+
+### 2 · Authentication — a post-quantum CA does not give post-quantum authentication
+
+Chain validation checks that a leaf is *signed by* a trusted CA. It never constrains the leaf's
+**own** subject key: in RFC 5280 path validation the subject key algorithm is an *output*, never an
+input to a check. So an RSA-2048 client certificate issued by the legitimate ML-DSA-65 intermediate
+chain-validates perfectly — and TLS 1.3 client authentication is algorithm-agile, so a server that
+does not restrict the accepted signature algorithms advertises classical options in its
+`CertificateRequest`.
+
+> **How it hides.** An *invalid* directive is caught loudly — the configuration test fails and the
+> worker refuses to start. An *omitted* one is not: it passes validation, starts, and runs
+> unrestricted.
+
+**Fix — two enforcement points, not one.** At the handshake:
+
+```nginx
+ssl_conf_command ClientSignatureAlgorithms ML-DSA-65;
 ```
+
+and a key-algorithm check at issuance. Either alone leaves a path open.
+`bench/check-negative-controls.sh` mints an RSA and an EC leaf out-of-band **with the real
+intermediate key** — the artifact issuance refuses to produce — routes it so that any refusal is
+attributable to TLS rather than to policy, and asserts that the handshake rejects it.
+
+### 3 · Transport — OCSP stapling costs a round trip, not only bytes
+
+Stapling works correctly for the ML-DSA-65 chain; the frequent claim that it does not is wrong. What
+it costs is a round trip. The staple adds **9,469 B**, dominated by the embedded signer certificate,
+taking the server's opening flight from 11,071 to **20,540 B** — past TCP's initial congestion window
+(IW10 = 10 × 1448 = **14,480 B**).
+
+> **How it hides.** Nothing fails. Every response is correct; the deployment simply pays one extra
+> round trip, **+51 ms** at a measured 50.1 ms RTT. Invisible on a LAN, and it never appears in any
+> log.
+
+A packet capture — [`bench/2026-08/results/staple-cwnd.pcap`](bench/2026-08/results/staple-cwnd.pcap)
+— shows the flight stall at exactly 14,480 B and resume one round trip later.
+
+**Fix.** The penalty belongs to the window, not to the algorithm. Raising `initcwnd` removes it, and
+so does not stapling. The trade is revocation freshness against one round trip.
+
+> **The rule all three share:** verify a security control by **observing the protocol**, not by
+> reading the configuration.
+
+---
 
 ## Issuing client certificates
 
-`issue-cert.sh` supports two modes. In both cases the operator generates their own ML-DSA-65 key pair locally, the private key never leaves the machine.
+In both modes the operator generates their own ML-DSA-65 key pair locally — **the private key never
+leaves the machine.**
 
-### Self-enrollment (operator, no admin credentials needed)
-
-An admin pre-issues a CN-constrained enrollment token and hands it to the operator out-of-band. The operator enrolls autonomously via the dedicated enrollment endpoint on **port 8443** (no mTLS client certificate required):
-
-```bash
-ENROLLMENT_TOKEN=enroll_xxx \
-PQC_GATEWAY=https://<server-ip> \
-PQC_CA_CHAIN=./ca-chain.crt \
-PQC_ENROLL_CA=./enroll-ca.crt \
-./issue-cert.sh <cn>
-```
-
-> `PQC_ENROLL_CA` is the CA that signed the **:8443 enrollment listener's**
-> server cert, a **classical ECDSA** cert, distinct from the ML-DSA chain in
-> `PQC_CA_CHAIN`. Copy it from the server at
-> `/etc/pki/pqc-ca/enroll-classical-ca.crt`. **On the server itself it is
-> auto-detected**, so `PQC_ENROLL_CA` is only needed when enrolling from a
-> remote machine.
-
-The token carries an `allowedCn` constraint set by the admin at creation time. The CSR subject CN must match exactly, a mismatched CN returns 403 without consuming the token.
-
-To issue the token (admin only):
-```bash
-curl -sk --cacert $CA_CHAIN --cert $ADMIN_CERT --key $ADMIN_KEY \
-  -H "X-PQC-CSRF: 1" \
-  -X POST "https://<server>/admin/certs/enrollment-tokens?cn=<cn>&ttl=86400"
-# → { "token": "enroll_...", "expiresAt": ..., "allowedCn": "<cn>" }
-```
-
-> The `X-PQC-CSRF` header is required on **every mutating admin call** (`POST`/`PUT`/`DELETE`).
-> It's the management-api CSRF guard's defense: a cross-site browser can't set it (its CORS
-> preflight is blocked), so a CLI that sets it explicitly is authorized without needing a
-> browser-console `Origin`. `issue-cert.sh` sends it for you; only hand-rolled `curl` needs it.
-
-### Admin-direct (token created automatically)
-
-If you have admin credentials, `issue-cert.sh` creates a short-lived token automatically and then enrolls via port 8443 in a single command.
-
-#### From the server:
+<details open>
+<summary><b>Admin-direct</b> — you hold admin credentials; the enrollment token is created for you</summary>
 
 ```bash
 PQC_GATEWAY=https://127.0.0.1 \
@@ -122,162 +246,158 @@ PQC_ADMIN_KEY=./admin-cert/gateway-admin.key \
 ./scripts/issue-cert.sh <cn> <backend-url>
 ```
 
-#### From a remote machine (macOS / Linux):
+Passing a backend URL also creates the routing policy in the same step.
 
-Copy the credentials printed by `deploy.sh`:
+**From a remote machine**, copy the credentials `deploy.sh` prints, plus the enrollment CA:
+
 ```bash
-scp root@<server>:<repo>/admin-cert/gateway-admin.crt ./admin.crt
-scp root@<server>:<repo>/admin-cert/gateway-admin.key ./admin.key
-chmod 600 admin.key
-scp root@<server>:/etc/pki/pqc-ca/ca-chain.crt ./ca-chain.crt
-# The :8443 enrollment listener presents a separate (classical) CA, copy it
-# too so the enrollment step can be verified from this machine:
+scp root@<server>:<repo>/admin-cert/gateway-admin.{crt,key} .
+scp root@<server>:/etc/pki/pqc-ca/ca-chain.crt .
 scp root@<server>:/etc/pki/pqc-ca/enroll-classical-ca.crt ./enroll-ca.crt
-scp root@<server>:<repo>/scripts/issue-cert.sh .
-```
+chmod 600 gateway-admin.key
 
-Then run (`PQC_ENROLL_CA` points at the enrollment CA you copied; unnecessary on the server, where it is auto-detected):
-```bash
 PQC_GATEWAY=https://<server-ip> PQC_ENROLL_CA=./enroll-ca.crt \
   ./issue-cert.sh <cn> <backend-url>
 ```
 
-**How `issue-cert.sh` finds a PQ-capable OpenSSL** (in order):
+`PQC_ENROLL_CA` is the CA behind the **:8443 enrollment listener's** server certificate — a
+classical ECDSA cert, distinct from the ML-DSA chain. It is auto-detected on the server itself and
+only needed remotely.
 
-1. **Native PQ OpenSSL**, if a binary with ML-DSA-65 support is on `PATH` (or at `/opt/openssl/bin/openssl`, or `PQC_OPENSSL=<path>`), it runs natively. On **macOS** this means Homebrew's OpenSSL 3.5+:
+</details>
+
+<details>
+<summary><b>Self-enrollment</b> — the operator has no admin credentials</summary>
+
+An admin pre-issues a CN-constrained token out-of-band:
+
+```bash
+curl -sk --cacert $CA_CHAIN --cert $ADMIN_CERT --key $ADMIN_KEY -H "X-PQC-CSRF: 1" \
+  -X POST "https://<server>/admin/certs/enrollment-tokens?cn=<cn>&ttl=86400"
+# → { "token": "enroll_...", "expiresAt": ..., "allowedCn": "<cn>" }
+```
+
+The operator then enrolls autonomously against port 8443, with no mTLS client certificate:
+
+```bash
+ENROLLMENT_TOKEN=enroll_xxx PQC_GATEWAY=https://<server-ip> \
+PQC_CA_CHAIN=./ca-chain.crt PQC_ENROLL_CA=./enroll-ca.crt \
+./issue-cert.sh <cn>
+```
+
+Tokens are single-use, TTL-bounded and atomically consumed. The CSR subject CN must match
+`allowedCn` exactly; a mismatch returns 403 **without** consuming the token.
+
+</details>
+
+<details>
+<summary><b>How the script finds a PQ-capable OpenSSL</b> (including macOS)</summary>
+
+1. **Native**, if a binary with ML-DSA-65 support is on `PATH`, at `/opt/openssl/bin/openssl`, or at
+   `PQC_OPENSSL=<path>`. On macOS that is Homebrew's OpenSSL 3.5+:
    ```bash
-   brew install openssl@3            # provides /opt/homebrew/bin/openssl (ML-DSA-65 capable)
-   PQC_GATEWAY=https://<server-ip> PQC_OPENSSL=/opt/homebrew/bin/openssl \
-     ./issue-cert.sh <cn> <backend-url>
+   brew install openssl@3
+   PQC_OPENSSL=/opt/homebrew/bin/openssl ./issue-cert.sh <cn> <backend-url>
    ```
-   The script uses `openssl s_client` directly for the admin/enrollment calls, because the system `curl` (macOS LibreSSL, or older Linux) cannot negotiate X25519MLKEM768 or load ML-DSA-65 client certs.
-2. **Docker fallback**, only if no PQ OpenSSL is found. The script re-execs inside the published PQ-OpenSSL base image, pinned by digest. It is multi-arch, so Apple Silicon runs it natively (no `--platform` pin, no Rosetta 2). The package is public; no registry login is needed.
+   The script drives `openssl s_client` directly rather than `curl`, because system curl — macOS
+   LibreSSL, or older Linux — can neither negotiate X25519MLKEM768 nor load an ML-DSA-65 client
+   certificate.
+2. **Docker fallback**, only if no PQ OpenSSL is found: it re-execs inside the digest-pinned
+   PQ-OpenSSL base image. Multi-arch, so Apple Silicon runs it natively — no Rosetta, no registry
+   login.
+
+</details>
+
+> [!IMPORTANT]
+> `X-PQC-CSRF: 1` is required on **every mutating admin call**. A cross-site browser cannot set it,
+> because its CORS preflight is blocked, so a CLI that sets it explicitly is authorised without
+> needing a browser-console `Origin`. `issue-cert.sh` sends it for you; only hand-rolled `curl`
+> needs it.
+
+---
 
 ## Routing policies
 
-A client certificate alone does not get traffic to a backend, the gateway routes
-each request by the client's CN, so every CN needs a **routing policy** (CN →
-backend + rate limit + allowed paths). Without a policy for the presented CN, the
-gateway has nowhere to send the request and returns `404`/`502`.
-
-The simplest way to create one is the **backend-URL argument to `issue-cert.sh`**,
-it issues the cert and PUTs the policy in one step:
+A client certificate alone does not move traffic. The gateway routes each request by the client's
+CN, so **every CN needs a policy** — backend, rate limit, allowed paths. Without one the gateway has
+nowhere to send the request.
 
 ```bash
-# CN 'demo-service' → the bundled shadow-mock test backend (works out of the box)
+# Issue and route in one step, against the bundled test backend
 ./scripts/issue-cert.sh demo-service http://shadow-mock:80
 ```
 
-> The backend must **resolve on a gateway network**. `shadow-mock` is the bundled
-> test service; `http://my-backend:8080` in the examples above is a **placeholder**,
-> replace it with a real `host:port` or you'll get a `502` (the backend won't resolve).
-
-Or manage policies directly via the admin API (mTLS on port 443):
+Or manage policies directly over mTLS:
 
 ```bash
-CURL_ADMIN="curl -sk --cacert ca-chain.crt --cert admin.crt --key admin.key -H X-PQC-CSRF:1"   # PQ-capable curl; header satisfies the CSRF guard
+ADMIN="curl -sk --cacert ca-chain.crt --cert admin.crt --key admin.key -H X-PQC-CSRF:1"
 
-# Create / update
-$CURL_ADMIN -X PUT https://<server>/admin/policy/routes/demo-service \
+$ADMIN -X PUT https://<server>/admin/policy/routes/demo-service \
   -H 'Content-Type: application/json' \
-  -d '{"org":"ACME","backend":"http://shadow-mock:80","rate_limit":{"rps":100,"burst":200},"allowed_paths":["/api/","/status/"]}'
+  -d '{"backend":"http://shadow-mock:80","rate_limit":{"rps":100,"burst":200},"allowed_paths":["/api/","/status/"]}'
 
-# Inspect / remove
-$CURL_ADMIN https://<server>/admin/policy/routes/demo-service
-$CURL_ADMIN -X DELETE https://<server>/admin/policy/routes/demo-service
+$ADMIN https://<server>/admin/policy/routes/demo-service          # inspect
+$ADMIN -X DELETE https://<server>/admin/policy/routes/demo-service # remove
 ```
 
-Policies are persisted (gateway volume + management-api store) and survive restarts.
+Policies are persisted and survive restarts. Updates reach the data plane **without a worker
+reload**, over the HMAC-authenticated control channel.
 
-## Verifying the deployment
+> The backend must resolve on a gateway network. `shadow-mock` is the bundled test service;
+> `http://my-backend:8080` in any example is a placeholder — replace it or you will get a `502`.
 
-```bash
-# PQC handshake, expect "Negotiated TLS1.3 group: X25519MLKEM768" + "mldsa65"
-OSSL=/opt/openssl/bin/openssl
-CA=/etc/pki/pqc-ca/ca-chain.crt
-CERT=./admin-cert/gateway-admin.crt
-KEY=./admin-cert/gateway-admin.key
-
-echo | OPENSSL_CONF=/etc/ssl/openssl.cnf $OSSL s_client \
-  -connect 127.0.0.1:443 -CAfile $CA -cert $CERT -key $KEY -tls1_3 2>&1 \
-  | grep -E 'Negotiated|Peer signature'
-
-# Admin API health
-curl -sk --cacert $CA --cert $CERT --key $KEY https://127.0.0.1/admin/health
-
-# Full end-to-end: issue cert → route to shadow-mock → request through gateway
-PQC_GATEWAY=https://127.0.0.1 PQC_CA_CHAIN=$CA PQC_ADMIN_CERT=$CERT PQC_ADMIN_KEY=$KEY \
-  ./scripts/issue-cert.sh test-service http://shadow-mock:80
-
-curl -s --cacert $CA \
-  --cert ./certs/test-service/test-service.crt \
-  --key  ./certs/test-service/test-service.key \
-  https://127.0.0.1/api/v1/status
-# → {"status":"pqc-shadow-success","pqc":"ML-DSA-65"}
-
-# Smoke tests
-./scripts/test-stack-smoke.sh
-```
+---
 
 ## Reproducing the paper's figures
 
-`bench/` carries the measurement harness, the raw per-sample data, and the commands that recompute
-each published figure. `bench/EXPECTED-RESULTS.md` records what every script returned on the
-reference testbed, so a re-run can be **checked rather than trusted**.
-
-The reference testbed is an 8-core i9-11950H LXC guest with 8 GiB, Ubuntu 24.04, OpenSSL 3.6.2.
-Absolute latency and throughput scale with the host; certificate sizes, wire bytes and the
-enforcement behaviour do not, and those are the figures to compare first.
+`bench/` carries the harness, the raw per-sample data, the packet capture, and the commands that
+recompute each published figure. [`bench/EXPECTED-RESULTS.md`](bench/EXPECTED-RESULTS.md) records
+what every script returned on the reference testbed, so a re-run can be **checked rather than
+trusted** — and it names the rig each figure belongs to, because a figure from one rig is not
+comparable with a figure from another.
 
 ```bash
-# 1. Issue the identity the live-gateway arms use. Run every step from the
-#    repository root; the harness runs in place, in ./bench.
-
-#    The CA holds one active certificate per CN, so a second issuance for
-#    bench-client is refused with 409 cn_already_active. Re-running is
-#    therefore a no-op; to force a fresh one revoke it first, as
-#    scripts/test-issuance-e2e.sh does via POST /admin/certs/revoke.
+# 1. Issue the identity the live-gateway arms use, from the repository root.
 if [ ! -f certs/bench-client/bench-client.crt ]; then
-    PQC_GATEWAY=https://127.0.0.1 PQC_CA_CHAIN=/etc/pki/pqc-ca/ca-chain.crt \
-    PQC_ADMIN_CERT=./admin-cert/gateway-admin.crt \
-    PQC_ADMIN_KEY=./admin-cert/gateway-admin.key \
-    ./scripts/issue-cert.sh bench-client http://pqc-shadow-mock:80
+  PQC_GATEWAY=https://127.0.0.1 PQC_CA_CHAIN=/etc/pki/pqc-ca/ca-chain.crt \
+  PQC_ADMIN_CERT=./admin-cert/gateway-admin.crt \
+  PQC_ADMIN_KEY=./admin-cert/gateway-admin.key \
+  ./scripts/issue-cert.sh bench-client http://pqc-shadow-mock:80
 fi
 
-#    The live-gateway arms read the identity from $EXPORT, which defaults to
-#    /root/measure-export. Set it to anywhere writable.
-export EXPORT=$PWD/bench-identity
-mkdir -p "$EXPORT"
+export EXPORT=$PWD/bench-identity && mkdir -p "$EXPORT"
 cp certs/bench-client/bench-client.crt "$EXPORT/client.crt"
 cp certs/bench-client/bench-client.key "$EXPORT/client.key"
 cp /etc/pki/pqc-ca/ca-chain.crt        "$EXPORT/ca-chain.crt"
 
 # 2. Run the whole harness.
-cd bench
-./run-all.sh
+cd bench && ./run-all.sh
 ```
 
-That is the entire reproduction. `run-all.sh` checks the testbed, records it to
-`PROVENANCE.md`, builds the hermetic comparison arms, runs the verification suite and the
-negative controls, then measures wire bytes, throughput, the live gateway and the three
-hermetic latency arms, and summarises with `stats.py`. It stops at the first failure rather
-than carrying on with a broken arm, and refuses to proceed past a failed `preflight.sh`.
+`run-all.sh` checks the testbed and records it to `PROVENANCE.md`, builds the hermetic comparison
+arms, runs the verification suite and the negative controls, measures wire bytes, throughput, the
+live gateway and the three hermetic latency arms, then summarises with `stats.py`. It stops at the
+first failure rather than carrying on with a broken arm, and refuses to proceed past a failed
+`preflight.sh`.
 
-Compare what it prints against [`bench/EXPECTED-RESULTS.md`](bench/EXPECTED-RESULTS.md), and
-read the rig table at the top of that file first: a figure from one rig is not comparable
-with a figure from another.
+> [!TIP]
+> `preflight.sh` installs missing measurement tools and refuses to run on a testbed that would
+> produce invalid numbers — a stopped container, a missing route, swap activity, or a load average
+> above 1.0. **Read its output rather than skipping past it.** Several retracted figures in this
+> project's history came from tools that did not crash.
 
-It deliberately leaves out what needs root `netem`, a second machine, or a VPN —
-`netem-sweep.sh`, `rtt-proof.sh`, `rtt-cwnd2.sh`, `concurrency-from-client.sh` — and the
-matched-PKI chain, which is a separate rig. [`bench/README.md`](bench/README.md) documents
-every script, and `run-all.sh`'s own header lists what it skips and why.
+It deliberately omits what needs root `netem`, a second machine, or a VPN — `netem-sweep.sh`,
+`rtt-proof.sh`, `rtt-cwnd2.sh`, `concurrency-from-client.sh` — and the matched-PKI chain, which is a
+separate rig. [`bench/README.md`](bench/README.md) documents every script, and `run-all.sh`'s header
+lists what it skips and why.
 
-### Running the steps individually
+<details>
+<summary><b>Running the steps individually</b></summary>
 
 ```bash
 cd bench
 ./preflight.sh                     # must end "PREFLIGHT OK". If it does not, stop.
-./gen-provenance.sh                # CPU/RAM/OpenSSL/HEAD -> PROVENANCE.md
+./gen-provenance.sh                # CPU/RAM/OpenSSL/HEAD → PROVENANCE.md
 
 # The hermetic arms. throughput3.sh and wirebytes.sh measure THESE, not the live
 # gateway, so skipping this makes both report FAILED / ERR for every row.
@@ -288,7 +408,7 @@ cd bench
 ./throughput3.sh 10 3              # three arms, CPU-normalised
 ./wirebytes.sh                     # handshake byte budget
 
-# Latency, all four arms. Needs a PQC-capable curl, which the deploy provides;
+# Latency, all four arms. Needs a PQC-capable curl — the deploy provides one;
 # confirm with `curl -V` (expect OpenSSL/3.6).
 ./measure-latency.sh gw-pqc-sni https://pqc-gw.local/api/v1/status \
     "$EXPORT" X25519MLKEM768 220 pqc-gw.local:443:127.0.0.1
@@ -298,80 +418,152 @@ cd bench
 ./stats.py *.dat
 ```
 
-`preflight.sh` installs any missing measurement tools and refuses to proceed on a testbed that
-would produce invalid numbers: a stopped container, a missing route, swap in use, or a load average
-above 1.0. **Read its output rather than skipping past it.**
+</details>
 
-## Admin authorization
+### Continuous integration
 
-Admin API access is authorized by **client-certificate SHA-256 fingerprint**, not by cert subject fields. `deploy.sh` issues a bootstrap admin cert and writes its fingerprint into `ADMIN_CERT_FINGERPRINTS` in `.env` automatically.
+`bring-up.yml` deploys the entire stack from scratch on a clean runner — on every pull request, every
+push to `main`, after a base-image publish, and weekly on a schedule — then asserts that every image
+shipping `/opt/openssl` resolves bare `openssl` to it, scans the built images for leaked secrets,
+runs the smoke test, and drives an **end-to-end issuance test**: issue a certificate, route it, make
+an mTLS request, assert the backend response, revoke. `checks.yml` runs hadolint, shellcheck,
+actionlint and an OpenSSL version-consistency gate.
 
-To add more admins: issue a cert, get its fingerprint, append it (comma-separated) to `ADMIN_CERT_FINGERPRINTS` in `.env`, then `docker compose up -d management-api`.
+---
+
+## Security model
+
+| | |
+|---|---|
+| **Key exchange** | X25519MLKEM768 (hybrid classical + ML-KEM-768, FIPS 203) |
+| **Authentication** | ML-DSA-65 (FIPS 204) on **both** peers, throughout a three-tier PKI |
+| **Revocation** | CRL checked in the data plane; OCSP responder over the ML-DSA-65 chain |
+| **Admin authorisation** | client-certificate **SHA-256 fingerprint allowlist** — not subject fields, not OU |
+| **Control channel** | HMAC-authenticated with a replay window, constant-time comparison |
+| **Backend identity** | short-lived RS256 JWT carrying CN, serial and the certificate's SHA-256 fingerprint |
+
+- Private keys — CA, server, JWT signing — the HMAC secret, client artifacts and build binaries are
+  **gitignored and never committed**. Each deployment generates its own CA and secrets; do not share
+  key material between environments.
+- `management-api` runs as a non-root service account with **no mount of the CA tree at all**.
+  Signing, revocation and reads of the CA index go through the `pqc-ca-custodian` sidecar over an
+  HMAC-authenticated internal API. The gateway mounts the CA tree with the private-key
+  subdirectories masked, so the internet-facing component never sees a CA private key.
+- **Four classical elements remain, and naming them is part of the result:** the ECDSA P-256 server
+  certificate on the `:8443` enrollment bootstrap channel and its self-signed CA, the classical
+  fallback group offered there, and the RS256/RSA-2048 JWT used for backend identity hand-off. The
+  JWT is a deliberate trade — an ML-DSA-65 signature on a token that rides every proxied request
+  would recreate the header-size problem this project exists to document.
+
+<details>
+<summary><b>Admin authorisation, in practice</b></summary>
+
+`deploy.sh` issues a bootstrap admin certificate and writes its fingerprint into
+`ADMIN_CERT_FINGERPRINTS` in `.env`. To add another admin, issue a certificate, take its
+fingerprint, append it comma-separated, and restart the control plane:
 
 ```bash
 /opt/openssl/bin/openssl x509 -in admin.crt -noout -fingerprint -sha256 \
   | sed 's/.*=//; s/://g' | tr 'A-F' 'a-f'
+
+docker compose up -d management-api
 ```
 
-## Configuration reference
+The allowlist **fails closed** if empty. `scripts/verify-admin-sha256.sh` checks the whole path from
+a real certificate.
 
-Deploy-specific values are kept in a **`.env`** file at the repo root, which Docker
-Compose reads automatically and substitutes into `docker-compose.yml`
-(`${VAR}` references). `.env` holds real per-deployment values and is **gitignored,
-never commit it**. The committed, value-less template is **`.env.example`**; copy it
-to `.env` (deploy.sh does this for you) and fill in the per-environment values.
+</details>
 
-| Where | Key | Purpose |
-|---|---|---|
-| `.env` | `ADMIN_CERT_FINGERPRINTS` | Admin authz allowlist (SHA-256 fingerprints, comma-separated). Auto-written by `deploy.sh` from the bootstrap admin cert; fails closed if empty. |
-| `.env` | `CORS_ALLOWED_ORIGINS` | Comma-separated web origins allowed to call the management API (CORS). Per-environment; set manually. Empty = no cross-origin access. |
-| compose (`management-api`) | `JWT_EXPECTED_ISSUER` / `JWT_EXPECTED_AUDIENCE` | JWT validation pinning |
-| compose (`management-api`) | `OPENSSL_CONF` | Points PQ OpenSSL to system config (avoids missing-file errors) |
-| secrets/ | `gateway-signing.key` | RSA-2048 JWT signing key (generated, gitignored) |
-| secrets/ | `control-plane-hmac.key` | `/update-routes` HMAC secret (generated, gitignored) |
+---
 
-## Scripts
+## Repository layout
+
+```
+config/nginx/         gateway configuration and the Lua data plane
+  lua/policy_router.lua    CN → backend resolution, JWT minting, header allowlist
+  lua/crl_worker.lua       CRL polling and the revocation fast path
+docker/               image definitions, including the PQ OpenSSL base
+scripts/              deploy, PKI bootstrap, certificate issuance, tests
+bench/                measurement harness, raw samples, packet capture
+  EXPECTED-RESULTS.md      what every script returned on the reference testbed
+  2026-08/                 the camera-ready campaign
+pki/                  OpenSSL CA configuration templates
+```
+
+<details>
+<summary><b>Script reference</b></summary>
 
 | Script | Purpose |
 |---|---|
-| `scripts/deploy.sh` | **One-shot deployment**, full stack from bare Linux host |
-| `scripts/teardown.sh` | Tear down, `--test-only` (remove shadow-mock + test certs) or `--all` (full: services, volumes, host PKI/OpenSSL) |
-| `scripts/issue-cert.sh` | Issue ML-DSA-65 client cert, self-enrollment (ENROLLMENT_TOKEN) or admin-direct; runs on native PQ OpenSSL (incl. macOS Homebrew), Docker fallback if absent |
-| `scripts/setup-pki.sh` | Bootstrap the ML-DSA PKI (called by deploy.sh) |
-| `scripts/generate-gateway-secrets.sh` | JWT signing key + control-plane HMAC (called by deploy.sh) |
-| `scripts/pqc-crl-renew.sh` | Regenerate CRLs (mounted into containers) |
-| `scripts/init-volumes.sh` | Seed Docker named volumes |
-| `scripts/build-all.sh` | Build base image + all compose services |
-| `scripts/request-client-cert.sh` | Enroll a client cert via local management API (server-side) |
-| `scripts/test-preflight.sh` | Checks the host has what `deploy.sh` needs before it starts |
-| `scripts/verify-admin-sha256.sh` | Checks the admin fingerprint allowlist end to end, from a real certificate |
-| `scripts/test-stack-smoke.sh` | Smoke test: all containers running and healthy |
-| `scripts/test-issuance-e2e.sh` | End-to-end issuance regression test against a live gateway (issue → route → mTLS request → 200; then revoke). Run post-deploy. |
+| `scripts/deploy.sh` | One-shot deployment of the full stack from a bare Linux host |
+| `scripts/teardown.sh` | `--test-only` removes shadow-mock and test certs; `--all` removes services, volumes, host PKI and OpenSSL |
+| `scripts/issue-cert.sh` | Issue an ML-DSA-65 client certificate — self-enrollment or admin-direct, native PQ OpenSSL or Docker fallback |
+| `scripts/setup-pki.sh` | Bootstrap the ML-DSA PKI, and assert the deployed CAs carry ML-DSA keys |
+| `scripts/generate-gateway-secrets.sh` | JWT signing keys and the control-plane HMAC |
+| `scripts/pqc-crl-renew.sh` | Regenerate CRLs |
+| `scripts/verify-admin-sha256.sh` | Verify the admin fingerprint allowlist end to end |
+| `scripts/test-stack-smoke.sh` | All containers running and healthy |
+| `scripts/test-issuance-e2e.sh` | Issue → route → mTLS request → 200 → revoke, against a live gateway |
+| `bench/run-all.sh` | The whole measurement campaign |
+| `bench/check-negative-controls.sh` | The checks that must fail closed, including the classical-leaf handshake bypass |
 
-## Security notes
+</details>
 
-- Private keys (CA, server, JWT signing), the HMAC secret, client artifacts and build binaries are **gitignored**, never committed.
-- Each deployment generates its **own** CA and secrets; do not share key material between environments.
-- The control plane (`/update-routes`, port 8081) is HMAC-authenticated and restricted to internal networks.
-- All keys and signatures on the data/admin plane use ML-DSA-65 (NIST PQC standard). TLS key exchange uses X25519MLKEM768 (hybrid classical + ML-KEM-768). Four classical elements remain and are deliberate: the ECDSA P-256 server certificate on the :8443 enrollment bootstrap channel and its self-signed enrollment CA, the classical fallback group offered there, and the internal RS256/RSA-2048 JWT used for backend identity hand-off.
-- `management-api` runs as a dedicated non-root service account (`user: 1001:1001`) with **zero filesystem access to the CA tree**, no mount at all. Signing, revocation, and reads of the CA index/issued certs/CRL all go through the `pqc-ca-custodian` sidecar, the only component with any access to the intermediate private key, over an HMAC-authenticated internal API. The gateway edge also mounts the CA tree with the private-key-bearing subdirs masked, so it never sees a CA private key either.
+<details>
+<summary><b>Configuration reference</b></summary>
+
+Deploy-specific values live in a **`.env`** at the repository root, which Compose substitutes into
+`docker-compose.yml`. It holds real per-deployment values and is **gitignored — never commit it**.
+The value-less template is `.env.example`; `deploy.sh` copies it for you.
+
+| Where | Key | Purpose |
+|---|---|---|
+| `.env` | `ADMIN_CERT_FINGERPRINTS` | Admin authorisation allowlist. Auto-written by `deploy.sh`; fails closed if empty |
+| `.env` | `CORS_ALLOWED_ORIGINS` | Web origins allowed to call the management API. Empty means no cross-origin access |
+| compose | `JWT_EXPECTED_ISSUER` / `JWT_EXPECTED_AUDIENCE` | JWT validation pinning |
+| `secrets/` | `gateway-signing.key` | RSA-2048 JWT signing key (generated, gitignored) |
+| `secrets/` | `control-plane-hmac.key` | Control-channel HMAC secret (generated, gitignored) |
+
+</details>
+
+---
+
+## Citing this work
+
+```bibtex
+@inproceedings{doynov2026pqcmtls,
+  author    = {Doynov, Rumen and Nenova, Maria and Shestakov, Alexander},
+  title     = {Deploying Post-Quantum Mutual {TLS} 1.3 with {ML-KEM} and {ML-DSA}:
+               An Operational and Standards-Readiness Study of a Native-OpenSSL Gateway},
+  booktitle = {2026 IEEE Conference on Standards for Communications and Networking (CSCN)},
+  year      = {2026},
+  address   = {London, United Kingdom},
+  publisher = {IEEE},
+  note      = {Poster. Artifact: \url{https://github.com/PQC-RA/pqc-mtls-gateway}}
+}
+```
+
+**Acknowledgment.** This work was supported by project BG05SFRP001-3.004-0025-C01, “DUNIZVICT”.
+
+---
 
 ## Licence
 
-AGPL-3.0-only. The full text is in [LICENSE](LICENSE).
+**AGPL-3.0-only.** Full text in [LICENSE](LICENSE).
 
-    pqc-mtls-gateway: a mutual-TLS API gateway with post-quantum client authentication
-    Copyright (C) 2026 Alexander Shestakov
-    Copyright (C) 2026 Rumen Doynov
+```
+pqc-mtls-gateway: a mutual-TLS API gateway with post-quantum client authentication
+Copyright (C) 2026 Alexander Shestakov
+Copyright (C) 2026 Rumen Doynov
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License, version 3,
-    as published by the Free Software Foundation.
+This program is free software: you can redistribute it and/or modify it under the
+terms of the GNU Affero General Public License, version 3, as published by the Free
+Software Foundation.
 
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details.
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
 
-    You should have received a copy of the GNU Affero General Public License
-    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+You should have received a copy of the GNU Affero General Public License along with
+this program. If not, see <https://www.gnu.org/licenses/>.
+```
