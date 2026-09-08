@@ -80,17 +80,21 @@ flowchart LR
     CU["pqc-ca-custodian<br/>sole holder of the<br/>intermediate CA key"]
     OC["ocsp-pq"]
     CR["crl-renewer"]
-    PD["pki-dist"]
+    PD["pki-dist<br/>serves CA certs and CRLs<br/>to relying parties"]
   end
 
+  TREE[("CA tree, shared mount<br/>chain · CRLs<br/>key subdirectories masked from the edge")]
+
   C -->|"X25519MLKEM768 · ML-DSA-65<br/>TLS 1.3 mutual auth"| GW
-  GW -->|"RS256 JWT<br/>CN · serial · fingerprint · 60 s"| BE
-  MA <-->|"HMAC control, no worker reload"| GW
+  GW -->|"RS256 JWT: CN · fingerprint · 60 s"| BE
+  MA -->|"internal TLS :8081<br/>JWKS fetch and HMAC route push"| GW
   MA --> RD
   MA -->|"HMAC · sign · revoke"| CU
-  OC -.->|"OCSP staple"| GW
-  CR -.->|"CRL"| GW
-  PD -.->|"trust bundle"| GW
+  GW -->|"staple fetch :9080"| OC
+  CU -->|"writes"| TREE
+  CR -->|"regenerates CRLs"| TREE
+  TREE -.->|"trust bundle and CRL,<br/>read from the mount"| GW
+  TREE -.-> PD
 
   style GW fill:#37414E,stroke:#37414E,color:#ffffff
 ```
@@ -98,7 +102,10 @@ flowchart LR
 Eight services across four bridge networks. The management API holds **zero filesystem access to the
 CA tree**; every signing and revocation operation goes through the custodian sidecar over an
 HMAC-authenticated internal API. The gateway mounts the CA tree with the private-key subdirectories
-masked, so the internet-facing component never sees a CA private key either.
+masked, so the internet-facing component never sees a CA private key either. Note what the diagram
+shows as a store rather than a service: the gateway does not fetch its trust bundle or its CRLs over
+the network. It reads them from the shared CA mount, which `crl-renewer` writes and `pki-dist`
+publishes onward to relying parties.
 
 | Service | Role |
 |---|---|
@@ -442,7 +449,7 @@ actionlint and an OpenSSL version-consistency gate.
 | **Revocation** | CRL checked in the data plane; OCSP responder over the ML-DSA-65 chain |
 | **Admin authorisation** | client-certificate **SHA-256 fingerprint allowlist**, not subject fields and not OU |
 | **Control channel** | HMAC-authenticated with a replay window, constant-time comparison |
-| **Backend identity** | short-lived RS256 JWT carrying CN, serial and the certificate's SHA-256 fingerprint |
+| **Backend identity** | short-lived RS256 JWT carrying the CN and the certificate's SHA-256 fingerprint. The serial travels beside it as an unsigned `X-Client-Serial` header, so it is forwarded but not attested |
 
 - Private keys for the CA, the server and JWT signing, the HMAC secret, client artifacts and build
   binaries are all
