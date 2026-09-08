@@ -36,14 +36,17 @@ post-quantum capable at all.
 
 ## Results at a glance
 
-Measured **2026-08-04** on the reference testbed: one LXC guest, i9-11950H (8 cores), 8 GiB,
-Ubuntu 24.04, OpenSSL 3.6.2. Absolute timings scale with the host; **byte counts and enforcement
-behaviour do not**, and those are the figures to compare first.
+Measured on the reference testbed: one LXC guest, i9-11950H (8 cores), 8 GiB, Ubuntu 24.04,
+OpenSSL 3.6.2. Two campaigns are quoted and every row says which it belongs to: the camera-ready
+run of **2026-08-04**, whose raw data is in `bench/2026-08/results/`, and the reference run of
+**2026-07-30**, recorded in [`bench/EXPECTED-RESULTS.md`](bench/EXPECTED-RESULTS.md). Absolute
+timings scale with the host; **byte counts and enforcement behaviour do not**, and those are the
+figures to compare first.
 
 | | Value | Configuration it belongs to |
 |---|---:|---|
-| Median TLS handshake, full edge | **4.57 ms** | `time_appconnect − time_connect`, N=200, fresh process per connection |
-| Single-core CPU vs classical | **≈2.9×** | paired `s_server`/`s_time`, one core, resumption off |
+| Median TLS handshake, full edge | **4.26 ms** | live gateway with SNI, N=200, `time_appconnect − time_connect`, fresh process per connection · 2026-07-30 |
+| Single-core CPU vs classical | **2.90×** | paired `s_server`/`s_time`, one core, resumption off, 9 windows · 2026-08-04 |
 | Handshake bytes vs classical | **9.3×** | 21,277 vs 2,285 B, controlled arms, leaf-only both ways |
 | ML-DSA-65 client leaf | **6,134 B** | DER on the wire |
 | …URL-escaped into an HTTP header | **9,050 B** | past the 8,192 B default single-header buffer |
