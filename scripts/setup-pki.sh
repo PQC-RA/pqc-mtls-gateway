@@ -101,10 +101,14 @@ OCSP_GID="${OCSP_GID:-1002}"
 #   gateway      -> intermediate/private, ocsp/, root/private masked (no key)
 #   ocsp-pq      -> intermediate/private, root/private masked (keeps ocsp/)
 #   crl-renewer  -> ocsp/, root/private masked (keeps intermediate/private)
+#   pqc-ca-custodian -> ocsp/, root/private masked (keeps intermediate/private)
 # The invariant to re-check whenever a service gains this mount: root/private is
-# masked on ALL of them. Verify against the mount list, never against a comment
-# -- the 2026-08-24 audit found this comment asserting a property two of the
-# three services did not implement.
+# masked on ALL of them, and this list matches the mount list. Verify against the
+# mount list, never against a comment -- the 2026-08-24 audit found this comment
+# asserting a property that two of the services mounting the tree did not
+# implement, and the custodian was then found missing from the list above.
+# bench/verify-suite.sh section 6 enumerates the mounters at runtime, so it
+# cannot go stale the way this list can.
 # Created explicitly (not left to Docker's implicit bind-mount auto-create) so
 # ownership/permissions are predictable.
 #
