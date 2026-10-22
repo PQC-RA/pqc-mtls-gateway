@@ -351,6 +351,14 @@ services:
    - pqc-pki
   volumes:
    - /etc/pki/pqc-ca:/etc/pki/pqc-ca:rw
+   # The custodian signs with the intermediate key and reads nothing under root/
+   # or ocsp/. root/private is already unreachable to uid 1001 by file mode
+   # (0700 root:root), but that is a single barrier: a regression of `user:` back
+   # to root would silently reopen it, because this was the one service with no
+   # mask. Mask both key-bearing subdirs so the property holds by mount list as
+   # well as by uid, as it does for every other service that mounts this tree.
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/ocsp:ro
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/root/private:ro
    # Docker standalone always mounts secrets as 0600/root, uid 1001 can't read
    # them. Mount as a regular bind so host file permissions (0644) apply instead
    # (same workaround already used for control-plane-hmac below).
