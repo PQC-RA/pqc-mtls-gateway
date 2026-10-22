@@ -184,16 +184,33 @@ services:
      cpus: '0.25'
 
  ocsp-pq:
-  # Verified with cap_drop ALL: the responder binds :9080 (unprivileged)
-  # and the renewer has no listener, so neither needs a capability back.
+  # Verified with cap_drop ALL and no capability added back: the responder binds
+  # :9080, which is unprivileged, and every path it reads is either world
+  # readable or group readable to its own gid, so it never needs DAC_OVERRIDE.
   cap_drop:
    - ALL
   build: docker/ocsp-pq
   container_name: pqc-ocsp-pq
+  # The responder signs OCSP answers with the delegated OCSP key and touches
+  # nothing else, so it has no need of root. uid/gid 1002 is the dedicated
+  # responder identity setup-pki.sh grants group read on ocsp/ocsp-pq.key
+  # (mode 640 root:1002) -- and nothing else in the CA tree. That is a second,
+  # independent barrier in front of the root CA key: root/private is
+  # 0700 root:root, so this uid cannot traverse it even if the mask below were
+  # ever dropped. 1002, not the custodian's 1001, so this container cannot
+  # reach the intermediate key by group either.
+  user: "1002:1002"
   networks:
    - pqc-pki
   volumes:
    - /etc/pki/pqc-ca:/etc/pki/pqc-ca:ro
+   # The responder reads exactly four paths: intermediate/db/index.txt,
+   # intermediate/certs/intermediate-ca.crt and ocsp/ocsp-pq.{crt,key} (see
+   # docker/ocsp-pq/Dockerfile). The delegated OCSP key is the ONLY private key
+   # it has any business holding, so mask the other two key-bearing subdirs
+   # with an empty dir, exactly as the gateway does above.
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/intermediate/private:ro
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/root/private:ro
   security_opt:
    - no-new-privileges:true
   read_only: true
@@ -243,10 +260,25 @@ services:
      cpus: '0.125'
 
  crl-renewer:
-  # Verified with cap_drop ALL: the responder binds :9080 (unprivileged)
-  # and the renewer has no listener, so neither needs a capability back.
+  # cap_drop ALL, but DAC_OVERRIDE has to come back. The CA tree is
+  # deliberately mixed ownership: intermediate/db/ and /signals are 1001:1001
+  # 0775 so the unprivileged management-api can write them, while the top level
+  # and intermediate/crl/ are root-owned. Renewal writes BOTH sets, and
+  # container-root with no capabilities cannot write a 0775 directory it does
+  # not own, so `openssl ca -gencrl` fails on intermediate/db/crlnumber.new and
+  # the reload sentinel cannot be touched. The original comment here claimed
+  # cap_drop ALL was verified for this service; it reasoned about the listening
+  # socket only and never about filesystem DAC, and the live container predated
+  # the line, so the break only appeared on the next recreate.
+  #
+  # This does not weaken the root-key masking below. DAC_OVERRIDE bypasses file
+  # permission bits; it cannot see through a bind mount, and root/private is
+  # masked by an empty directory, so the key is absent from this mount
+  # namespace rather than merely unreadable in it.
   cap_drop:
    - ALL
+  cap_add:
+   - DAC_OVERRIDE
   build: docker/crl-renewer
   container_name: pqc-crl-renewer
   environment:
@@ -254,8 +286,23 @@ services:
    - CRL_RENEW_SIGNAL_FILE=/signals/renew-crl
   networks:
    - pqc-pki
+  # Stays root, deliberately, unlike ocsp-pq above: the renewal script writes
+  # intermediate/crl/, root/crl/ and the two combined-CRL files that sit in the
+  # root-owned top level of the CA tree, and `mv` into that directory needs
+  # write permission ON the directory. Dropping to a non-root uid would mean
+  # making the top level of the CA tree group-writable, which widens the write
+  # surface at the root of the tree to buy back a uid -- a worse trade. The
+  # mask below is the control here, not the uid.
   volumes:
    - /etc/pki/pqc-ca:/etc/pki/pqc-ca:rw
+   # Regenerating the intermediate CRL means signing it, so this container does
+   # legitimately need intermediate/private. It needs neither the delegated
+   # OCSP key nor the root CA key, so both are masked with an empty dir.
+   # Masking root/private makes root-CRL regeneration an offline operation:
+   # pqc-crl-renew.sh Step 2 detects the absent key, says so loudly, and keeps
+   # the intermediate path working rather than failing the whole run.
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/ocsp:ro
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/root/private:ro
    - /usr/local/bin/pqc-crl-renew.sh:/usr/local/bin/pqc-crl-renew.sh:ro
    - pqc-www-pki:/var/www/pki:rw
    - pqc-logs-crl:/var/log/pqc-gw:rw

@@ -40,12 +40,20 @@ PQ_INT_CRL="${PQ_INT_DIR}/crl/intermediate-ca.crl"
 PQ_ROOT_DIR="${PKI_BASE}/root"
 PQ_ROOT_CNF="${PQ_ROOT_DIR}/openssl-root.cnf"
 PQ_ROOT_CRL="${PQ_ROOT_DIR}/crl/root-ca.crl"
+PQ_ROOT_KEY="${PQ_ROOT_DIR}/private/root-ca.key"
 
 # Combined output
 HYBRID_CRL="${PKI_BASE}/hybrid-combined-crl.pem"
 
 # Root CRL renewal interval (days)
 ROOT_CRL_INTERVAL=90
+
+# How close to expiry the root CRL may get before an unsignable root CRL stops
+# being a notice and becomes an outage: an expired CRL inside the combined file
+# makes nginx reject the chain at the handshake, so it has to be shouted about
+# well before that. 14 days inside a 180-day CRL whose renewal triggers at 90
+# means 76 days of ordinary notices went unactioned first.
+ROOT_CRL_ALARM_DAYS=14
 
 # ── Logging ───────────────────────────────────────────────────
 mkdir -p "$(dirname "$LOG_FILE")" 2>/dev/null || true
@@ -82,6 +90,30 @@ if [ -f "$LOCK_FILE" ]; then
     rm -f "$LOCK_FILE"
 fi
 echo $$ > "$LOCK_FILE"
+
+# ── Helper: can this process sign with the root CA key? ────
+# Is the root CA key present and readable here? It is NOT, by design, in the
+# crl-renewer container: docker-compose.yml masks root/private with an empty
+# directory so a compromise of this container cannot reach the trust anchor.
+# Root CRL generation is therefore an offline operation, performed where the key
+# actually lives. Answered by attempting the read rather than inferred from a
+# hostname or an env var, because the question is "can THIS process sign with
+# the root key", and only the filesystem answers that.
+root_key_available() {
+    [ -s "$PQ_ROOT_KEY" ] && [ -r "$PQ_ROOT_KEY" ]
+}
+
+# Days until a CRL's nextUpdate; negative once it has expired. Prints nothing
+# and fails if the file is missing or unparseable, so callers must handle that.
+crl_days_left() {
+    local crl_file="$1" next_update next_epoch
+    [ -f "$crl_file" ] || return 1
+    next_update=$($OPENSSL crl -in "$crl_file" -noout -nextupdate 2>/dev/null | cut -d= -f2)
+    [ -n "$next_update" ] || return 1
+    next_epoch=$(date -d "$next_update" +%s 2>/dev/null || echo 0)
+    [ "$next_epoch" -gt 0 ] || return 1
+    echo $(( (next_epoch - $(date +%s)) / 86400 ))
+}
 
 # ── Helper: check if Root CRL needs renewal ──────────────────
 root_crl_needs_renewal() {
@@ -146,12 +178,40 @@ fi
 
 # ── Step 2: Root CRLs (periodic, every ROOT_CRL_INTERVAL days)
 if root_crl_needs_renewal "$PQ_ROOT_CRL"; then
-    log "INFO" "Generating PQ Root CRL (periodic renewal)..."
-    if $OPENSSL ca -gencrl -config "$PQ_ROOT_CNF" -out "$PQ_ROOT_CRL" 2>>"$LOG_FILE"; then
-        verify_crl "$PQ_ROOT_CRL" "$PQ_ROOT_DIR/certs/root-ca.crt" "PQ-Root" || ERRORS=$((ERRORS + 1))
+    if root_key_available; then
+        log "INFO" "Generating PQ Root CRL (periodic renewal)..."
+        if $OPENSSL ca -gencrl -config "$PQ_ROOT_CNF" -out "$PQ_ROOT_CRL" 2>>"$LOG_FILE"; then
+            verify_crl "$PQ_ROOT_CRL" "$PQ_ROOT_DIR/certs/root-ca.crt" "PQ-Root" || ERRORS=$((ERRORS + 1))
+        else
+            log "ERROR" "Failed to generate PQ Root CRL"
+            ERRORS=$((ERRORS + 1))
+        fi
     else
-        log "ERROR" "Failed to generate PQ Root CRL"
-        ERRORS=$((ERRORS + 1))
+        # Expected in the crl-renewer container: root/private is masked, so
+        # signing a root CRL is impossible here and that is the whole point.
+        # Deliberately does NOT increment ERRORS. ERRORS gates the nginx reload
+        # in Step 5 and makes the entrypoint log a failed run, so counting a
+        # key this container is not allowed to hold would stop the INTERMEDIATE
+        # CRL, which was generated successfully above, from reaching the data
+        # plane. The root key being absent is the design working; a silent skip
+        # would not be.
+        ROOT_DAYS=$(crl_days_left "$PQ_ROOT_CRL" || echo "")
+        log "WARN" "PQ Root CRL is due for renewal but the root CA key is not readable here" \
+                   "(root/private is masked in this container by design)." \
+                   "Regenerate it where the key lives:" \
+                   "$OPENSSL ca -gencrl -config $PQ_ROOT_CNF -out $PQ_ROOT_CRL"
+        if [ -n "$ROOT_DAYS" ]; then
+            log "WARN" "PQ Root CRL expires in ${ROOT_DAYS} day(s)"
+            if [ "$ROOT_DAYS" -lt "$ROOT_CRL_ALARM_DAYS" ]; then
+                # Past this point it stops being an operational to-do: an
+                # expired root CRL in the combined file fails chain validation
+                # at the TLS handshake, i.e. every client is refused.
+                log "ERROR" "PQ Root CRL expires in ${ROOT_DAYS} day(s) and cannot be renewed from this container." \
+                            "Once it expires the combined CRL fails chain validation and client authentication stops."
+            fi
+        else
+            log "ERROR" "PQ Root CRL at $PQ_ROOT_CRL is missing or unparseable and cannot be renewed from this container"
+        fi
     fi
 else
     log "INFO" "PQ Root CRL still valid, skipping renewal"

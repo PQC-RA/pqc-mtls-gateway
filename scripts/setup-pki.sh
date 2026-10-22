@@ -89,10 +89,22 @@ SERVER_IP="${SERVER_IP:-$(hostname -I 2>/dev/null | awk '{print $1}')}"
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 TPL_DIR="$ROOT_DIR/pki/templates"
 
-# --- Empty dir the gateway edge mounts over key-bearing subdirs -------------
-# docker-compose.yml bind-mounts this over intermediate/private
-# and ocsp/ in the gateway container, so the internet-facing edge never sees
-# any CA private key even though it otherwise mounts the CA tree read-only.
+# gid that owns the delegated OCSP key by group, so the responder container can
+# read it without running as root. Must match `user:` on ocsp-pq in
+# docker-compose.yml. Deliberately NOT the custodian's 1001.
+OCSP_GID="${OCSP_GID:-1002}"
+
+# --- Empty dir every CA-tree consumer mounts over key-bearing subdirs -------
+# docker-compose.yml bind-mounts this over the key-bearing subdirectories of
+# every service that mounts the CA tree, so each one holds at most the single
+# private key it actually uses and none of them holds the root CA key:
+#   gateway      -> intermediate/private, ocsp/, root/private masked (no key)
+#   ocsp-pq      -> intermediate/private, root/private masked (keeps ocsp/)
+#   crl-renewer  -> ocsp/, root/private masked (keeps intermediate/private)
+# The invariant to re-check whenever a service gains this mount: root/private is
+# masked on ALL of them. Verify against the mount list, never against a comment
+# -- the 2026-08-24 audit found this comment asserting a property two of the
+# three services did not implement.
 # Created explicitly (not left to Docker's implicit bind-mount auto-create) so
 # ownership/permissions are predictable.
 #
@@ -106,6 +118,25 @@ chmod 555 /etc/pki/pqc-empty
 command -v "$OPENSSL" >/dev/null 2>&1 || { echo "FATAL: openssl not found at $OPENSSL (set OPENSSL_BIN)"; exit 1; }
 "$OPENSSL" list -signature-algorithms 2>/dev/null | grep -qi "ml-dsa" || \
   { echo "FATAL: $OPENSSL has no ML-DSA support, need OpenSSL 3.5+"; exit 1; }
+
+# Group read on the delegated OCSP key for the responder's own uid/gid
+# (docker-compose.yml runs ocsp-pq as 1002:1002), so the responder does not have
+# to run as root to sign with its own key. 640 root:$OCSP_GID, not 600
+# root:root: the key stays unreadable to every other identity in the stack,
+# including the custodian's 1001, while root/private stays 0700 root:root so a
+# non-root responder cannot traverse it at all even if its mask were dropped.
+#
+# A separate function, and called from the catch-up branch below as well as from
+# the bootstrap path, because the root-CA guard exits early on an existing PKI:
+# a host whose PKI predates the non-root responder would otherwise keep the key
+# at 600 root:root and ocsp-pq would fail to start after an upgrade.
+set_ocsp_key_perms() {
+    local key="$PKI_DIR/ocsp/ocsp-pq.key"
+    [ -f "$key" ] || return 0
+    chown "root:$OCSP_GID" "$key"
+    chmod 640 "$key"
+    echo "==> OCSP responder key: 640 root:$OCSP_GID (readable by the ocsp-pq container's gid)"
+}
 
 generate_internal_tls() {
     # --- Internal service-mesh TLS CA (classical RSA-2048) -------------------
@@ -179,6 +210,7 @@ if [ -f "$PKI_DIR/root/certs/root-ca.crt" ]; then
     echo "Root CA already exists at $PKI_DIR, leaving the CA untouched."
     echo "==> Catching up any newer artifacts introduced after initial bootstrap..."
     generate_internal_tls
+    set_ocsp_key_perms
     # Check the CA that is already on disk, not just the one this run would
     # create. A host bootstrapped elsewhere, or with KEY_ALG overridden, is
     # caught here rather than
@@ -275,7 +307,7 @@ SERVER_IP="$SERVER_IP" PKI_DIR="$PKI_DIR" SSL_DIR="$SSL_DIR" \
 # --- OCSP responder certificate ----------------------------------------------
 echo "==> OCSP responder certificate"
 "$OPENSSL" genpkey -algorithm "$KEY_ALG" -out "$PKI_DIR/ocsp/ocsp-pq.key"
-chmod 600 "$PKI_DIR/ocsp/ocsp-pq.key"
+set_ocsp_key_perms
 "$OPENSSL" req -config "$INT_CNF" -new \
     -key "$PKI_DIR/ocsp/ocsp-pq.key" \
     -subj "/C=BG/O=${PKI_ORG}/OU=OCSP Responder/CN=ocsp.pqc-gw.local" \

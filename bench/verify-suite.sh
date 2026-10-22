@@ -176,6 +176,46 @@ echo "  serials in live CRL : $($OSSL crl -in $PKI/hybrid-combined-crl.pem -noou
 $OSSL crl -in $PKI/hybrid-combined-crl.pem -noout -text 2>/dev/null | grep -E "Signature Algorithm|Last Update|Next Update" | head -3 | sed 's/^/  /'
 docker exec pqc-gateway sh -c "grep -ihE 'revoked serial' /var/log/nginx/error.log 2>/dev/null | tail -1" 2>/dev/null | sed 's/^/  data plane: /'
 echo
+echo "=============== 6. CA PRIVATE KEY ISOLATION ==============="
+# The tiered CA exists so that compromising an online component does not
+# compromise the trust anchor. That property lives in the MOUNT LIST, not in a
+# comment: on 2026-07-30 root/private was masked in the gateway and the compose
+# comment was corrected, and the 2026-08-24 audit then found ocsp-pq and
+# crl-renewer mounting the same tree unmasked, as root, with the corrected
+# comment sitting above them. So this is a runtime check, and it enumerates
+# every container that mounts the CA tree rather than a hard-coded list -- a
+# service that gains the mount later is covered without anyone remembering to
+# add it here.
+ROOT_KEY=/etc/pki/pqc-ca/root/private/root-ca.key
+MOUNTERS=$(docker ps --format '{{.Names}}' 2>/dev/null | while read -r c; do
+  docker inspect -f '{{range .Mounts}}{{.Destination}}{{"\n"}}{{end}}' "$c" 2>/dev/null \
+    | grep -qx '/etc/pki/pqc-ca' && echo "$c"
+done)
+if [ -z "$MOUNTERS" ]; then
+  fail "no running container mounts the CA tree, section 6 verified nothing"
+else
+  for c in $MOUNTERS; do
+    # Canary first. `docker exec ... [ -r key ]` returning non-zero is
+    # indistinguishable from exec itself failing, and reading that as "key not
+    # readable" is exactly the false green this suite exists to prevent. So
+    # prove the probe can read a file that IS supposed to be there before
+    # trusting it about one that is not.
+    if ! docker exec "$c" sh -c '[ -r /etc/pki/pqc-ca/ca-chain.crt ]' 2>/dev/null; then
+      fail "$c: could not probe the CA tree, root-key isolation UNVERIFIED"
+      continue
+    fi
+    U=$(docker exec "$c" id -u 2>/dev/null)
+    KEYS=$(docker exec "$c" sh -c "grep -rl 'PRIVATE KEY' /etc/pki/pqc-ca 2>/dev/null | sed 's#/etc/pki/pqc-ca/##' | tr '\n' ' '" 2>/dev/null)
+    printf '  %-20s uid=%-5s private keys visible: %s\n' "$c" "${U:-?}" "${KEYS:-none}"
+    if docker exec "$c" sh -c "[ -r $ROOT_KEY ]" 2>/dev/null; then
+      fail "$c CAN READ THE ROOT CA PRIVATE KEY, the tiered CA design is defeated"
+    else
+      echo "     ==> PASS: root-ca.key not readable"
+    fi
+  done
+fi
+
+echo
 echo "evidence -> $(pwd)/$EV/"
 [ "$RC" -eq 0 ] && echo "ALL GUARDS PASSED" || echo "*** ONE OR MORE GUARDS FAILED ***"
 exit "$RC"
