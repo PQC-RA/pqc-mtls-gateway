@@ -22,8 +22,8 @@
 # Required env vars (or edit defaults below):
 #   PQC_GATEWAY          Gateway base URL              (default: https://127.0.0.1)
 #   PQC_CA_CHAIN         Path to CA chain cert         (default: ./ca-chain.crt)
-#   PQC_ENROLL_CA        CA that signed the :8443 enrollment cert
-#                        (default: /etc/pki/pqc-ca/enroll-classical-ca.crt;
+#   PQC_ENROLL_CA        CA chain that verifies the :8443 enrollment cert
+#                        (default: /etc/pki/pqc-ca/ca-chain.crt, the PQ chain;
 #                         falls back to PQC_CA_CHAIN when that file is absent)
 #   PQC_ENROLL_URL       Enrollment endpoint           (default: https://<PQC_GATEWAY host>:8443/enroll;
 #                         set it for a gateway published on non-default ports)
@@ -44,54 +44,42 @@ ADMIN_CERT="${PQC_ADMIN_CERT:-./admin.crt}"
 ADMIN_KEY="${PQC_ADMIN_KEY:-./admin.key}"
 ENROLLMENT_TOKEN="${ENROLLMENT_TOKEN:-}"
 
-# The :8443 enrollment listener presents a CLASSICAL ECDSA server cert (since
-# 2026-07-01), issued by a SEPARATE self-signed CA, the ML-DSA chain in
-# $CA_CHAIN cannot verify it. Trust the enrollment CA for :8443 calls.
-# Override with PQC_ENROLL_CA. Fall back to $CA_CHAIN when the enrollment CA
-# is absent (pre-2026-07-01 deployments where :8443 still served the ML-DSA
-# leaf, or a remote client that has not copied the enrollment CA over).
-# Where to find the CA that signed the :8443 listener's certificate.
+# The :8443 enrollment listener is post-quantum-only (since 2026-10): it
+# presents the ML-DSA-65 server cert from the PQ hierarchy and accepts only
+# X25519MLKEM768, so it is verified with the PQ CA chain, like :443. From
+# 2026-07-01 until then it presented a classical ECDSA cert from the separate
+# enroll-classical-ca; against such a gateway set
+# PQC_ENROLL_CA=/etc/pki/pqc-ca/enroll-classical-ca.crt.
 #
 # Explicitly set: use it, and fail if it is not there. Someone who names a path
-# is telling us where their trust anchor lives; quietly fetching a different one
-# over the network would be the wrong answer to a typo.
+# is telling us where their trust anchor lives.
 #
-# Not set: on the gateway host the file is already in place. From a client
-# machine it is not, and falling back to $CA_CHAIN cannot work, the ML-DSA chain
-# will never verify a classical ECDSA certificate, so the connection fails with
-# no HTTP response at all. Fetch it from the bootstrap listener, which serves it
-# unauthenticated for exactly this case. Step 3b then verifies the ISSUED
-# certificate against $CA_CHAIN, so a substituted enrollment CA cannot get a
-# forged certificate past this script.
+# Not set: the PQ chain on the gateway host, else $CA_CHAIN, which a client
+# machine already has for :443. (This used to fetch enroll-ca.crt from :8443;
+# that was the classical CA, which no longer verifies the endpoint.)
 if [[ -n "${PQC_ENROLL_CA:-}" ]]; then
     ENROLL_CA="$PQC_ENROLL_CA"
     if [[ ! -f "$ENROLL_CA" ]]; then
         echo "ERROR: PQC_ENROLL_CA is set to '$ENROLL_CA', which does not exist." >&2
-        echo "  Point it at the enrollment CA, or unset it to fetch it from the" >&2
-        echo "  gateway's :8443 listener automatically." >&2
+        echo "  Point it at the PQ CA chain (ca-chain.crt), or unset it to use" >&2
+        echo "  /etc/pki/pqc-ca/ca-chain.crt or PQC_CA_CHAIN." >&2
         exit 1
     fi
 else
-    ENROLL_CA="/etc/pki/pqc-ca/enroll-classical-ca.crt"
-    if [[ ! -f "$ENROLL_CA" ]]; then
-        _GW_HOST_EARLY=$(echo "$GW" | sed 's|https://||; s|[:/].*||')
-        ENROLL_CA="$(mktemp -t enroll-ca.XXXXXX)"
-        if ! curl -fsSk --max-time 15 --connect-timeout 8 \
-             "https://${_GW_HOST_EARLY}:8443/enroll-ca.crt" -o "$ENROLL_CA" 2>/dev/null \
-           || ! grep -q "BEGIN CERTIFICATE" "$ENROLL_CA"; then
-            rm -f "$ENROLL_CA"
-            echo "ERROR: could not fetch the enrollment CA from ${_GW_HOST_EARLY}:8443" >&2
-            echo "  Copy it from the gateway host and point PQC_ENROLL_CA at it:" >&2
-            echo "    scp root@${_GW_HOST_EARLY}:/etc/pki/pqc-ca/enroll-classical-ca.crt ./enroll-ca.crt" >&2
-            echo "    PQC_ENROLL_CA=./enroll-ca.crt $0 $*" >&2
-            exit 1
-        fi
-        trap 'rm -f "$ENROLL_CA"' EXIT
-        echo "    Fetched the enrollment CA from ${_GW_HOST_EARLY}:8443"
-        echo "      SHA-256: $("${OSSL:-openssl}" x509 -in "$ENROLL_CA" -noout -fingerprint -sha256 2>/dev/null | sed 's/.*=//')"
-        echo "      Compare it out of band if this deployment is not yours."
-    fi
+    ENROLL_CA="/etc/pki/pqc-ca/ca-chain.crt"
+    [[ -f "$ENROLL_CA" ]] || ENROLL_CA="$CA_CHAIN"
 fi
+
+# Printed when the TLS handshake with the enrollment endpoint fails.
+enroll_tls_hint() {
+    echo "  The enrollment endpoint $ENROLL_URL is post-quantum-only:"
+    echo "  it presents an ML-DSA-65 server certificate and accepts only the"
+    echo "  X25519MLKEM768 key exchange, with no classical fallback."
+    echo "  The client needs OpenSSL 3.5 or later (curl linked against it, or"
+    echo "  PQC_OPENSSL=<openssl 3.5+>), and must trust the PQ CA chain,"
+    echo "  ca-chain.crt (PQC_ENROLL_CA; this run used $ENROLL_CA)."
+    echo "  The old enroll-classical-ca.crt no longer verifies this endpoint."
+}
 
 CN="${1:-}"
 BACKEND="${2:-}"
@@ -207,8 +195,8 @@ if [[ "${_PQC_IN_DOCKER:-0}" != "1" ]] && ! has_pq_openssl; then
         --rm
         -v "${ABS_CA}:/creds/ca-chain.crt:ro"
     )
-    # Enrollment CA (:8443 classical cert): mount it too when it differs from the
-    # ML-DSA chain, so in-container :8443 verification works. If ENROLL_CA fell
+    # Enrollment CA chain: mount it too when it is a different file from
+    # $CA_CHAIN, so in-container :8443 verification works. If ENROLL_CA fell
     # back to $CA_CHAIN it is already mounted as /creds/ca-chain.crt.
     ENROLL_ENV_BLOCK=""
     if [[ -f "$ENROLL_CA" && "$ENROLL_CA" != "$CA_CHAIN" ]]; then
@@ -276,7 +264,7 @@ fi
 export OPENSSL_CONF="${OPENSSL_CONF:-/etc/ssl/openssl.cnf}"
 
 # curl for enrollment: server-auth only, no client cert, targets port 8443,
-# which presents the classical ECDSA cert -> verify with $ENROLL_CA.
+# which presents the ML-DSA-65 cert -> verify with $ENROLL_CA.
 CURL_ENROLL="curl -sS --cacert $ENROLL_CA --max-time 15 --connect-timeout 8"
 # curl for admin API: mTLS, admin cert required, targets port 443.
 # X-PQC-CSRF:1 satisfies the management-api CSRF guard on mutating admin
@@ -299,8 +287,8 @@ _pq_https() {
     port="${port:-443}"
     path=$(echo "$url" | sed "s|https://[^/]*||")
     [[ -z "$path" ]] && path="/"
-    # :8443 (enrollment) presents the classical ECDSA cert -> verify with
-    # $ENROLL_CA; :443 (admin/API) uses the ML-DSA chain.
+    # :8443 (enrollment) is verified with $ENROLL_CA, :443 (admin/API) with
+    # $CA_CHAIN. Both are the ML-DSA chain unless overridden.
     local cafile="$CA_CHAIN"
     [[ "$port" == "8443" ]] && cafile="$ENROLL_CA"
     # -verify_return_error is what makes -CAfile mean anything here: without it
@@ -430,14 +418,20 @@ import json, os
 print(json.dumps({'csr': open(os.environ['CSR_FILE']).read(), 'enrollmentToken': os.environ['ENROLL_TOKEN']}))
 ")
 
+CURL_RC=0
 if ! has_pq_curl; then
     SIGN_RESP=$(_pq_https POST "$ENROLL_URL" "$PAYLOAD" 0)
-elif ! SIGN_RESP=$($CURL_ENROLL -X POST "$ENROLL_URL" \
+else
+    SIGN_RESP=$($CURL_ENROLL -X POST "$ENROLL_URL" \
         -H "Content-Type: application/json" \
         -d "$PAYLOAD" \
-        -w "\n%{http_code}" 2>&1); then
-    echo "ERROR: curl failed during enrollment"
+        -w "\n%{http_code}" 2>&1) || CURL_RC=$?
+fi
+if [[ "$CURL_RC" != "0" ]]; then
+    echo "ERROR: curl failed during enrollment (curl exit $CURL_RC)"
     echo "  $(echo "$SIGN_RESP" | tail -1)"
+    # 35 handshake failed, 58/59 local cert/cipher, 60 server cert not verified
+    case "$CURL_RC" in 35|58|59|60) enroll_tls_hint ;; esac
     exit 1
 fi
 HTTP_CODE=$(echo "$SIGN_RESP" | tail -1)
@@ -455,11 +449,7 @@ if [[ "$HTTP_CODE" != "200" && "$HTTP_CODE" != "201" ]]; then
     if [[ "$HTTP_CODE" == "000" ]]; then
         echo ""
         echo "  000 means no HTTP response arrived: the TLS connection to :8443 failed."
-        echo "  That listener presents a CLASSICAL ECDSA certificate from a separate CA,"
-        echo "  which the ML-DSA chain in PQC_CA_CHAIN cannot verify. From a client"
-        echo "  machine, copy that CA over and point PQC_ENROLL_CA at it:"
-        echo "    scp root@<server>:/etc/pki/pqc-ca/enroll-classical-ca.crt ./enroll-ca.crt"
-        echo "    PQC_ENROLL_CA=./enroll-ca.crt $0 $CN"
+        enroll_tls_hint
     fi
     if [[ "$HTTP_CODE" == "409" ]]; then
         echo ""
