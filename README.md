@@ -341,6 +341,23 @@ gateway.
 
 ---
 
+## Migration listener
+
+The strict listeners accept post-quantum clients only. To put the gateway in front of an existing
+service whose clients are still mostly classical, a **migration listener** (off by default) serves
+both on one port: ML-DSA-65 and X25519MLKEM768 to clients that offer them, the service's classical
+certificate to the rest. It classifies every connection as `pq`, `pq-kex` (post-quantum key
+exchange, classical identities) or `classical`, passes the class to the backend as `X-PQ-Class`
+and to the access log, and keeps a per-client inventory on the control-plane listener. Nobody is
+refused for being classical unless the per-client policy says `pq-required`.
+
+Measured against real stacks (`bench/migration/`): CPython on OpenSSL 1.1.1 and 3.0 and Java 21
+are served as `classical`; curl on OpenSSL 3.5 and Chromium 155 that trust the gateway's CA are
+served fully post-quantum. Setup, the inventory API and the limits, including where the ML-DSA-65
+certificate must not be served, are in [`config/nginx/migration/README.md`](config/nginx/migration/README.md).
+
+---
+
 ## Routing policies
 
 A client certificate alone does not move traffic. The gateway routes each request by the client's
@@ -636,6 +653,7 @@ pki/                  OpenSSL CA configuration templates
 | `scripts/test-issuance-e2e.sh` | Issue → route → mTLS request → 200 → revoke, against a live gateway |
 | `bench/run-all.sh` | The whole measurement campaign |
 | `bench/check-negative-controls.sh` | The checks that must fail closed, including the classical-leaf handshake bypass |
+| `bench/migration/migration-listener-test.sh` | The migration listener in a throwaway gateway; `REAL_CLIENTS=1` adds CPython (OpenSSL 1.1.1, 3.0), Java 21, curl (OpenSSL 3.5) and Chromium |
 
 </details>
 
