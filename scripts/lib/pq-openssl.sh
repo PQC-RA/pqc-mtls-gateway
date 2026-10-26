@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # pq-openssl.sh: sourced by the stand and item-4 scripts. Finds an OpenSSL that
 # can do ML-DSA-65 and X25519MLKEM768 (3.5 or later) and exports it as $O, with
 # its library directory on LD_LIBRARY_PATH and OPENSSL_CONF=/dev/null.
@@ -16,5 +17,6 @@ pq_openssl_find() {
 	return 1
 }
 O=$(pq_openssl_find) || { echo "no OpenSSL 3.5+ found (set OSSL to one)" >&2; exit 1; }
-[ -d "$(dirname "$(dirname "$O")")/lib64" ] && export LD_LIBRARY_PATH=$(dirname "$(dirname "$O")")/lib64${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
+PQ_OPENSSL_LIB=$(dirname "$(dirname "$O")")/lib64
+if [ -d "$PQ_OPENSSL_LIB" ]; then LD_LIBRARY_PATH=$PQ_OPENSSL_LIB${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}; export LD_LIBRARY_PATH; fi
 export OPENSSL_CONF=/dev/null O

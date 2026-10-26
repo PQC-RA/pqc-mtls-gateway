@@ -35,7 +35,7 @@ stand)
 	SD=${STAND_DIR:?source STAND_DIR/stand.env first}; PREFIX=${STAND_PROJECT:?}; VOLP=$PREFIX
 	live_p=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' pqc-gateway 2>/dev/null || true)
 	[ -n "$live_p" ] && [ "$PREFIX" = "$live_p" ] && { echo "stand project '$PREFIX' is the live one" >&2; exit 2; }
-	PKI=$SD/pki; SSL=$SD/ssl; COMPOSE=(${STAND_COMPOSE:-$SD/compose}) ;;
+	PKI=$SD/pki; SSL=$SD/ssl; COMPOSE=("${STAND_COMPOSE:-$SD/compose}") ;;
 live)
 	LIVE_DIR=${LIVE_DIR:-$(cd "$(dirname "$0")/.." && pwd)}
 	LIVE_PROJECT=${LIVE_PROJECT:-$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' pqc-gateway)}
@@ -83,7 +83,7 @@ done
 sha256sum < "$B/compose-config.yml" | cut -d' ' -f1 > "$B/compose-config.sha256"
 docker ps -a --filter "label=com.docker.compose.project=$VOLP" \
 	--format '{{.Names}} {{.Image}} {{.ID}}' > "$B/containers.txt"
-while read -r name image _; do echo "$name $(docker inspect -f '{{.Image}}' "$name")"; done < "$B/containers.txt" > "$B/image-ids.txt"
+while read -r name _ _; do echo "$name $(docker inspect -f '{{.Image}}' "$name")"; done < "$B/containers.txt" > "$B/image-ids.txt"
 for r in "$(cd "$(dirname "$0")/.." && pwd)" ${LIVE_DIR:-} ${API_SRC:-}; do
 	[ -d "$r/.git" ] || [ -f "$r/.git" ] || continue
 	echo "$r $(git -C "$r" rev-parse HEAD) $(git -C "$r" branch --show-current)"
