@@ -71,11 +71,15 @@ changed.
 > The client row is **identity-dependent**. `CN=bench-client, O=ACME` on the same deployment is
 > 5,614 B. Always record which identity a client-leaf figure came from.
 >
-> It is also **profile-dependent**. Both figures above were measured when every leaf carried the
-> full `v3_client` extension set. The admin leaf still does (`deploy.sh` asks for it explicitly),
-> so 6,134 B stands. Leaves issued through enrollment now get the minimal `v3_m2m_leaf` profile
-> (no certificate policy, CDP or AIA), so a `bench-client` issued after that change is smaller
-> than 5,614 B; re-measure it rather than comparing against this figure.
+> It is also **profile-dependent**. The admin leaf is issued by `deploy.sh` with an explicit
+> `-extensions v3_client`, before and after the 2026-10 CA-profile change, so 6,134 B stands. The
+> `bench-client` figure is an enrolled leaf. The CA template it was signed under set no default
+> `x509_extensions`, so enrolled leaves carried only the subject and authority key identifiers
+> OpenSSL adds by default. Enrolled leaves now get the `v3_m2m_leaf` profile, which adds
+> `basicConstraints`, `keyUsage` and `extendedKeyUsage`: the same CSR signed by the same throwaway
+> CA under the old and the new template comes out **51 B larger** (OpenSSL 3.6.2). A `bench-client`
+> issued after the change is therefore larger than 5,614 B; re-measure it rather than comparing
+> against this figure.
 
 > The ECDSA row is a **range, and re-issuing moves it**: an ECDSA signature's DER length depends
 > on the random `r` and `s`, so a leading zero byte makes the certificate one byte shorter.
