@@ -13,7 +13,9 @@ works either way, and `scripts/issue-cert.sh` uses that route directly without
 a browser.
 
 `:8443` is post-quantum-only (ML-DSA-65 server certificate, X25519MLKEM768
-only), and current browsers cannot complete that handshake, so a page mounted
-here is reachable only by a client built on OpenSSL 3.5 or later. Browser
-enrollment needs the classical `:8443` configuration (see `ARCHITECTURE.md`,
-"Enrollment bootstrap plane").
+only), and browsers as of 2026-10 cannot complete that handshake, so a page
+mounted here is reachable only by a client built on OpenSSL 3.5 or later.
+Browser enrollment needs the classical `:8443` server certificate: the
+`ssl_certificate`, `ssl_certificate_key` and `Groups` lines of the `:8443`
+server block in `config/nginx/nginx.conf` at commit `87ad02a` (see
+`ARCHITECTURE.md`, "PKI hierarchy" and "Enrollment bootstrap plane").

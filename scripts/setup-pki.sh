@@ -104,10 +104,9 @@ OCSP_GID="${OCSP_GID:-1002}"
 #   pqc-ca-custodian -> ocsp/, root/private masked (keeps intermediate/private)
 # The invariant to re-check whenever a service gains this mount: root/private is
 # masked on ALL of them, and this list matches the mount list. Verify against the
-# mount list, never against a comment -- the 2026-08-24 audit found this comment
-# asserting a property that two of the services mounting the tree did not
-# implement, and the custodian was then found missing from the list above.
-# bench/verify-suite.sh section 6 enumerates the mounters at runtime, so it
+# mount list, never against a comment: a comment like this one can assert a
+# property that a service mounting the tree does not implement, and nothing
+# fails. bench/verify-suite.sh section 6 enumerates the mounters at runtime, so it
 # cannot go stale the way this list can.
 # Created explicitly (not left to Docker's implicit bind-mount auto-create) so
 # ownership/permissions are predictable.
@@ -213,7 +212,7 @@ CNF
 # The rendered intermediate config is written once, at bootstrap, so a template
 # fix never reaches an existing CA by itself. The leaf profile is a security
 # property (a CA that copies CSR extensions lets a token holder obtain CA:TRUE
-# or a server SAN), so say so loudly rather than edit a live CA config here.
+# or a server SAN), so say so loudly rather than edit an existing CA config here.
 warn_leaf_profile() {
     local cnf="$PKI_DIR/intermediate/openssl-intermediate.cnf"
     [ -f "$cnf" ] || return 0
@@ -318,8 +317,8 @@ chmod 600 "$SSL_DIR/server-mldsa65.key"
 # The default nginx.conf serves :8443 with the ML-DSA-65 leaf above
 # (post-quantum-only), so this certificate is not used by it. It is still
 # generated so that a deployment that needs browser enrollment can switch
-# :8443 back to the classical server certificate (the earlier nginx.conf, in
-# git history) without re-running the PKI bootstrap, and so bench/ can report
+# :8443 back to the classical server certificate (the :8443 TLS lines of
+# config/nginx/nginx.conf at commit 87ad02a) without re-running the PKI bootstrap, and so bench/ can report
 # its size. Classical ECDSA P-256 CA + leaf for :8443 SERVER auth only; see the
 # script header. SANs mirror the ML-DSA server cert.
 echo "==> Enrollment classical server certificate (:8443)"

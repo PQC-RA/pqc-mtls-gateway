@@ -198,7 +198,7 @@ services:
   # The responder signs OCSP answers with the delegated OCSP key and touches
   # nothing else, so it has no need of root. uid/gid 1002 is the dedicated
   # responder identity setup-pki.sh grants group read on ocsp/ocsp-pq.key
-  # (mode 640 root:1002) -- and nothing else in the CA tree. That is a second,
+  # (mode 640 root:1002), and nothing else in the CA tree. That is a second,
   # independent barrier in front of the root CA key: root/private is
   # 0700 root:root, so this uid cannot traverse it even if the mask below were
   # ever dropped. 1002, not the custodian's 1001, so this container cannot
@@ -270,10 +270,9 @@ services:
   # and intermediate/crl/ are root-owned. Renewal writes BOTH sets, and
   # container-root with no capabilities cannot write a 0775 directory it does
   # not own, so `openssl ca -gencrl` fails on intermediate/db/crlnumber.new and
-  # the reload sentinel cannot be touched. The original comment here claimed
-  # cap_drop ALL was verified for this service; it reasoned about the listening
-  # socket only and never about filesystem DAC, and the live container predated
-  # the line, so the break only appeared on the next recreate.
+  # the reload sentinel cannot be touched. Reasoning about the listening socket
+  # alone (an unprivileged port) suggests cap_drop ALL is enough; filesystem DAC
+  # is what makes it fail, and only when the container is next recreated.
   #
   # This does not weaken the root-key masking below. DAC_OVERRIDE bypasses file
   # permission bits; it cannot see through a bind mount, and root/private is
@@ -298,7 +297,7 @@ services:
   # root-owned top level of the CA tree, and `mv` into that directory needs
   # write permission ON the directory. Dropping to a non-root uid would mean
   # making the top level of the CA tree group-writable, which widens the write
-  # surface at the root of the tree to buy back a uid -- a worse trade. The
+  # surface at the root of the tree to buy back a uid, a worse trade. The
   # mask below is the control here, not the uid.
   volumes:
    - /etc/pki/pqc-ca:/etc/pki/pqc-ca:rw

@@ -44,11 +44,11 @@ ADMIN_CERT="${PQC_ADMIN_CERT:-./admin.crt}"
 ADMIN_KEY="${PQC_ADMIN_KEY:-./admin.key}"
 ENROLLMENT_TOKEN="${ENROLLMENT_TOKEN:-}"
 
-# The :8443 enrollment listener is post-quantum-only (since 2026-10): it
-# presents the ML-DSA-65 server cert from the PQ hierarchy and accepts only
-# X25519MLKEM768, so it is verified with the PQ CA chain, like :443. From
-# 2026-07-01 until then it presented a classical ECDSA cert from the separate
-# enroll-classical-ca; against such a gateway set
+# The :8443 enrollment listener is post-quantum-only: it presents the
+# ML-DSA-65 server cert from the PQ hierarchy and accepts only X25519MLKEM768,
+# so it is verified with the PQ CA chain, like :443. A gateway configured with
+# the optional classical :8443 server certificate (from the separate
+# enroll-classical-ca) needs
 # PQC_ENROLL_CA=/etc/pki/pqc-ca/enroll-classical-ca.crt.
 #
 # Explicitly set: use it, and fail if it is not there. Someone who names a path

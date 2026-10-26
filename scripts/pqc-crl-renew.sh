@@ -172,7 +172,7 @@ verify_crl() {
 # on every reload, so it must never be observable half-written, empty or 0600.
 # The temp file has to live beside dest: mktemp's default /tmp is the
 # container's overlayfs while /etc/pki/pqc-ca is a different filesystem, and a
-# cross-filesystem mv is a copy into the live name, not a rename.
+# cross-filesystem mv is a copy into the published name, not a rename.
 # The gateway mounts the directory (not the file), so the new inode is visible.
 publish_atomic() {
     local dest="$1"; shift
@@ -190,7 +190,7 @@ publish_atomic() {
     PENDING_TMP=""
 }
 
-# ── Helper: generate a CRL without touching the live file until it parses ──
+# ── Helper: generate a CRL without touching the published file until it parses ──
 # gen_crl_atomic <ca.cnf> <dest.crl> <ca.crt> <label>
 gen_crl_atomic() {
     local cnf="$1" dest="$2" cacrt="$3" label="$4" tmp
