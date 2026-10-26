@@ -43,6 +43,26 @@ const PORT = Number(process.env.PORT || 8091);
 const HMAC_SECRET_FILE = process.env.CUSTODIAN_HMAC_SECRET_FILE || "/run/secrets/custodian-hmac";
 const MAX_BODY_BYTES = 1_000_000; // CSRs/certs are small; refuse anything larger
 
+// Renewal (item 4). Off by default: with RENEWAL_ENABLED unset the custodian
+// issues exactly what it always has (CERT_VALIDITY_DAYS via -days) and refuses
+// every renewal request. The lifetime is never taken from the caller: the
+// caller may only name one of these profiles, and the custodian maps it.
+const RENEWAL_ENABLED = process.env.RENEWAL_ENABLED === "1";
+const DEMO_PROFILE_ENABLED = process.env.CUSTODIAN_DEMO_PROFILE === "1";
+const PROFILES = { "client-30d": 30 * 86400, "demo-120s": 120 };
+const LINEAGE_CAP_S = 365 * 86400; // a renewal chain ends this long after its bootstrap enrollment
+const REBOOTSTRAP_WINDOW_S = 30 * 86400; // a new bootstrap is allowed this close to the cap
+const BACKDATE_S = 60; // notBefore = issue time - 60 s, for client clock skew
+// One lock for every writer of the CA database, shared with the CRL renewer
+// (which runs -updatedb and -gencrl against the same index). `openssl ca` itself
+// does no locking. Inside this process the mutex below serialises the CN check
+// with the signing that follows it.
+const CA_LOCK_FILE = process.env.CA_LOCK_FILE || path.join(CA_DIR, "db", ".ca-db.lock");
+const LINEAGE_FILE = path.join(CA_DIR, "db", "lineage.json");
+const IDEMPOTENCY_FILE = path.join(CA_DIR, "db", "idempotency.json");
+const CLOCK_SKEW_MS = 30_000;
+const NONCE_TTL_MS = 120_000;
+
 const VALID_REVOKE_REASONS = new Set([
 	"unspecified",
 	"keyCompromise",
@@ -164,22 +184,102 @@ function extractCn(dn) {
 }
 
 /**
- * A CN must map to at most one *active* (status V) certificate at a
- * time. index.txt is OpenSSL's own authoritative status ledger (tab-separated:
- * status, expiry, revocation, serial, filename, subject DN), reused directly
- * rather than duplicating CN tracking into a second index. `unique_subject =
- * no` in openssl-intermediate.cnf means OpenSSL itself won't stop a re-sign,
- * so this check is the only enforcement point.
+ * A CN may map to at most one active certificate, plus at most one successor
+ * named by a renewal. index.txt is OpenSSL's status ledger (tab-separated:
+ * status, expiry, revocation, serial, filename, subject DN). "Active" means
+ * status V AND expiry still in the future: nothing runs `openssl ca -updatedb`
+ * on every request, so an expired certificate can still read V here.
+ * `unique_subject` in openssl-intermediate.cnf must be `no` for a renewal to
+ * overlap its predecessor; this check is then the only guard.
  */
-function cnHasActiveCertificate(cn) {
+function parseIndexTime(s) {
+	const m = /^(\d{2}|\d{4})(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})Z$/.exec(s || "");
+	if (!m) return null;
+	let y = Number(m[1]);
+	if (m[1].length === 2) y = y < 50 ? 2000 + y : 1900 + y;
+	return Date.UTC(y, Number(m[2]) - 1, Number(m[3]), Number(m[4]), Number(m[5]), Number(m[6]));
+}
+
+function readIndexRows() {
 	const content = fs.readFileSync(INDEX_FILE, "utf8");
+	const rows = [];
 	for (const line of content.split("\n")) {
 		if (!line) continue;
-		const fields = line.split("\t");
-		if (fields[0] !== "V") continue;
-		if (extractCn(fields[5]) === cn) return true;
+		const f = line.split("\t");
+		rows.push({ status: f[0], expiryMs: parseIndexTime(f[1]), serial: (f[3] || "").toUpperCase(), dn: f[5] || "" });
 	}
-	return false;
+	return rows;
+}
+
+function activeRowsForCn(cn, now = Date.now()) {
+	return readIndexRows().filter(r => r.status === "V" && r.expiryMs !== null && r.expiryMs > now && extractCn(r.dn) === cn);
+}
+
+function cnHasActiveCertificate(cn) {
+	return activeRowsForCn(cn).length > 0;
+}
+
+// Atomic JSON state: temp file beside the target, fsync, rename. A torn write
+// can never leave a half file in place, and a file that does not parse is an
+// error (fail closed), never an empty list.
+function writeJsonAtomic(file, obj) {
+	const tmp = `${file}.tmp-${process.pid}-${crypto.randomBytes(4).toString("hex")}`;
+	const fd = fs.openSync(tmp, "w", 0o640);
+	try {
+		fs.writeSync(fd, JSON.stringify(obj));
+		fs.fsyncSync(fd);
+	} finally {
+		fs.closeSync(fd);
+	}
+	fs.renameSync(tmp, file);
+}
+
+function readJsonState(file) {
+	try {
+		return JSON.parse(fs.readFileSync(file, "utf8"));
+	} catch (err) {
+		if (err.code === "ENOENT") return {};
+		throw new Error(`state file ${path.basename(file)} unreadable: ${err.message}`);
+	}
+}
+
+// In-process mutex: every CA mutation runs one at a time.
+let caChain = Promise.resolve();
+function withCaMutex(fn) {
+	const run = caChain.then(fn, fn);
+	caChain = run.catch(() => {});
+	return run;
+}
+
+// `openssl ca` under the CA-wide file lock shared with the CRL renewer.
+function opensslCaLocked(args) {
+	return execFileAsync("flock", ["-w", "20", CA_LOCK_FILE, OPENSSL, ...args], { cwd: CA_DIR });
+}
+
+async function subjectRfc2253(kind, file) {
+	const { stdout } = await execFileAsync(OPENSSL, [kind, "-in", file, "-noout", "-subject", "-nameopt", "RFC2253"],
+		{ env: { ...process.env, OPENSSL_CONF: "/dev/null" } });
+	return stdout.replace(/^subject=\s*/, "").trim();
+}
+
+async function spkiSha256(kind, file) {
+	const { stdout } = await execFileAsync(OPENSSL, [kind, "-in", file, "-noout", "-pubkey"],
+		{ env: { ...process.env, OPENSSL_CONF: "/dev/null" } });
+	const m = /-----BEGIN PUBLIC KEY-----([\s\S]+?)-----END PUBLIC KEY-----/.exec(stdout);
+	if (!m) throw new Error("no public key");
+	return crypto.createHash("sha256").update(Buffer.from(m[1].replace(/\s/g, ""), "base64")).digest("hex");
+}
+
+function opensslTime(ms) {
+	const d = new Date(ms);
+	const p = n => String(n).padStart(2, "0");
+	return `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`;
+}
+
+function normalizeIdempotencyKey(raw) {
+	if (raw === undefined) return undefined;
+	if (typeof raw !== "string" || !/^[A-Za-z0-9:_-]{8,160}$/.test(raw)) return null;
+	return raw;
 }
 
 function readFingerprintIndex() {
@@ -196,7 +296,7 @@ function readFingerprintIndex() {
 function appendFingerprintIndexEntry(fingerprint, serialNumber) {
 	const entries = readFingerprintIndex();
 	entries.push({ fingerprint, serialNumber });
-	fs.writeFileSync(FINGERPRINT_INDEX_FILE, JSON.stringify(entries));
+	writeJsonAtomic(FINGERPRINT_INDEX_FILE, entries);
 }
 
 function readBody(req) {
@@ -217,28 +317,56 @@ function readBody(req) {
 	});
 }
 
-function verifyHmac(bodyBuf, sigHeader) {
-	if (!sigHeader || typeof sigHeader !== "string") return false;
-	const m = /^sha256=([0-9a-fA-F]+)$/.exec(sigHeader);
-	if (!m) return false;
-	const expected = crypto.createHmac("sha256", HMAC_SECRET).update(bodyBuf).digest("hex");
-	const expectedBuf = Buffer.from(expected, "hex");
-	const providedBuf = Buffer.from(m[1], "hex");
-	if (expectedBuf.length !== providedBuf.length) return false;
-	return crypto.timingSafeEqual(expectedBuf, providedBuf);
+// Request authentication (v2): HMAC-SHA256 over method, path, timestamp,
+// nonce and the SHA-256 of the body. A request older or newer than 30 s, or a
+// nonce already seen in the last 120 s, is refused, so a captured request
+// cannot be replayed and two different GETs no longer share one signature.
+// Nonces are kept in memory: a restart reopens a replay window of at most the
+// 30 s clock tolerance.
+const seenNonces = new Map();
+
+function hmacHex(data) {
+	return crypto.createHmac("sha256", HMAC_SECRET).update(data).digest("hex");
 }
 
+function sha256Hex(buf) {
+	return crypto.createHash("sha256").update(buf).digest("hex");
+}
+
+function safeEqualHex(a, b) {
+	const ab = Buffer.from(a, "hex"), bb = Buffer.from(b, "hex");
+	return ab.length === bb.length && ab.length > 0 && crypto.timingSafeEqual(ab, bb);
+}
+
+function verifyRequest(req, bodyBuf) {
+	const sig = req.headers["x-hub-signature-256"];
+	const ts = req.headers["x-custodian-timestamp"];
+	const nonce = req.headers["x-custodian-nonce"];
+	if (typeof sig !== "string" || typeof ts !== "string" || typeof nonce !== "string") return { ok: false, why: "missing_headers" };
+	const m = /^sha256=([0-9a-f]{64})$/.exec(sig);
+	if (!m || !/^\d{10,16}$/.test(ts) || !/^[0-9a-f]{32}$/.test(nonce)) return { ok: false, why: "malformed_headers" };
+	const now = Date.now();
+	if (Math.abs(now - Number(ts)) > CLOCK_SKEW_MS) return { ok: false, why: "stale_timestamp" };
+	const expected = hmacHex(`v2\n${req.method}\n${req.url}\n${ts}\n${nonce}\n${sha256Hex(bodyBuf)}`);
+	if (!safeEqualHex(expected, m[1])) return { ok: false, why: "bad_signature" };
+	for (const [n, exp] of seenNonces) if (exp < now) seenNonces.delete(n);
+	if (seenNonces.has(nonce)) return { ok: false, why: "replayed_nonce" };
+	seenNonces.set(nonce, now + NONCE_TTL_MS);
+	return { ok: true, nonce };
+}
+
+// Responses are signed too, bound to the request's nonce, so the caller's
+// decision never rests on unauthenticated data.
 function sendJson(res, status, obj) {
 	const body = JSON.stringify(obj);
-	res.writeHead(status, {
-		"Content-Type": "application/json",
-		"Content-Length": Buffer.byteLength(body),
-	});
+	const headers = { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(body) };
+	if (res.pqcNonce) headers["X-Custodian-Response-Signature"] = "sha256=" + hmacHex(`v2r\n${status}\n${res.pqcNonce}\n${sha256Hex(Buffer.from(body))}`);
+	res.writeHead(status, headers);
 	res.end(body);
 }
 
-function sendError(res, status, error, message) {
-	sendJson(res, status, { error, message });
+function sendError(res, status, error, message, extra) {
+	sendJson(res, status, { error, message, ...(extra || {}) });
 }
 
 function handleGetCrl(res) {
@@ -317,98 +445,211 @@ async function handleGetCertByFingerprint(res, fprRaw) {
 	}
 }
 
+function readIssuedResult(serial) {
+	const certPath = issuedCertPath(serial);
+	if (!certPath || !fs.existsSync(certPath)) return null;
+	return fs.readFileSync(certPath, "utf8");
+}
+
+async function certResult(serial) {
+	const certPath = issuedCertPath(serial);
+	const certificate = readIssuedResult(serial);
+	if (!certificate) return null;
+	const { stdout } = await execFileAsync(OPENSSL, ["x509", "-in", certPath, "-noout", "-startdate", "-enddate"]);
+	const nb = stdout.match(/notBefore=(.+)/), na = stdout.match(/notAfter=(.+)/);
+	return { certificate, serialNumber: serial, notBefore: nb ? new Date(nb[1]).toISOString() : "", expiresAt: na ? new Date(na[1]).toISOString() : "" };
+}
+
+// R5 fallback: an intent with no serial (crash between `openssl ca` and the
+// record) is resolved by looking for an issued certificate with this CN and
+// this public key.
+async function findIssuedBySpki(cn, spki) {
+	for (const row of readIndexRows()) {
+		if (extractCn(row.dn) !== cn) continue;
+		const certPath = issuedCertPath(row.serial);
+		if (!certPath || !fs.existsSync(certPath)) continue;
+		try {
+			if ((await spkiSha256("x509", certPath)) === spki) return row.serial;
+		} catch { /* unreadable entry: skip */ }
+	}
+	return null;
+}
+
 async function handleSign(res, payload) {
 	const csrPem = payload && typeof payload.csrPem === "string" ? payload.csrPem : null;
 	if (!csrPem || !csrPem.includes("BEGIN CERTIFICATE REQUEST")) {
 		return sendError(res, 400, "invalid_csr", "csrPem is required and must be a PEM-encoded CSR");
 	}
-
-	const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pqc-custodian-"));
-	const csrPath = path.join(tmpDir, "client.csr");
-	const crtPath = path.join(tmpDir, "client.crt");
-	try {
-		fs.writeFileSync(csrPath, csrPem, { mode: 0o600 });
-
-		let cn;
-		try {
-			// Unlike the `x509` invocations elsewhere in this file, `req` loads a
-			// config file even for pure read-only display ops, OPENSSL_CONF is
-			// otherwise unset in this container. Point it at /dev/null rather than
-			// a real openssl.cnf: this is just a subject-line parse, and pulling in
-			// unrelated config content is unnecessary surface for the single most
-			// sensitive process in the stack.
-			const { stdout: subjectOut } = await execFileAsync(
-				OPENSSL,
-				["req", "-in", csrPath, "-noout", "-subject"],
-				{ env: { ...process.env, OPENSSL_CONF: "/dev/null" } }
-			);
-			cn = extractCn(subjectOut);
-		} catch (err) {
-			log("ERROR", `Failed to read subject from CSR: ${err.stderr || err.message}`);
-			return sendError(res, 400, "invalid_csr", "Could not read subject from CSR");
-		}
-		if (!cn) {
-			return sendError(res, 400, "invalid_csr", "CSR subject has no CN component");
-		}
-
-		if (cnHasActiveCertificate(cn)) {
-			log("WARN", `Rejected signing request: CN=${cn} already has an active certificate`);
-			return sendError(res, 409, "cn_already_active", `Certificate CN ${cn} already has an active certificate, revoke it first to renew`);
-		}
-
-		let stderr = "";
-		try {
-			const result = await execFileAsync(
-				OPENSSL,
-				["ca", "-config", CA_CNF, "-in", csrPath, "-out", crtPath, "-batch", "-days", CERT_VALIDITY_DAYS],
-				{ cwd: CA_DIR }
-			);
-			stderr = result.stderr || "";
-		} catch (err) {
-			log("ERROR", `openssl ca signing failed: ${err.stderr || err.message}`);
-			return sendError(res, 400, "signing_failed", "CA signing failed, check CSR subject and CA state");
-		}
-
-		if (stderr && /\berror:/i.test(stderr)) {
-			log("ERROR", `CA signing reported an error: ${stderr}`);
-			return sendError(res, 400, "signing_failed", "CA signing failed, check CSR subject and CA state");
-		}
-
-		if (!fs.existsSync(crtPath)) {
-			log("ERROR", "openssl ca exited cleanly but produced no certificate file");
-			return sendError(res, 500, "signing_failed", "Certificate file was not created by the CA");
-		}
-
-		const certificate = fs.readFileSync(crtPath, "utf8");
-
-		const { stdout: textOut } = await execFileAsync(OPENSSL, ["x509", "-in", crtPath, "-noout", "-serial", "-enddate"]);
-		const serialMatch = textOut.match(/serial=([0-9A-Fa-f]+)/);
-		const endDateMatch = textOut.match(/notAfter=(.+)/);
-		const serialNumber = serialMatch ? serialMatch[1].toUpperCase() : null;
-		const expiresAt = endDateMatch ? new Date(endDateMatch[1]).toISOString() : "";
-
-		if (!serialNumber) {
-			log("ERROR", "Could not extract serial number from freshly issued certificate");
-			return sendError(res, 500, "signing_failed", "Could not determine serial number of issued certificate");
-		}
-
-		log("INFO", `Signed certificate serial=${serialNumber} expires=${expiresAt}`);
-
-		try {
-			const fingerprint = computeCertFingerprint(certificate);
-			appendFingerprintIndexEntry(fingerprint, serialNumber);
-			log("INFO", `Recorded fingerprint index entry fingerprint=${fingerprint} serial=${serialNumber}`);
-		} catch (err) {
-			// The issued cert is still valid and already returned below via
-			// /issued/:serial, losing the fingerprint-index entry only means
-			// /cert/by-fingerprint won't find it, not that issuance failed.
-			log("ERROR", `Failed to update fingerprint index for serial=${serialNumber}: ${err.message}`);
-		}
-
-		return sendJson(res, 201, { certificate, serialNumber, expiresAt });
-	} finally {
-		fs.rmSync(tmpDir, { recursive: true, force: true });
+	const profile = payload.profile === undefined ? "legacy" : payload.profile;
+	if (profile !== "legacy" && !Object.prototype.hasOwnProperty.call(PROFILES, profile)) {
+		return sendError(res, 400, "invalid_profile", "Unknown profile");
 	}
+	if (profile !== "legacy" && !RENEWAL_ENABLED) return sendError(res, 403, "renewal_disabled", "Renewal profiles are disabled");
+	if (profile === "demo-120s" && !DEMO_PROFILE_ENABLED) return sendError(res, 403, "profile_disabled", "The demo profile is disabled");
+	const renewsSerial = payload.renewsSerial === undefined ? undefined : normalizeSerial(payload.renewsSerial);
+	if (renewsSerial === null) return sendError(res, 400, "invalid_serial", "renewsSerial must be hexadecimal");
+	if (renewsSerial && !RENEWAL_ENABLED) return sendError(res, 403, "renewal_disabled", "Renewal is disabled");
+	const idemKey = normalizeIdempotencyKey(payload.idempotencyKey);
+	if (idemKey === null) return sendError(res, 400, "invalid_idempotency_key", "idempotencyKey must be 8 to 160 characters of [A-Za-z0-9:_-]");
+
+	return withCaMutex(async () => {
+		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pqc-custodian-"));
+		const csrPath = path.join(tmpDir, "client.csr");
+		const crtPath = path.join(tmpDir, "client.crt");
+		try {
+			fs.writeFileSync(csrPath, csrPem, { mode: 0o600 });
+			let cn, subject, spki;
+			try {
+				subject = await subjectRfc2253("req", csrPath);
+				cn = extractCn(subject.replace(/,/g, "/"));
+				spki = await spkiSha256("req", csrPath);
+			} catch (err) {
+				log("ERROR", `Failed to read CSR: ${err.stderr || err.message}`);
+				return sendError(res, 400, "invalid_csr", "Could not read subject or key from CSR");
+			}
+			if (!cn) return sendError(res, 400, "invalid_csr", "CSR subject has no CN component");
+
+			const now = Date.now();
+			const idem = readJsonState(IDEMPOTENCY_FILE);
+			if (idemKey && idem[idemKey]) {
+				const rec = idem[idemKey];
+				if (rec.spki !== spki) return sendError(res, 409, "idempotency_conflict", "This idempotency key was used with a different key pair");
+				let serial = rec.serial || (await findIssuedBySpki(cn, spki));
+				if (serial) {
+					if (!rec.serial) { idem[idemKey] = { ...rec, serial, state: "done" }; writeJsonAtomic(IDEMPOTENCY_FILE, idem); }
+					const r = await certResult(serial);
+					if (r) return sendJson(res, 200, { ...r, replay: true });
+				}
+			}
+
+			const lineage = readJsonState(LINEAGE_FILE);
+			let lifetimeS = null, notAfterMs = null, lineageId, bootstrapAt, closes = null;
+			const active = activeRowsForCn(cn, now);
+
+			if (renewsSerial) {
+				const pred = readIndexRows().find(r => r.serial === renewsSerial);
+				if (!pred || pred.status !== "V" || !(pred.expiryMs > now)) return sendError(res, 409, "predecessor_not_active", "The certificate being renewed is not valid");
+				if (extractCn(pred.dn) !== cn) return sendError(res, 400, "subject_mismatch", "CSR CN differs from the certificate being renewed");
+				const predPath = issuedCertPath(renewsSerial);
+				if (!predPath || !fs.existsSync(predPath)) return sendError(res, 409, "predecessor_not_active", "No issued certificate for that serial");
+				if ((await subjectRfc2253("x509", predPath)) !== subject) return sendError(res, 400, "subject_mismatch", "CSR subject differs from the certificate being renewed");
+				if ((await spkiSha256("x509", predPath)) === spki) return sendError(res, 400, "same_key", "A renewal must use a new key pair");
+				const L = lineage[renewsSerial];
+				if (!L) return sendError(res, 403, "not_renewable", "This certificate was not issued under a renewal profile");
+				if (L.frozen) return sendError(res, 403, "lineage_frozen", "This identity is frozen; a new bootstrap enrollment is required");
+				if (L.successor) {
+					if (L.successorSpki === spki) { const r = await certResult(L.successor); if (r) return sendJson(res, 200, { ...r, replay: true }); }
+					return sendError(res, 409, "successor_exists", "This certificate already has a successor with a different key", { successorSerial: L.successor });
+				}
+				if (!(active.length === 1 && active[0].serial === renewsSerial)) return sendError(res, 409, "cn_already_active", "The CN has another active certificate");
+				lifetimeS = PROFILES[L.profile];
+				lineageId = L.lineageId; bootstrapAt = L.bootstrapAt;
+				notAfterMs = Math.min(now + lifetimeS * 1000, bootstrapAt + LINEAGE_CAP_S * 1000);
+				if (notAfterMs - now < (lifetimeS * 1000) / 2) return sendError(res, 409, "lineage_cap_reached", "This renewal chain has reached its cap; a new bootstrap enrollment is required");
+			} else {
+				if (active.length > 0) {
+					const L = active.length === 1 ? lineage[active[0].serial] : null;
+					const nearCap = L && !L.frozen && (L.bootstrapAt + LINEAGE_CAP_S * 1000 - now) <= REBOOTSTRAP_WINDOW_S * 1000;
+					if (!(nearCap && profile !== "legacy")) {
+						log("WARN", `Rejected signing request: CN=${cn} already has an active certificate`);
+						return sendError(res, 409, "cn_already_active", `Certificate CN ${cn} already has an active certificate; revoke it first`);
+					}
+					closes = active[0].serial; // a new lineage for a CN whose chain is in its last 30 days
+				}
+				if (profile !== "legacy") {
+					lifetimeS = PROFILES[profile];
+					notAfterMs = now + lifetimeS * 1000;
+					bootstrapAt = now;
+				}
+			}
+
+			if (idemKey) { idem[idemKey] = { spki, cn, state: "intent", at: now }; writeJsonAtomic(IDEMPOTENCY_FILE, idem); }
+
+			const args = ["ca", "-config", CA_CNF, "-in", csrPath, "-out", crtPath, "-batch"];
+			if (notAfterMs === null) args.push("-days", CERT_VALIDITY_DAYS);
+			else args.push("-startdate", opensslTime(now - BACKDATE_S * 1000), "-enddate", opensslTime(notAfterMs));
+			let stderr = "";
+			try {
+				const result = await opensslCaLocked(args);
+				stderr = result.stderr || "";
+			} catch (err) {
+				log("ERROR", `openssl ca signing failed: ${err.stderr || err.message}`);
+				return sendError(res, 400, "signing_failed", "CA signing failed", { mayHaveIssued: true });
+			}
+			if (stderr && /\berror:/i.test(stderr)) {
+				log("ERROR", `CA signing reported an error: ${stderr}`);
+				return sendError(res, 400, "signing_failed", "CA signing failed", { mayHaveIssued: true });
+			}
+			if (!fs.existsSync(crtPath)) {
+				log("ERROR", "openssl ca exited cleanly but produced no certificate file");
+				return sendError(res, 500, "signing_failed", "Certificate file was not created by the CA", { mayHaveIssued: true });
+			}
+			const certificate = fs.readFileSync(crtPath, "utf8");
+			const { stdout: textOut } = await execFileAsync(OPENSSL, ["x509", "-in", crtPath, "-noout", "-serial", "-startdate", "-enddate"]);
+			const serialMatch = textOut.match(/serial=([0-9A-Fa-f]+)/);
+			const serialNumber = serialMatch ? serialMatch[1].toUpperCase() : null;
+			const na = textOut.match(/notAfter=(.+)/), nb = textOut.match(/notBefore=(.+)/);
+			const expiresAt = na ? new Date(na[1]).toISOString() : "";
+			if (!serialNumber) {
+				log("ERROR", "Could not extract serial number from freshly issued certificate");
+				return sendError(res, 500, "signing_failed", "Could not determine serial number of issued certificate", { mayHaveIssued: true });
+			}
+			log("INFO", `Signed certificate serial=${serialNumber} profile=${renewsSerial ? "renewal" : profile} expires=${expiresAt}`);
+
+			if (idemKey) { idem[idemKey] = { spki, cn, state: "done", serial: serialNumber, at: now }; writeJsonAtomic(IDEMPOTENCY_FILE, idem); }
+			if (renewsSerial || profile !== "legacy") {
+				const L2 = readJsonState(LINEAGE_FILE);
+				const prof = renewsSerial ? L2[renewsSerial].profile : profile;
+				L2[serialNumber] = { lineageId: lineageId || serialNumber, bootstrapAt, profile: prof, predecessor: renewsSerial || null, spki, at: now };
+				if (renewsSerial) { L2[renewsSerial].successor = serialNumber; L2[renewsSerial].successorSpki = spki; }
+				if (closes && L2[closes]) L2[closes].closedBy = serialNumber;
+				writeJsonAtomic(LINEAGE_FILE, L2);
+			}
+			try {
+				const fingerprint = computeCertFingerprint(certificate);
+				appendFingerprintIndexEntry(fingerprint, serialNumber);
+			} catch (err) {
+				log("ERROR", `Failed to update fingerprint index for serial=${serialNumber}: ${err.message}`);
+			}
+			return sendJson(res, 201, { certificate, serialNumber, notBefore: nb ? new Date(nb[1]).toISOString() : "", expiresAt, lineageId: lineageId || (profile !== "legacy" ? serialNumber : undefined) });
+		} finally {
+			fs.rmSync(tmpDir, { recursive: true, force: true });
+		}
+	});
+}
+
+async function handleSignResult(res, keyRaw) {
+	const key = normalizeIdempotencyKey(keyRaw);
+	if (!key) return sendError(res, 400, "invalid_idempotency_key", "Invalid key");
+	const rec = readJsonState(IDEMPOTENCY_FILE)[key];
+	if (!rec) return sendJson(res, 200, { state: "none" });
+	const serial = rec.serial || (await findIssuedBySpki(rec.cn, rec.spki));
+	if (!serial) return sendJson(res, 200, { state: "intent_without_certificate" });
+	const r = await certResult(serial);
+	return sendJson(res, 200, { state: "issued", ...r });
+}
+
+function handleGetLineage(res, serialRaw) {
+	const serial = normalizeSerial(serialRaw);
+	if (!serial) return sendError(res, 400, "invalid_serial", "Serial must be hexadecimal");
+	const L = readJsonState(LINEAGE_FILE)[serial];
+	if (!L) return sendError(res, 404, "not_found", "No lineage record for that serial");
+	return sendJson(res, 200, { serial, ...L, capAt: new Date(L.bootstrapAt + LINEAGE_CAP_S * 1000).toISOString() });
+}
+
+function handleFreeze(res, payload) {
+	const serial = normalizeSerial(payload && payload.serialNumber);
+	if (!serial) return sendError(res, 400, "invalid_serial", "serialNumber is required");
+	return withCaMutex(async () => {
+		const L = readJsonState(LINEAGE_FILE);
+		if (!L[serial]) return sendError(res, 404, "not_found", "No lineage record for that serial");
+		const id = L[serial].lineageId;
+		let n = 0;
+		for (const s of Object.keys(L)) if (L[s].lineageId === id) { L[s].frozen = true; n++; }
+		writeJsonAtomic(LINEAGE_FILE, L);
+		log("WARN", `Froze lineage ${id} (${n} certificate(s))`);
+		return sendJson(res, 200, { ok: true, lineageId: id, frozen: n });
+	});
 }
 
 async function handleRevoke(res, payload) {
@@ -437,8 +678,9 @@ async function handleRevoke(res, payload) {
 		args.push("-crl_reason", reason);
 	}
 
+	return withCaMutex(async () => {
 	try {
-		const { stdout, stderr } = await execFileAsync(OPENSSL, args, { cwd: CA_DIR });
+		const { stdout, stderr } = await opensslCaLocked(args.slice(0));
 		const output = `${stdout}\n${stderr}`;
 		if (/already revoked/i.test(output)) {
 			return sendError(res, 409, "already_revoked", `Certificate ${serial} is already revoked`);
@@ -458,6 +700,7 @@ async function handleRevoke(res, payload) {
 
 	log("INFO", `Revoked certificate serial=${serial} reason=${reason || "unspecified"}`);
 	return sendJson(res, 200, { ok: true });
+	});
 }
 
 const server = http.createServer(async (req, res) => {
@@ -478,10 +721,12 @@ const server = http.createServer(async (req, res) => {
 			return sendError(res, 413, "payload_too_large", "Request body too large");
 		}
 
-		if (!verifyHmac(bodyBuf, req.headers["x-hub-signature-256"])) {
-			log("WARN", `HMAC verification failed for ${req.method} ${req.url} from ${req.socket.remoteAddress}`);
-			return sendError(res, 401, "invalid_signature", "HMAC signature verification failed");
+		const auth = verifyRequest(req, bodyBuf);
+		if (!auth.ok) {
+			log("WARN", `Request authentication failed (${auth.why}) for ${req.method} ${req.url} from ${req.socket.remoteAddress}`);
+			return sendError(res, 401, "invalid_signature", "Request authentication failed");
 		}
+		res.pqcNonce = auth.nonce;
 
 		let payload = {};
 		if (bodyBuf.length > 0) {
@@ -520,6 +765,20 @@ const server = http.createServer(async (req, res) => {
 			return await handleRevoke(res, payload);
 		}
 
+		const resultMatch = /^\/sign-result\/([^/]+)$/.exec(url);
+		if (req.method === "GET" && resultMatch) {
+			return await handleSignResult(res, decodeURIComponent(resultMatch[1]));
+		}
+
+		const lineageMatch = /^\/lineage\/([^/]+)$/.exec(url);
+		if (req.method === "GET" && lineageMatch) {
+			return handleGetLineage(res, decodeURIComponent(lineageMatch[1]));
+		}
+
+		if (req.method === "POST" && url === "/lineage/freeze") {
+			return await handleFreeze(res, payload);
+		}
+
 		return sendError(res, 404, "not_found", "No such endpoint");
 	} catch (err) {
 		log("ERROR", `Unhandled error: ${err && err.stack ? err.stack : err}`);
@@ -528,5 +787,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-	log("INFO", `pqc-ca-custodian listening on :${PORT} (CA_DIR=${CA_DIR})`);
+	log("INFO", `pqc-ca-custodian listening on :${PORT} (CA_DIR=${CA_DIR}, renewal=${RENEWAL_ENABLED ? "on" : "off"}, demo profile=${DEMO_PROFILE_ENABLED ? "on" : "off"})`);
 });

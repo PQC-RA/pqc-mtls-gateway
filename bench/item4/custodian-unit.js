@@ -1,0 +1,30 @@
+const http=require("http"),crypto=require("crypto"),fs=require("fs"),{execFileSync}=require("child_process");
+const SECRET=fs.readFileSync("/t/hmac","utf8").trim(); const O="/opt/openssl/bin/openssl";
+const sha=b=>crypto.createHash("sha256").update(b).digest("hex"); const mac=d=>crypto.createHmac("sha256",SECRET).update(d).digest("hex");
+function req(method,path,body,{ts,nonce}={}){ return new Promise((res,rej)=>{ const b=body?Buffer.from(JSON.stringify(body)):Buffer.alloc(0);
+ ts=ts||String(Date.now()); nonce=nonce||crypto.randomBytes(16).toString("hex");
+ const r=http.request({host:"127.0.0.1",port:8091,method,path,headers:{"Content-Type":"application/json","Content-Length":b.length,"X-Custodian-Timestamp":ts,"X-Custodian-Nonce":nonce,"X-Hub-Signature-256":"sha256="+mac(`v2\n${method}\n${path}\n${ts}\n${nonce}\n${sha(b)}`)}},rr=>{const c=[];rr.on("data",d=>c.push(d));rr.on("end",()=>{const rb=Buffer.concat(c);const sig=rr.headers["x-custodian-response-signature"];const ok=sig==="sha256="+mac(`v2r\n${rr.statusCode}\n${nonce}\n${sha(rb)}`);let j={};try{j=JSON.parse(rb)}catch{}res({status:rr.statusCode,j,respSigOk:ok,nonce,ts})})});r.on("error",rej);r.end(b)})}
+let n=0; function csr(cn,keyFile){ keyFile=keyFile||`/tmp/k${++n}.pem`; if(!fs.existsSync(keyFile)) execFileSync(O,["genpkey","-algorithm","ML-DSA-65","-out",keyFile]); execFileSync(O,["req","-new","-key",keyFile,"-subj",`/C=BG/O=ACME/OU=M2M-Client/CN=${cn}`,"-out",`/tmp/c${n}.csr`],{env:{...process.env,OPENSSL_CONF:"/dev/null"}}); return {pem:fs.readFileSync(`/tmp/c${n}.csr`,"utf8"),keyFile};}
+const results=[]; const check=(name,cond,extra)=>{results.push(`${cond?"PASS":"FAIL"}  ${name}${extra?"  ["+extra+"]":""}`)};
+const life=c=>{const f="/tmp/life.pem";fs.writeFileSync(f,c);const o=execFileSync(O,["x509","-in",f,"-noout","-startdate","-enddate"]).toString();const nb=new Date(o.match(/notBefore=(.+)/)[1]),na=new Date(o.match(/notAfter=(.+)/)[1]);return (na-nb)/1000;};
+(async()=>{
+ const ts=Date.now()%100000;
+ let r=await req("POST","/sign",{csrPem:csr(`t-legacy-${ts}`).pem}); check("legacy sign 201, 365 d", r.status===201 && Math.abs(life(r.j.certificate)-365*86400)<5, `${r.status} life=${r.j.certificate?life(r.j.certificate):"-"}s`); check("response signature valid", r.respSigOk);
+ r=await req("POST","/sign",{csrPem:csr(`t-legacy-${ts}`).pem}); check("legacy second for same CN 409 cn_already_active", r.status===409 && r.j.error==="cn_already_active", r.j.error);
+ const a=csr(`t-renew-${ts}`); r=await req("POST","/sign",{csrPem:a.pem,profile:"client-30d",idempotencyKey:`enroll-${ts}-0001`}); const s1=r.j.serialNumber; check("client-30d enroll 201, life 30 d + 60 s", r.status===201 && Math.abs(life(r.j.certificate)-(30*86400+60))<5, `${r.status} ${r.j.error||""} life=${r.j.certificate?life(r.j.certificate):"-"}`);
+ r=await req("POST","/sign",{csrPem:a.pem,profile:"client-30d",idempotencyKey:`enroll-${ts}-0001`}); check("enroll replay same key 200 replay same serial", r.status===200 && r.j.replay && r.j.serialNumber===s1, `${r.status} ${r.j.serialNumber}`);
+ const b=csr(`t-renew-${ts}`); r=await req("POST","/sign",{csrPem:b.pem,renewsSerial:s1}); const s2=r.j.serialNumber; check("renewal with new key 201", r.status===201 && s2 && s2!==s1, `${r.status} ${r.j.error||""}`);
+ r=await req("POST","/sign",{csrPem:csr(`t-renew-${ts}`,b.keyFile).pem,renewsSerial:s1}); check("renewal retry, same new key re-signed CSR: 200 replay", r.status===200 && r.j.replay && r.j.serialNumber===s2, `${r.status} ${r.j.error||""}`);
+ r=await req("POST","/sign",{csrPem:csr(`t-renew-${ts}`).pem,renewsSerial:s1}); check("second renewal with a different key: 409 successor_exists", r.status===409 && r.j.error==="successor_exists" && r.j.successorSerial===s2, `${r.status} ${r.j.error}`);
+ r=await req("POST","/sign",{csrPem:csr(`t-renew-${ts}`,b.keyFile).pem,renewsSerial:s2}); check("renew successor with its own key: 400 same_key", r.status===400 && r.j.error==="same_key", `${r.status} ${r.j.error}`);
+ r=await req("POST","/sign",{csrPem:csr(`t-other-${ts}`).pem,renewsSerial:s2}); check("renew with a different CN: 400 subject_mismatch", r.status===400 && r.j.error==="subject_mismatch", `${r.status} ${r.j.error}`);
+ const lg=await req("POST","/sign",{csrPem:csr(`t-legacy2-${ts}`).pem}); r=await req("POST","/sign",{csrPem:csr(`t-legacy2-${ts}`).pem,renewsSerial:lg.j.serialNumber}); check("renew a legacy certificate: 403 not_renewable", r.status===403 && r.j.error==="not_renewable", `${r.status} ${r.j.error}`);
+ const d=csr(`t-demo-${ts}`); r=await req("POST","/sign",{csrPem:d.pem,profile:"demo-120s"}); const d1=r.j.serialNumber; check("demo-120s enroll 201, life 180 s", r.status===201 && Math.abs(life(r.j.certificate)-180)<3, `${r.status} life=${r.j.certificate?life(r.j.certificate):"-"}`);
+ const pc=[csr(`t-demo-${ts}`),csr(`t-demo-${ts}`)]; const par=await Promise.all(pc.map(x=>req("POST","/sign",{csrPem:x.pem,renewsSerial:d1}))); const codes=par.map(p=>p.status).sort().join(","); check("two concurrent renewals, different keys: one 201, one 409", codes==="201,409", codes);
+ r=await req("POST","/lineage/freeze",{serialNumber:s2}); check("freeze lineage 200", r.status===200 && r.j.frozen>=2, `${r.status} frozen=${r.j.frozen}`);
+ r=await req("POST","/sign",{csrPem:csr(`t-renew-${ts}`).pem,renewsSerial:s2}); check("renewal after freeze: 403 lineage_frozen", r.status===403 && r.j.error==="lineage_frozen", `${r.status} ${r.j.error}`);
+ r=await req("GET",`/sign-result/enroll-${ts}-0001`); check("sign-result for enroll key: issued, same serial", r.j.state==="issued" && r.j.serialNumber===s1, r.j.state);
+ const nn=crypto.randomBytes(16).toString("hex"); await req("GET","/index",null,{nonce:nn}); r=await req("GET","/index",null,{nonce:nn}); check("replayed nonce: 401", r.status===401);
+ r=await req("GET","/index",null,{ts:String(Date.now()-60000)}); check("stale timestamp: 401", r.status===401);
+ console.log(results.join("\n")); console.log(`${results.filter(x=>x.startsWith("PASS")).length}/${results.length} passed`);
+})().catch(e=>{console.log("ERROR",e.message);process.exit(1)});
