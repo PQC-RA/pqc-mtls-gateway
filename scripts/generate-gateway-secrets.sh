@@ -155,6 +155,20 @@ else
     fi
 fi
 
+# Item 4: renew-hmac attests the mTLS client on the gateway -> management-api
+# /renew hop. Same readers and mode as enroll-hmac above.
+RENEW_HMAC_FILE="$SECRETS_DIR/renew-hmac.key"
+if [ -f "$RENEW_HMAC_FILE" ]; then
+    echo "SKIP: $RENEW_HMAC_FILE already exists (delete it first to regenerate)"
+else
+    echo "Generating 256-bit renew HMAC secret..."
+    openssl rand -hex 32 > "$RENEW_HMAC_FILE"
+    APP_GID="${APP_GID:-1001}"
+    chown "root:$APP_GID" "$RENEW_HMAC_FILE" 2>/dev/null || echo "  WARN: could not chown $RENEW_HMAC_FILE to root:$APP_GID" >&2
+    chmod 640 "$RENEW_HMAC_FILE" 2>/dev/null || true
+    echo "  Written: $RENEW_HMAC_FILE"
+fi
+
 echo ""
 echo "Secrets ready in $SECRETS_DIR/"
 echo "These files are gitignored.  Store them in your secrets manager or"

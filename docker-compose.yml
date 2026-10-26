@@ -128,6 +128,9 @@ services:
    # root-owned nginx master AND management-api's non-root uid 1001, same
    # workaround already used for control-plane-hmac/custodian-hmac.
    - ./secrets/enroll-hmac.key:/run/secrets/enroll-hmac:ro
+   # Item 4: attests the mTLS client on the /renew hop (renew_attest.lua /
+   # RenewAttestGuard). Same 0640 bind-mount convention as enroll-hmac.
+   - ./secrets/renew-hmac.key:/run/secrets/renew-hmac:ro
    - pqc-logs-audit:/var/log/pqc-gw:rw
    - pqc-routes-cache:/var/cache/pqc-gw/routes:rw
    # Consume the crl-renewer's reload-nginx sentinel to refresh the static
@@ -357,6 +360,10 @@ services:
   user: "1001:1001"
   environment:
    - CERT_VALIDITY_DAYS=${CERT_VALIDITY_DAYS:-365}
+   # Item 4 switches (ADR-019): off unless set to 1. Read by the custodian and
+   # management-api only; flipping them recreates those two containers.
+   - RENEWAL_ENABLED=${RENEWAL_ENABLED:-}
+   - CUSTODIAN_DEMO_PROFILE=${CUSTODIAN_DEMO_PROFILE:-}
   networks:
    - pqc-pki
   volumes:
@@ -558,6 +565,7 @@ services:
    - GATEWAY_JWKS_URI=https://gateway:8081/.well-known/jwks.json
    - GATEWAY_CONTROL_URL=https://gateway:8081/update-routes
    - NODE_EXTRA_CA_CERTS=/etc/pki/internal-tls-ca.crt
+   - RENEWAL_ENABLED=${RENEWAL_ENABLED:-}
   container_name: pqc-mtls-management-api
   networks:
    - pqc-mgmt
@@ -579,6 +587,9 @@ services:
    # Verifies the /enroll -> /api/admin/certs/sign proxy hop
    # (EnrollHmacGuard). Same 0644 bind-mount workaround as the two secrets above.
    - ./secrets/enroll-hmac.key:/run/secrets/enroll-hmac:ro
+   # Item 4: attests the mTLS client on the /renew hop (renew_attest.lua /
+   # RenewAttestGuard). Same 0640 bind-mount convention as enroll-hmac.
+   - ./secrets/renew-hmac.key:/run/secrets/renew-hmac:ro
    - /etc/pki/pqc-ca/internal-tls-ca.crt:/etc/pki/internal-tls-ca.crt:ro
   ports:
    - "127.0.0.1:3000:3000"
