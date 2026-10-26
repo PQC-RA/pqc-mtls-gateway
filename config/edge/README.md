@@ -11,12 +11,15 @@ SCADA/historian -> central gateway :1502 (config/nginx/stream/)
                    edge box :8502 (this directory) -> device :502 (plain)
 ```
 
-The box runs the gateway image with `nginx -c /etc/pqc-edge/nginx.conf`. Mount
-this directory's `nginx.conf` and `lua/` together with:
+The box runs the gateway image with `entrypoint.sh` from this directory as its
+entrypoint (nginx with `/etc/pqc-edge/nginx.conf`, plus a watcher that reloads it
+when the CRL or the allowed clients change). Mount this directory's `nginx.conf`
+and `lua/` together with:
 
 | File in `/etc/pqc-edge` | What |
 |---|---|
 | `edge-server.crt`, `edge-server.key` | the box's ML-DSA-65 certificate: `serverAuth`, SAN = the name the central side checks (`proxy_ssl_name`) |
+| `central-crl.pem` | the CRL of that CA, required (nginx does not start without it), kept current: past nextUpdate every handshake is refused |
 | `central-ca.pem` | the ML-DSA-65 CA that issued the central gateway's client certificate, and nothing else (a classical CA here would let a classical chain through) |
 | `allowed-clients.txt` | SHA-256 fingerprints of the client certificates allowed through: one per line, 64 hex characters (`openssl x509 -in c.crt -outform DER \| sha256sum`, not the colon form of `-fingerprint`). The CA issues other client certificates too; only these reach the device. Absent, empty or unreadable: nobody. It is read by the worker processes (user `nobody`), so it must be readable by them, and re-read on `nginx -s reload`. |
 
@@ -38,11 +41,19 @@ gateway's entrypoint nothing rotates `/var/log/nginx`; arrange it.
   wrong clock, a gateway down) must never cost control of a process.
 - The segment from the box to the device stays plain.
 
+## Revocation of open sessions
+
+A stream session is checked once, at its handshake, and Modbus, IEC 104 or DNP3
+sessions stay open for days. So a CRL change causes a reload, and after a reload
+the old workers close what they still hold after `worker_shutdown_timeout`
+(10 s here, 60 s on the central gateway); the clients reconnect and the revoked
+identity is refused in the new handshake. Measured (`bench/edge/edge-link-test.sh`
+R1, R2): a revoked box loses its open session 60 s after the central gateway's
+reload, a revoked central identity 11 s after the box's CRL file changes. Every
+session on that box or gateway reconnects once at each reload: plan for it.
+
 ## Not in this stage
 
-- **Revocation that closes live sessions.** A stream session is checked once, at
-  the handshake; Modbus, IEC 104 and DNP3 sessions stay open for days. Until this
-  exists, revoking a certificate stops new sessions only.
 - Issuance and renewal of the box's `serverAuth` certificate through the gateway's
   custodian (it issues `clientAuth` only today).
 - Stream-side telemetry beyond the access log; ARM64 packaging; TPM sealing of the

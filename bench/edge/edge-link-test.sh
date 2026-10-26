@@ -26,6 +26,10 @@
 #   E9 boxes the central gateway refuses, the SCADA getting nothing: another CA's
 #      certificate (E9), the right CA under another name (E9b), the right CA's
 #      classical certificate (E9c)
+#   R0-R2 revocation reaches open sessions: a revoked box (CRL on the central side,
+#      reload) and a revoked central identity (CRL on the box, its watcher reloads)
+#      each end a held Modbus session within the shutdown timeout, and no new
+#      session reads
 #   L  latency (recorded, no threshold): new connection per read and one
 #      connection for all reads, through the link and straight on the cell network
 #
@@ -45,7 +49,7 @@ O(){ LD_LIBRARY_PATH=$LIBDIR OPENSSL_CONF=/dev/null "$OSSL" "$@"; }
 pass=0; fail=0
 check(){ if eval "$2"; then echo "PASS  $1"; pass=$((pass+1)); else echo "FAIL  $1"; fail=$((fail+1)); fi; }
 cleanup(){
-	docker rm -f $CENTRAL $EDGE $DEVICE $T-E9 $T-E9b $T-E9c >/dev/null 2>&1
+	docker rm -f $CENTRAL $EDGE $DEVICE $T-E9 $T-E9b $T-E9c $T-R1 $T-R2 >/dev/null 2>&1
 	docker network rm $NET_CTL $NET_WAN $NET_CELL >/dev/null 2>&1
 	find "$W" -name '*.key' -exec shred -u {} + 2>/dev/null
 }
@@ -69,10 +73,17 @@ leaf ca edge-server ML "${SRV[@]}"; leaf rogue-ca rogue-server ML "${SRV[@]}"
 leaf ca wrongname-server ML "keyUsage=critical,digitalSignature" "extendedKeyUsage=serverAuth" "subjectAltName=DNS:other.example"
 leaf ca classical-server EC "keyUsage=critical,digitalSignature" "extendedKeyUsage=serverAuth" "subjectAltName=DNS:edge.example"
 leaf ca central-gateway ML "${CLI[@]}"; leaf ca other-client ML "${CLI[@]}"; leaf ca classical-client EC "${CLI[@]}"
+# the CA's database, for revocations and CRLs (ML-DSA: no separate digest)
+: > "$W/pki/index.txt"; echo 1000 > "$W/pki/crlnumber"
+printf '[ca]\ndefault_ca=d\n[d]\ndatabase=%s/index.txt\ncrlnumber=%s/crlnumber\ndefault_md=default\ndefault_crl_days=1\nunique_subject=no\n' "$W/pki" "$W/pki" > "$W/pki/ca.cnf"
+CA=(-config "$W/pki/ca.cnf" -cert "$W/pki/ca.crt" -keyfile "$W/pki/ca.key")
+crl(){ O ca "${CA[@]}" -gencrl -out "$1.tmp" 2>/dev/null && mv "$1.tmp" "$1"; }
+revoke(){ O ca "${CA[@]}" -revoke "$1" 2>/dev/null; }
 fpr(){ O x509 -in "$1" -outform DER | sha256sum | cut -d' ' -f1; }
 
 # edge box files
 cp "$W/pki/edge-server.crt" "$W/pki/edge-server.key" "$W/edge/"; cp "$W/pki/ca.crt" "$W/edge/central-ca.pem"
+crl "$W/edge/central-crl.pem"
 printf '# the central gateway\n%s\n' "$(fpr "$W/pki/central-gateway.crt")" > "$W/edge/allowed-clients.txt"
 # fixed addresses: the box on wan (the same for the rogue box later), the device on cell
 SUB=10.$((200 + RANDOM % 25)).$((RANDOM % 250)); EDGE_ADDR=$SUB.10; DEV_ADDR=$SUB.140
@@ -91,7 +102,7 @@ sed -i -e '/ssl_conf_command SignatureAlgorithms/d' -e '/ssl_conf_command Client
 sed -e "s/192.0.2.10:8502/$EDGE_ADDR:8502/" -e "s/listen 192.0.2.1:1502/listen $CENTRAL_CTL:1502/" -e "s/allow 192.0.2.50;/allow $SCADA_ADDR;/" \
 	"$REPO/config/nginx/stream/edge-link.conf.example" > "$W/stream/edge-link.conf"
 cp "$W/pki/central-gateway.crt" "$W/stream/central-client.crt"; cp "$W/pki/central-gateway.key" "$W/stream/central-client.key"
-cp "$W/pki/ca.crt" "$W/stream/edge-ca.pem"
+cp "$W/pki/ca.crt" "$W/stream/edge-ca.pem"; crl "$W/stream/edge-crl.pem"
 chmod -R a+rX "$W/edge" "$W/rogue" "$W/wrongname" "$W/classical" "$W/stream"
 
 # ── the Modbus device and the tools ──
@@ -111,6 +122,30 @@ def read(c):
     if r.isError():
         raise RuntimeError(str(r))
     return r.registers
+if mode == "hold":
+    # one session, a read every 0.5 s for up to n seconds; report when it breaks
+    # and whether a new connection then reads
+    started, last_ok = time.time(), None
+    c = ModbusTcpClient(host, port=port, timeout=5, retries=0)
+    if not c.connect():
+        print(json.dumps({"error": "no connection"})); sys.exit(1)
+    while time.time() < started + n:
+        try:
+            read(c); last_ok = time.time()
+        except Exception:
+            fail_at = time.time(); c.close()
+            c2, again = ModbusTcpClient(host, port=port, timeout=15, retries=0), False
+            if c2.connect():
+                try:
+                    read(c2); again = True
+                except Exception:
+                    pass
+            c2.close()
+            print(json.dumps({"started": started, "last_ok": last_ok, "fail_at": fail_at, "reconnect_reads": again}))
+            sys.exit(0)
+        time.sleep(0.5)
+    print(json.dumps({"started": started, "last_ok": last_ok, "fail_at": None}))
+    sys.exit(0)
 if mode == "read":
     c = ModbusTcpClient(host, port=port, timeout=15, retries=0)
     if not c.connect():
@@ -147,7 +182,8 @@ docker run -d --name $DEVICE --network $NET_CELL --ip $DEV_ADDR --network-alias 
 edge_up(){ # edge_up NAME DIR
 	docker create --name "$1" --network $NET_WAN --ip $EDGE_ADDR --network-alias edge.example \
 		-v "$2:/etc/pqc-edge:ro" -v "$REPO/config/edge/lua:/etc/pqc-edge/lua:ro" -v "$REPO/config/nginx/lua:/etc/nginx/lua:ro" \
-		--entrypoint sh "$GW_IMAGE" -c 'mkdir -p /var/log/nginx; exec nginx -c /etc/pqc-edge/nginx.conf -g "daemon off;"' >/dev/null
+		-v "$REPO/config/edge/entrypoint.sh:/usr/local/bin/edge-entrypoint.sh:ro" \
+		--entrypoint /usr/local/bin/edge-entrypoint.sh "$GW_IMAGE" >/dev/null
 	docker network connect $NET_CELL "$1"; docker start "$1" >/dev/null
 }
 edge_up $EDGE "$W/edge"
@@ -247,6 +283,38 @@ impostor E9 rogue "a box with another CA's certificate under the right name" 'up
 impostor E9b wrongname "a box with the right CA's certificate under another name" 'upstream SSL certificate does not match'
 impostor E9c classical "a box with the right CA's classical (EC) certificate, willing to sign with ECDSA" 'alert handshake failure'
 docker exec $CENTRAL sh -c 'cat /var/log/nginx/error.log' > "$W/central-error.log" 2>/dev/null
+
+# R revocation reaches sessions already open
+hold(){ # hold LABEL -> starts a held session from the SCADA host
+	docker run -d --name $T-$1 --network $NET_CTL --ip $SCADA_ADDR -v "$W:/w:ro" "$MB_IMAGE" python /w/client.py central 1502 hold 150 >/dev/null
+	sleep 3
+}
+outcome(){ # outcome LABEL T0 LIMIT -> prints the result, sets R_OK
+	timeout 170 docker wait $T-$1 >/dev/null; local j; j=$(docker logs $T-$1 2>&1 | tail -1); docker rm -f $T-$1 >/dev/null
+	echo "  $1: $j"
+	R_OK=$(python3 -I -c 'import json,sys; d=json.loads(sys.argv[1]); t0=float(sys.argv[2]); lim=float(sys.argv[3])
+f=d.get("fail_at"); print("yes %.1f" % (f - t0) if f and f > t0 and f - t0 <= lim and d.get("reconnect_reads") is False and d.get("last_ok") and d["last_ok"] > t0 - 1 else "no %s" % (None if not f else round(f - t0, 1)))' "$j" "$2" "$3" 2>/dev/null || echo "no parse")
+}
+edge_up $EDGE "$W/edge"; sleep 3
+r=$(scada central 1502 read 1 2>&1 | tail -1); echo "  R0: $r"
+check "R0 the real box is back" "[ '$r' = 'registers 4242 1717 2026' ]"
+# R1: the box's certificate is revoked; the central side gets the new CRL and reloads
+hold R1; t0=$(date +%s.%N)
+revoke "$W/pki/edge-server.crt"; crl "$W/stream/edge-crl.pem"; docker exec $CENTRAL nginx -s reload
+outcome R1 "$t0" 75; echo "  R1: closed after the revocation: $R_OK s (worker_shutdown_timeout 60s)"
+check "R1 a revoked box: the open session ends within the central gateway's shutdown timeout, and no new one reads" "echo '$R_OK' | grep -q '^yes'"
+# R2: a fresh box certificate; then the central gateway's certificate is revoked on the box
+leaf ca edge-server2 ML "${SRV[@]}"; cp "$W/pki/edge-server2.crt" "$W/edge/edge-server.crt.new"; cp "$W/pki/edge-server2.key" "$W/edge/edge-server.key.new"
+mv "$W/edge/edge-server.crt.new" "$W/edge/edge-server.crt"; mv "$W/edge/edge-server.key.new" "$W/edge/edge-server.key"; chmod a+r "$W/edge/edge-server."*
+docker exec $EDGE nginx -c /etc/pqc-edge/nginx.conf -s reload; sleep 12
+r=$(scada central 1502 read 1 2>&1 | tail -1); echo "  R2a: $r"
+check "R2a with a new box certificate the link reads again" "[ '$r' = 'registers 4242 1717 2026' ]"
+hold R2; t0=$(date +%s.%N)
+revoke "$W/pki/central-gateway.crt"; crl "$W/edge/central-crl.pem"   # the box's watcher reloads by itself
+outcome R2 "$t0" 15; echo "  R2: closed after the revocation: $R_OK s (box worker_shutdown_timeout 10s)"
+check "R2 a revoked central identity: the box ends the open session within its shutdown timeout, and no new one reads" "echo '$R_OK' | grep -q '^yes'"
+docker logs $EDGE 2>&1 | grep -c '\[edge\] reloaded' > "$W/edge-reloads.txt"
+check "R2 the box's watcher reloaded on its own" "[ \$(cat '$W/edge-reloads.txt') -ge 1 ]"
 
 docker exec $CENTRAL sh -c 'cat /var/log/nginx/pqc-edge-link.log' > "$W/central-link.log" 2>/dev/null
 echo "== result: $pass passed, $fail failed"

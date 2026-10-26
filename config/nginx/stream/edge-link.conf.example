@@ -53,6 +53,12 @@ server {
 	proxy_ssl_conf_command Groups X25519MLKEM768;
 	proxy_ssl_conf_command SignatureAlgorithms ML-DSA-65;
 	proxy_ssl_session_reuse off;
+	# The box CA's CRL: a stolen box is stopped by revoking its certificate. Read
+	# at start and on reload (touch /signals/reload-nginx after replacing it);
+	# open sessions to a revoked box end at the old workers' shutdown timeout
+	# (worker_shutdown_timeout in nginx.conf). Past nextUpdate it refuses every
+	# box of that CA (fail closed): keep it current.
+	proxy_ssl_crl /etc/nginx/stream/edge-crl.pem;
 
 	access_log /var/log/nginx/pqc-edge-link.log pqc_edge_link_json;
 }
