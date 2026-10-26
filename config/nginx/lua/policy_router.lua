@@ -51,6 +51,9 @@ if client_serial then
     end
 end
 
+-- Expiry, per request: a keep-alive connection outlives the handshake check.
+require("client_cert_expiry").refuse_if_expired("policy_router")
+
 -- ── Helpers ──────────────────────────────────────────────────────────────────
 
 local function extract_cn(dn)

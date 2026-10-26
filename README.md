@@ -507,6 +507,7 @@ config/nginx/         gateway configuration and the Lua data plane
   lua/policy_router.lua    CN → backend resolution, JWT minting, header allowlist
   lua/crl_worker.lua       CRL polling and the revocation fast path
   lua/revocation_check.lua the same revocation check for locations without a router
+  lua/client_cert_expiry.lua per-request client-certificate expiry check
 docker/               image definitions, including the PQ OpenSSL base
 scripts/              deploy, PKI bootstrap, certificate issuance, tests
 bench/                measurement harness, raw samples, packet capture

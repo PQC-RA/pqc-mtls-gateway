@@ -51,6 +51,9 @@ if client_serial then
     end
 end
 
+-- Expiry, per request: a keep-alive connection outlives the handshake check.
+require("client_cert_expiry").refuse_if_expired("admin_jwt")
+
 local function extract_cn(dn)
     return dn and dn:match("CN=([^,/]+)") or ""
 end

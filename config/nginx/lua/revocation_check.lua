@@ -1,5 +1,5 @@
 -- revocation_check.lua
--- Revocation-only access check for locations on the mTLS listener that do not
+-- Revocation and expiry access check for locations on the mTLS listener that do not
 -- run policy_router.lua or admin_jwt.lua (today: the static `location /`).
 --
 -- Without it those locations relied on nginx's ssl_crl alone, which refreshes
@@ -15,3 +15,6 @@ if client_serial then
         return ngx.exit(444)
     end
 end
+
+-- Expiry, per request: a keep-alive connection outlives the handshake check.
+require("client_cert_expiry").refuse_if_expired("location /")
