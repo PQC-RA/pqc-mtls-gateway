@@ -114,6 +114,8 @@ services:
    - ./config/nginx/lua:/etc/nginx/lua:ro
    # Migration listener configuration (empty by default, see its README).
    - ./config/nginx/migration:/etc/nginx/migration:ro
+   # Edge-link stream listeners (empty by default, see its README).
+   - ./config/nginx/stream:/etc/nginx/stream:ro
    # Mount point for a public enrollment page, served read-only. ONLY an enrollment
    # bundle belongs here, never the admin console.
    - ./config/enroll-ui:/etc/nginx/enroll-ui:ro

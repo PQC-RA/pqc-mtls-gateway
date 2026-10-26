@@ -1,0 +1,44 @@
+# Central side of an edge link (ADR-020): copy to edge-link.conf to enable (see
+# README.md here). Included inside stream { } of the gateway's nginx.conf.
+#
+# The SCADA or historian connects to this listener in plain TCP, as it did to the
+# device; the gateway carries the connection to the edge box over post-quantum
+# mTLS and verifies the box. Keep this listener on a network only the SCADA side
+# reaches: it is the plain end.
+
+log_format pqc_edge_link_json escape=json
+	'{"ts":"$time_iso8601","side":"central","client":"$remote_addr",'
+	'"upstream":"$upstream_addr","status":$status,"bytes_in":$bytes_received,'
+	'"bytes_out":$bytes_sent,"session_time":$session_time,'
+	'"connect_time":"$upstream_connect_time"}';
+
+server {
+	listen 1502;
+
+	# The box's ADDRESS, not its name: nginx resolves a name once, at start, and
+	# an unresolvable one stops the whole gateway from starting. The box's
+	# identity is checked by name below (proxy_ssl_name), not by address.
+	proxy_pass 192.0.2.10:8502;
+	proxy_connect_timeout 10s;
+	proxy_timeout 1h;
+
+	proxy_ssl on;
+	proxy_ssl_protocols TLSv1.3;
+	# The gateway's identity towards the box (ML-DSA-65, clientAuth); its
+	# fingerprint is in the box's allowed-clients.txt.
+	proxy_ssl_certificate     /etc/nginx/stream/central-client.crt;
+	proxy_ssl_certificate_key /etc/nginx/stream/central-client.key;
+	# The box must prove itself: a CA, its name, ML-DSA-65 only. proxy_ssl_verify
+	# is off by default in nginx; without it anyone on the path could stand in for
+	# the box while the box's log still showed a post-quantum handshake.
+	proxy_ssl_verify on;
+	proxy_ssl_trusted_certificate /etc/nginx/stream/edge-ca.pem;
+	proxy_ssl_verify_depth 3;
+	proxy_ssl_name edge.example;
+	proxy_ssl_server_name on;
+	proxy_ssl_conf_command Groups X25519MLKEM768;
+	proxy_ssl_conf_command SignatureAlgorithms ML-DSA-65;
+	proxy_ssl_session_reuse off;
+
+	access_log /var/log/nginx/pqc-edge-link.log pqc_edge_link_json;
+}
