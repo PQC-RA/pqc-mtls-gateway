@@ -210,6 +210,22 @@ CNF
     rm -f "$INT_TLS_DIR/internal-tls.csr"
 }
 
+# The rendered intermediate config is written once, at bootstrap, so a template
+# fix never reaches an existing CA by itself. The leaf profile is a security
+# property (a CA that copies CSR extensions lets a token holder obtain CA:TRUE
+# or a server SAN), so say so loudly rather than edit a live CA config here.
+warn_leaf_profile() {
+    local cnf="$PKI_DIR/intermediate/openssl-intermediate.cnf"
+    [ -f "$cnf" ] || return 0
+    if grep -Eq '^[[:space:]]*copy_extensions[[:space:]]*=[[:space:]]*copy' "$cnf" \
+       || ! grep -Eq '^[[:space:]]*x509_extensions[[:space:]]*=' "$cnf"; then
+        echo "WARNING: $cnf predates the leaf-profile fix:" >&2
+        echo "  it copies extensions from CSRs and/or has no default x509_extensions." >&2
+        echo "  Set 'copy_extensions = none' and 'x509_extensions = v3_m2m_leaf' in [ CA_default ]" >&2
+        echo "  and add the [ v3_m2m_leaf ] section from pki/templates/openssl-intermediate.cnf." >&2
+    fi
+}
+
 if [ -f "$PKI_DIR/root/certs/root-ca.crt" ]; then
     echo "Root CA already exists at $PKI_DIR, leaving the CA untouched."
     echo "==> Catching up any newer artifacts introduced after initial bootstrap..."
@@ -220,6 +236,7 @@ if [ -f "$PKI_DIR/root/certs/root-ca.crt" ]; then
     # caught here rather than
     # silently carried forward.
     assert_pq_ca
+    warn_leaf_profile
     echo ""
     echo "==> Nothing else to do."
     exit 0

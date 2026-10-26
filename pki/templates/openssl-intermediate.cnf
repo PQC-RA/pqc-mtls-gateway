@@ -5,8 +5,10 @@
 #
 # DISTRIBUTION URLs ARE DEPLOYMENT-SPECIFIC AND MUST BE SET
 #   The crlDistributionPoints and authorityInfoAccess entries below are written
-#   into every certificate this CA issues, and tell a third-party verifier where
-#   to fetch the CRL and the issuing certificate. `pqc-gw.local` is a PLACEHOLDER
+#   into the server certificate and into certificates issued with the v3_client
+#   profile (the admin certificate), and tell a third-party verifier where to
+#   fetch the CRL and the issuing certificate. Leaves the custodian signs use
+#   v3_m2m_leaf, which carries neither. `pqc-gw.local` is a PLACEHOLDER
 #   and will not resolve on your network: replace the host with wherever this
 #   deployment publishes them before issuing certificates anyone else validates.
 #   The pki-dist service serves that tree on :8090 if you want to front it.
@@ -37,7 +39,12 @@ default_md        = default
 default_days      = 365               # M2M client cert: 1 year
 preserve          = no
 policy            = policy_loose
-copy_extensions   = copy              # Copy the SAN from the CSR
+copy_extensions   = none              # NEVER copy extensions from a CSR: with `copy`, any token holder
+                                      # could obtain CA:TRUE, keyCertSign, anyExtendedKeyUsage,
+                                      # serverAuth/OCSPSigning or an arbitrary SAN (a SAN of the
+                                      # gateway's own name verifies as a TLS server for it)
+x509_extensions   = v3_m2m_leaf       # every certificate signed without an explicit -extensions
+                                      # (i.e. every leaf the custodian signs) gets the minimal M2M profile
 unique_subject    = yes               # Reissue via revoke-then-reenroll; blocks duplicate active CNs (defence in depth)
 
 # GDPR-compliant: no personal data is required for M2M
@@ -63,8 +70,21 @@ OU = M2M Certificate Issuing CA
 CN = PQC-GW PQC Intermediate CA G1
 
 # ─────────────────────────────────
-# M2M CLIENT Certificate Profile (eIDAS + ETSI EN 319 411-2)
+# M2M CLIENT Certificate Profiles
 # ────────
+[ v3_m2m_leaf ]
+# Minimal M2M client leaf, applied by default (x509_extensions above) to every
+# certificate the custodian signs. No policy text, no CDP or AIA: it claims
+# nothing the deployment cannot show.
+subjectKeyIdentifier   = hash
+authorityKeyIdentifier = keyid:always
+basicConstraints       = critical, CA:FALSE
+keyUsage               = critical, digitalSignature
+extendedKeyUsage       = clientAuth
+
+# Full client profile (eIDAS + ETSI EN 319 411-2 fields), applied only when
+# asked for explicitly with -extensions v3_client: scripts/deploy.sh issues the
+# admin certificate with it.
 [ v3_client ]
 subjectKeyIdentifier   = hash
 authorityKeyIdentifier = keyid:always,issuer:always
