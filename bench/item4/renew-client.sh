@@ -5,6 +5,9 @@
 # The directory given with --dir holds the client's identity:
 #   client.crt, client.key   the CURRENT certificate and its ML-DSA-65 key
 #   ca-chain.crt             the chain that issued the gateway's certificate
+#   identity.pem             key and certificate in ONE file, replaced by a single
+#                            rename; a service reading its identity while a renewal
+#                            swaps the files should use this (curl --cert identity.pem)
 # and, while a renewal is in flight:
 #   pending.key, pending.csr the NEW key and its CSR, written BEFORE the request,
 #                            so a lost response is retried with the same key and
@@ -47,6 +50,7 @@ done
 [ -n "$DIR" ] && [ -n "$URL" ] || { echo "usage: $0 --dir DIR --url URL [--resolve h:p:a] [--once|--loop]" >&2; exit 2; }
 for f in client.crt client.key ca-chain.crt; do [ -s "$DIR/$f" ] || { echo "missing $DIR/$f" >&2; exit 2; }; done
 umask 077
+[ -s "$DIR/identity.pem" ] || { cat "$DIR/client.key" "$DIR/client.crt" > "$DIR/identity.pem.new" && mv "$DIR/identity.pem.new" "$DIR/identity.pem"; }
 
 log() { printf '%s %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 epoch() { date -u -d "$1" +%s; }
@@ -105,6 +109,8 @@ print(json.dumps({"csr": open(os.environ["CSR_FILE"]).read(),
 		# Swap: certificate first into place under a temporary name, then both renames.
 		cp "$DIR/client.crt" "$DIR/prev.crt"; cp "$DIR/client.key" "$DIR/prev.key"
 		cp "$work/new.crt" "$DIR/client.crt.new"
+		{ cat "$DIR/pending.key"; "$OPENSSL" x509 -in "$work/new.crt"; } > "$DIR/identity.pem.new"
+		mv "$DIR/identity.pem.new" "$DIR/identity.pem"   # the one atomic switch
 		mv "$DIR/pending.key" "$DIR/client.key"
 		mv "$DIR/client.crt.new" "$DIR/client.crt"
 		rm -f "$DIR/pending.csr"
