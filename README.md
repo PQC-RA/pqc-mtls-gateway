@@ -552,6 +552,15 @@ The renewer reports the state on every run, in `docker logs pqc-crl-renewer` and
 
 ## Upgrading to 2026-10
 
+**Reloads now end old connections after 60 s.** `nginx.conf` sets
+`worker_shutdown_timeout 60s`: after a reload, which happens on every CRL change
+(every revocation and once a day), old workers close whatever they still hold
+after 60 seconds. Before, they kept every open connection until it ended, so a
+long-lived session (an edge link, a slow download) survived any revocation.
+Responses that take longer than 60 seconds in total and straddle a reload are
+cut; change the value in `nginx.conf` if you serve such responses. The
+crl-renewer now signals a reload only when a published CRL actually changed.
+
 A deployment made before this release needs these steps beyond `deploy.sh`:
 
 1. **`:8443` is post-quantum-only and `/enroll-ca.crt` is gone.** Clients verify `:8443` with

@@ -53,7 +53,9 @@ server {
 	proxy_ssl_conf_command Groups X25519MLKEM768;
 	proxy_ssl_conf_command SignatureAlgorithms ML-DSA-65;
 	proxy_ssl_session_reuse off;
-	# The box CA's CRL: a stolen box is stopped by revoking its certificate. Read
+	# The CRLs of every CA in the box's chain (nginx checks the whole chain): a
+	# stolen box is stopped by revoking its certificate. Mount the directory, not
+	# the file (a replaced single-file mount is never seen). Read
 	# at start and on reload (touch /signals/reload-nginx after replacing it);
 	# open sessions to a revoked box end at the old workers' shutdown timeout
 	# (worker_shutdown_timeout in nginx.conf). Past nextUpdate it refuses every

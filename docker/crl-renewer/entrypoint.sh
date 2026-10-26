@@ -43,8 +43,13 @@ RETRY_MAX=60
 retry_wait=0       # 0 = no retry pending
 retry_at=0
 
+# The CRL files the gateway reads (ssl_crl and the Lua pollers).
+CRL_FILES="${CRL_PUBLISHED_FILES:-/etc/pki/pqc-ca/hybrid-combined-crl.pem /etc/pki/pqc-ca/combined-crl.pem}"
+crl_state() { cat $CRL_FILES 2>/dev/null | cksum; }
+
 run_renew() {
-  local reason="$1" ok=1
+  local reason="$1" ok=1 before
+  before=$(crl_state)
   touch "$MARKER.next"
   echo "[crl-renewer] ($reason) running CRL renewal at $(date -Iseconds)"
   if /usr/local/bin/pqc-crl-renew.sh; then
@@ -55,13 +60,17 @@ run_renew() {
   fi
   # Signal the gateway container to reload nginx so the refreshed CRL takes
   # effect at the TLS layer (the Lua CRL poller also picks it up independently).
-  # Sent on failure too: the script publishes each file atomically, so a
-  # partially failed run may still have replaced the combined CRL, and a reload
-  # of an unchanged CRL is harmless. Losing this signal silently would leave
-  # the handshake-layer ssl_crl on the OLD CRL until the next reload, and one
-  # of two "independent" revocation paths quietly dead, which is exactly how a
-  # revocation gap goes unnoticed.
-  if ! touch "$RELOAD_SIGNAL" 2>/dev/null; then
+  # Sent whenever a published CRL file changed, on failure too: the script
+  # publishes each file atomically, so a partially failed run may still have
+  # replaced the combined CRL. Losing this signal silently would leave the
+  # handshake-layer ssl_crl on the OLD CRL until the next reload, and one of two
+  # "independent" revocation paths quietly dead. NOT sent when nothing changed:
+  # a reload is not free, old workers close what they hold after
+  # worker_shutdown_timeout, so a renewer failing every minute would otherwise
+  # cut every long-lived session (edge links) every minute.
+  if [ "$(crl_state)" = "$before" ]; then
+    echo "[crl-renewer] published CRLs unchanged, no gateway reload"
+  elif ! touch "$RELOAD_SIGNAL" 2>/dev/null; then
     echo "[crl-renewer] WARN: could not write reload signal $RELOAD_SIGNAL," \
          "handshake-layer CRL will not refresh until the next gateway reload" >&2
   fi

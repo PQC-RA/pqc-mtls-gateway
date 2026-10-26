@@ -19,8 +19,8 @@ and `lua/` together with:
 | File in `/etc/pqc-edge` | What |
 |---|---|
 | `edge-server.crt`, `edge-server.key` | the box's ML-DSA-65 certificate: `serverAuth`, SAN = the name the central side checks (`proxy_ssl_name`) |
-| `central-crl.pem` | the CRL of that CA, required (nginx does not start without it), kept current: past nextUpdate every handshake is refused |
-| `central-ca.pem` | the ML-DSA-65 CA that issued the central gateway's client certificate, and nothing else (a classical CA here would let a classical chain through) |
+| `central-ca.pem` | the ML-DSA-65 chain (root and intermediate) that issued the central gateway's client certificate, and nothing else (a classical CA here would let a classical chain through) |
+| `central-crl.pem` | the CRLs of **every** CA in that chain, concatenated (the gateway's `hybrid-combined-crl.pem` form): nginx checks the whole chain, and a missing one refuses every handshake. Required (nginx does not start without it) and kept current: past nextUpdate every handshake is refused |
 | `allowed-clients.txt` | SHA-256 fingerprints of the client certificates allowed through: one per line, 64 hex characters (`openssl x509 -in c.crt -outform DER \| sha256sum`, not the colon form of `-fingerprint`). The CA issues other client certificates too; only these reach the device. Absent, empty or unreadable: nobody. It is read by the worker processes (user `nobody`), so it must be readable by them, and re-read on `nginx -s reload`. |
 
 Set the device's address in `proxy_pass` (an address, not a name: nginx resolves
@@ -50,7 +50,21 @@ the old workers close what they still hold after `worker_shutdown_timeout`
 identity is refused in the new handshake. Measured (`bench/edge/edge-link-test.sh`
 R1, R2): a revoked box loses its open session 60 s after the central gateway's
 reload, a revoked central identity 11 s after the box's CRL file changes. Every
-session on that box or gateway reconnects once at each reload: plan for it.
+session on that box or gateway reconnects once at each reload: plan for it. The
+central gateway reloads whenever its own CRL changes, which is on every
+revocation of any of its clients and once a day; the box, whenever
+`central-crl.pem` changes.
+
+Operating rules that follow:
+
+- **Mount `/etc/pqc-edge` as a directory.** A single file bind-mounted on its own
+  keeps its old content when it is replaced on the host, and the revocation is
+  silently not enforced. The same holds for `edge-crl.pem` on the central side.
+- **Deliver the CRL well inside its validity** (the gateway's intermediate CRL is
+  valid for 7 days): a box that misses it refuses every new session.
+- **Keep the box's clock synchronised.** OpenSSL allows no skew: a box running
+  behind the CA rejects a fresh CRL (lastUpdate in the future) and refuses every
+  new session until its clock catches up.
 
 ## Not in this stage
 
