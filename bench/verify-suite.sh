@@ -90,11 +90,15 @@ for alg in rsa ec mldsa44; do
         -X POST "https://127.0.0.1/admin/certs/enrollment-tokens?cn=badalg-$alg&ttl=120" 2>/dev/null \
         | python3 -c "import json,sys;print(json.load(sys.stdin)['token'])" 2>/dev/null)
   P=$(CSR=$TD/c.csr T="$TOK" python3 -c "import json,os;print(json.dumps({'csr':open(os.environ['CSR']).read(),'enrollmentToken':os.environ['T']}))")
-  # :8443 is post-quantum-only since 2026-10: verified with the PQ chain.
+  # :8443 is post-quantum-only: verified with the PQ chain.
   R=$(timeout 30 curl -sS --cacert $CA -X POST https://127.0.0.1:8443/enroll \
       -H "Content-Type: application/json" -d "$P" -w "\n%{http_code}" 2>/dev/null)
-  [ "$(echo "$R"|tail -1)" = "000" ] && echo "     $alg: TLS handshake with :8443 failed. The endpoint is post-quantum-only; the client needs OpenSSL 3.5 or later and the PQ CA chain ($CA)."
-  echo "     $alg -> HTTP $(echo "$R"|tail -1)  $(echo "$R"|sed '$d'|head -c 110)"
+  CODE=$(echo "$R"|tail -1)
+  [ "$CODE" = "000" ] && echo "     $alg: TLS handshake with :8443 failed. The endpoint is post-quantum-only; the client needs OpenSSL 3.5 or later and the PQ CA chain ($CA)."
+  echo "     $alg -> HTTP $CODE  $(echo "$R"|sed '$d'|head -c 110)"
+  # The guard refuses a non-ML-DSA-65 CSR with 400. Anything else, including
+  # 000 (no handshake, so the guard was never asked), is not evidence of it.
+  [ "$CODE" = "400" ] || fail "$alg CSR: expected HTTP 400 from the issuance guard, got $CODE"
 done
 rm -rf $TD
 IDXA=$($OSSL dgst -sha256 $PKI/intermediate/db/index.txt | awk '{print $2}')
@@ -181,13 +185,11 @@ echo
 echo "=============== 6. CA PRIVATE KEY ISOLATION ==============="
 # The tiered CA exists so that compromising an online component does not
 # compromise the trust anchor. That property lives in the MOUNT LIST, not in a
-# comment: on 2026-07-30 root/private was masked in the gateway and the compose
-# comment was corrected, and the 2026-08-24 audit then found ocsp-pq and
-# crl-renewer mounting the same tree unmasked, as root, with the corrected
-# comment sitting above them. So this is a runtime check, and it enumerates
-# every container that mounts the CA tree rather than a hard-coded list -- a
-# service that gains the mount later is covered without anyone remembering to
-# add it here.
+# comment: a compose comment can assert a mask that the mount lines below it do
+# not implement, and nothing fails. So this is a runtime check, and it
+# enumerates every container that mounts the CA tree rather than a hard-coded
+# list, so a service that gains the mount later is covered without anyone
+# remembering to add it here.
 ROOT_KEY=/etc/pki/pqc-ca/root/private/root-ca.key
 MOUNTERS=$(docker ps --format '{{.Names}}' 2>/dev/null | while read -r c; do
   docker inspect -f '{{range .Mounts}}{{.Destination}}{{"\n"}}{{end}}' "$c" 2>/dev/null \
