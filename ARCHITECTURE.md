@@ -42,7 +42,7 @@ The management API binds only to `127.0.0.1:3000` and is never directly reachabl
 |---|---|---|
 | 443 | TLS 1.3 + mTLS | Main data/admin plane, `ssl_verify_client on`, ML-DSA-65 server cert, ML-DSA-65 client cert required |
 | 8443 | TLS 1.3 | Enrollment bootstrap, MLKEM key exchange + **classical (ECDSA P-256)** server cert, no client cert; proxies only the CSR-signing route |
-| 8081 | TLS (internal) | Gateway control plane, HMAC-authenticated, restricted to loopback and 172.16.0.0/12 (the default Docker bridge range), never published to host |
+| 8081 | TLS (internal) | Gateway control plane, HMAC-authenticated, restricted to loopback and 172.16.0.0/12 (the default Docker bridge range), never published to host. Also serves the JWKS and `/metrics` (`pqc_crl_age_seconds`, seconds since the CRL worker last confirmed a good CRL; -1 if it never has) |
 
 ---
 

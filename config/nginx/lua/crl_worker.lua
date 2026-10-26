@@ -41,6 +41,22 @@ local held      = 0
 local last_beat = 0
 local BEAT_EVERY = 60 -- seconds
 
+-- Liveness is also published to pqc_route_meta, because last_beat is an upvalue
+-- and with worker_processes auto there are several workers: a /metrics request
+-- served by one worker cannot see another's. Written at both success points and
+-- never on the failure path, so the age climbs exactly when the poller stops
+-- confirming a good CRL, which is the signal a silent revocation failure lacks.
+-- Deliberately separate from last_beat: BEAT_EVERY rate-limits the *log line*,
+-- which would otherwise flood. The metric has no such problem and wants the
+-- opposite: publishing on every successful poll keeps the healthy age bounded
+-- by the poll interval instead of by the log cadence.
+local function publish(now)
+    local ok, err = ngx.shared.pqc_route_meta:set("crl_last_update", now)
+    if not ok then
+        ngx.log(ngx.ERR, "[crl_worker] failed to publish crl_last_update: ", tostring(err))
+    end
+end
+
 -- Match the binary the rest of the gateway ships (see Dockerfile / healthcheck).
 -- Hardcoded rather than sourced from an env var: this path is interpolated
 -- directly into an io.popen shell command below, so honoring an
@@ -74,6 +90,7 @@ poll_crl = function(premature)
         fh:close()
         if pem and last_pem and pem == last_pem then
             local now = ngx.now()
+            publish(now)
             if now - last_beat >= BEAT_EVERY then
                 last_beat = now
                 ngx.log(ngx.WARN, "[crl_worker] CRL unchanged, poller alive, ",
@@ -133,6 +150,7 @@ poll_crl = function(premature)
             last_pem  = pem
             held      = loaded
             last_beat = ngx.now()
+            publish(last_beat)
             ngx.log(ngx.WARN, "[crl_worker] CRL poll OK, ", loaded, " revoked serial(s) loaded")
         end
     end
