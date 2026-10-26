@@ -63,7 +63,9 @@ local function parse_time(s)
     return days * 86400 + tonumber(h) * 3600 + tonumber(mi) * 60 + tonumber(sec)
 end
 
--- Run openssl with `input` on stdin; returns output (stdout+stderr) or nil, err.
+-- Run openssl with `input` on stdin. Returns output (stdout+stderr) and whether
+-- it exited 0, or nil, err when it could not run to its end (spawn, I/O, a
+-- signal): such output is never used, a cut-off serial list must not be.
 local function openssl(args, input)
     local argv = { OPENSSL }
     for _, a in ipairs(args) do argv[#argv + 1] = a end
@@ -74,9 +76,15 @@ local function openssl(args, input)
     if not ok then proc:kill(9); return nil, "write: " .. tostring(werr) end
     proc:shutdown("stdin")
     local out, rerr = proc:stdout_read_all()
-    proc:wait()
-    if not out then return nil, "read: " .. tostring(rerr) end
-    return out
+    if not out then
+        proc:kill(9); proc:wait()
+        return nil, "read: " .. tostring(rerr)
+    end
+    local ok, reason, status = proc:wait()
+    if not ok and reason ~= "exit" then
+        return nil, "openssl ended by " .. tostring(reason) .. " " .. tostring(status)
+    end
+    return out, ok
 end
 
 local function pem_blocks(text, kind)
@@ -115,21 +123,28 @@ local function index_bundle(text)
         end
         workdir = dir
     end
-    local by, dup = {}, {}
+    local by, pem_of, dup = {}, {}, {}
     for i, pem in ipairs(pem_blocks(text, "CERTIFICATE")) do
-        local out, err = openssl({ "x509", "-noout", "-subject", "-nameopt", "RFC2253" }, pem)
-        if not out then
-            ngx.log(ngx.ERR, "[migration_crl] reading ", CA_BUNDLE, ": ", err)
+        local out, ok = openssl({ "x509", "-noout", "-subject", "-nameopt", "RFC2253" }, pem)
+        if not out or not ok then
+            ngx.log(ngx.ERR, "[migration_crl] reading ", CA_BUNDLE, ": ", tostring(ok == false and out or ok))
             return nil
         end
         local subject = out:match("subject=([^\n]+)")
-        if subject then
+        local body = pem:gsub("%s", "")
+        -- The same certificate listed twice is one CA; two different ones under
+        -- one name are a duplicate.
+        if subject and pem_of[subject] ~= body then
             local path = workdir .. "/ca-" .. i .. ".pem"
             local f = io.open(path, "w")
-            if not f then return nil end
-            f:write(pem); f:close()
-            if by[subject] then dup[subject] = true end
-            by[subject] = path
+            local written = f and f:write(pem)
+            if f then f:close() end
+            if not written then
+                ngx.log(ngx.ERR, "[migration_crl] cannot write ", path)
+                return nil
+            end
+            if pem_of[subject] then dup[subject] = true end
+            by[subject], pem_of[subject] = path, body
         end
     end
     for s in pairs(dup) do
@@ -157,12 +172,12 @@ end
 -- changes) or nil (transient: retry next tick).
 local function load_block(block, source)
     local dict = ngx.shared.migration_crl
-    local out, err = openssl({ "crl", "-noout", "-issuer", "-nameopt", "RFC2253" }, block)
+    local out, ok = openssl({ "crl", "-noout", "-issuer", "-nameopt", "RFC2253" }, block)
     if not out then
-        ngx.log(ngx.ERR, "[migration_crl] ", source, ": ", err)
+        ngx.log(ngx.ERR, "[migration_crl] ", source, ": ", ok)
         return nil
     end
-    local issuer = out:match("issuer=([^\n]+)")
+    local issuer = ok and out:match("issuer=([^\n]+)")
     if not issuer then
         ngx.log(ngx.ERR, "[migration_crl] unreadable CRL in ", source)
         return "bad"
@@ -176,12 +191,18 @@ local function load_block(block, source)
             ": no CA certificate of that name in ", CA_BUNDLE, "; ignored")
         return "bad"
     end
-    out, err = openssl({ "crl", "-CAfile", cas[issuer], "-noout", "-nextupdate", "-text" }, block)
+    out, ok = openssl({ "crl", "-CAfile", cas[issuer], "-noout", "-nextupdate", "-text" }, block)
     if not out then
-        ngx.log(ngx.ERR, "[migration_crl] ", source, ": ", err)
+        ngx.log(ngx.ERR, "[migration_crl] ", source, ": ", ok)
         return nil
     end
-    if not out:find("verify OK", 1, true) then
+    -- Exit 0 with "verify OK" is the only output whose serial list is used; a
+    -- signature failure exits 1 and says so; anything else is retried.
+    if not ok and not out:find("verify failure", 1, true) then
+        ngx.log(ngx.ERR, "[migration_crl] openssl crl failed on a CRL of ", issuer, ": ", out:sub(1, 200))
+        return nil
+    end
+    if not ok or not out:find("verify OK", 1, true) then
         ngx.log(ngx.ERR, "[migration_crl] a CRL in ", source, " claiming issuer ", issuer,
             " does not verify against that CA's certificate; ignored")
         return "bad"

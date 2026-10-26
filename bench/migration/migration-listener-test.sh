@@ -175,8 +175,11 @@ check "V6 past that CRL's nextUpdate: 403 crl_stale" "grep -q 'HTTP/1.1 403' '$W
 
 # a customer certificate whose serial the GATEWAY's CA has revoked: a different
 # issuer, so it is not revoked (the earlier serial-only check refused it)
-GW_REVOKED_N=$(O crl -in "$PKI_DIR/hybrid-combined-crl.pem" -noout -text 2>/dev/null | grep -c 'Serial Number:')
-GW_REVOKED=$(O crl -in "$PKI_DIR/hybrid-combined-crl.pem" -noout -text 2>/dev/null | grep -m1 -oE 'Serial Number: [0-9A-F]+' | cut -d' ' -f3)
+# the gateway intermediate's CRL, whichever block of the combined file it is
+awk -v d="$W" '/BEGIN X509 CRL/{n++} n{print > (d "/gwcrl-" n ".pem")}' "$PKI_DIR/hybrid-combined-crl.pem"
+for f in "$W"/gwcrl-*.pem; do O crl -in "$f" -noout -issuer 2>/dev/null | grep -q 'PQC Intermediate' && GW_CRL=$f; done
+GW_REVOKED_N=$(O crl -in "$GW_CRL" -noout -text 2>/dev/null | grep -c 'Serial Number:')
+GW_REVOKED=$(O crl -in "$GW_CRL" -noout -text 2>/dev/null | grep -m1 -oE 'Serial Number: [0-9A-F]+' | cut -d' ' -f3)
 O req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout "$W/cl/twin.key" -out "$W/cl/twin.csr" -subj "/O=Customer/CN=classical-twin" 2>/dev/null
 O x509 -req -in "$W/cl/twin.csr" -CA "$W/cl/ca.crt" -CAkey "$W/cl/ca.key" -set_serial "0x$GW_REVOKED" -days 2 -out "$W/cl/twin.crt" \
 	-extfile <(printf 'keyUsage=critical,digitalSignature\nextendedKeyUsage=clientAuth\n') 2>/dev/null
@@ -189,6 +192,10 @@ r=$(req v8a "${PQC[@]}" -cert "$W/pq/revoked.crt" -key "$W/pq/revoked.key"); ech
 check "V8a an ML-DSA-65 client certificate revoked by its (ML-DSA-65) CA: 403 certificate_revoked" "grep -q 'HTTP/1.1 403' '$W/v8a.out' && grep -q 'certificate_revoked' '$W/v8a.out'"
 r=$(req v8b "${PQC[@]}" -cert "$W/pq/client.crt" -key "$W/pq/client.key"); echo "   V8b: $r"
 check "V8b its not-revoked ML-DSA-65 client: served, class pq" "echo '$r' | grep -q '^mldsa65 | class=pq\$'"
+# V9: the same CA certificate listed twice is one CA, still served
+cat "$W/client-ca-bundle.orig" "$W/cl/ca.crt" > "$W/mig/client-ca-bundle.pem"; docker exec $NAME nginx -s reload; sleep 3
+r=$(req v9s "${CL2[@]}" -cert "$W/cl/spare.crt" -key "$W/cl/spare.key"); echo "   V9s: $r"
+check "V9s the customer CA's certificate listed twice: still one CA, served" "echo '$r' | grep -q 'class=classical\$'"
 # V9: a second CA certificate under the customer CA's name (a key rolled over)
 cat "$W/client-ca-bundle.orig" "$W/evil/ca.crt" > "$W/mig/client-ca-bundle.pem"; docker exec $NAME nginx -s reload; sleep 3
 r=$(req v9a "${CL2[@]}" -cert "$W/cl/spare.crt" -key "$W/cl/spare.key"); echo "   V9a: $r"

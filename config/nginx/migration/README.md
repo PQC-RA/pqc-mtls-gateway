@@ -98,7 +98,9 @@ clients (logged once a minute) rather than dropping old ones.
   that name has no usable CRL and its clients are refused until one of the two
   is removed. If a CRL's revocations do not all fit in `lua_shared_dict
   migration_crl` (about 4,000 per MB, 32 MB in `nginx.conf`), its issuer has no
-  usable CRL.
+  usable CRL. Revocations stay loaded until the gateway restarts, also after a
+  CA certificate is replaced: with sequential serials, a new key's certificate
+  whose serial an old key revoked is refused until then.
 - **Upgrading from the first version of this listener** (no CRL handling): with
   no `crl-bundle.pem`, every client certificate from a customer CA is now
   refused (`no_crl_for_issuer`). Add the CRLs, or set
