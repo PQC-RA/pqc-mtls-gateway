@@ -233,6 +233,8 @@ order; the rest are run on their own when you have a specific question.
 | `check-negative-controls-detail.sh` | The two above that need more than an exit code: captures the response body and nginx's own verify state |
 | `check-published-values.sh` | Four checks against values the paper prints: netem, wire bytes, OCSP signer DER, idle CPU |
 | `check-ocsp-and-policy-values.sh` | Three more: zero-reload policy latency, OCSP `-rother` comparison, the quantum buffer via `sendRawCert` |
+| `crl-fastpath.sh` | The Lua revocation layer fires on `/api/`, `/admin/` and `/` before nginx reloads its CRL, timed from the revoke call. Pauses the reload watcher in a running gateway and leaves a revoked certificate, so it needs `CRLFAST_I_UNDERSTAND=1` |
+| `test-crl-renewer.sh` | Hermetic, no running stack: a revocation during a renewal is not lost, a failed renewal is retried with backoff, a burst coalesces, and CRL publication is never seen half-written. `IMAGE=` a crl-renewer image built from this tree |
 
 ### Specific questions
 

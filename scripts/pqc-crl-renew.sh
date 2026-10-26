@@ -75,8 +75,12 @@ log() {
 }
 
 # ── Lock (prevent concurrent execution) ──────────────────────
+PENDING_TMP=""
 cleanup() {
     rm -f "$LOCK_FILE"
+    # Must be an `if`, not `[ ] && rm`: under set -e a false && list as the
+    # trap's last command replaces the script's `exit 0` with status 1.
+    if [ -n "$PENDING_TMP" ]; then rm -f "$PENDING_TMP"; fi
 }
 trap cleanup EXIT
 
@@ -161,6 +165,49 @@ verify_crl() {
     return 0
 }
 
+# ── Helper: publish a file atomically ────────────────────────
+# publish_atomic <dest> <src>...: concatenate the sources into a temp file in
+# the DESTINATION's directory, make it readable, then rename(2) it over dest.
+# The gateway re-reads hybrid-combined-crl.pem every second and nginx reads it
+# on every reload, so it must never be observable half-written, empty or 0600.
+# The temp file has to live beside dest: mktemp's default /tmp is the
+# container's overlayfs while /etc/pki/pqc-ca is a different filesystem, and a
+# cross-filesystem mv is a copy into the live name, not a rename.
+# The gateway mounts the directory (not the file), so the new inode is visible.
+publish_atomic() {
+    local dest="$1"; shift
+    local tmp
+    tmp=$(mktemp "$(dirname "$dest")/.$(basename "$dest").XXXXXX") || {
+        log "ERROR" "cannot create temp file beside $dest"; return 1; }
+    PENDING_TMP="$tmp"
+    if ! cat "$@" > "$tmp" 2>>"$LOG_FILE"; then
+        log "ERROR" "failed to write $tmp"; rm -f "$tmp"; PENDING_TMP=""; return 1
+    fi
+    chmod 644 "$tmp"
+    if ! mv -f "$tmp" "$dest"; then
+        log "ERROR" "failed to rename $tmp over $dest"; rm -f "$tmp"; PENDING_TMP=""; return 1
+    fi
+    PENDING_TMP=""
+}
+
+# ── Helper: generate a CRL without touching the live file until it parses ──
+# gen_crl_atomic <ca.cnf> <dest.crl> <ca.crt> <label>
+gen_crl_atomic() {
+    local cnf="$1" dest="$2" cacrt="$3" label="$4" tmp
+    tmp=$(mktemp "$(dirname "$dest")/.$(basename "$dest").XXXXXX") || {
+        log "ERROR" "cannot create temp file beside $dest"; return 1; }
+    PENDING_TMP="$tmp"
+    if ! $OPENSSL ca -gencrl -config "$cnf" -out "$tmp" 2>>"$LOG_FILE"; then
+        log "ERROR" "Failed to generate $label CRL"; rm -f "$tmp"; PENDING_TMP=""; return 1
+    fi
+    if ! verify_crl "$tmp" "$cacrt" "$label"; then
+        rm -f "$tmp"; PENDING_TMP=""; return 1
+    fi
+    chmod 644 "$tmp"
+    mv -f "$tmp" "$dest" || { log "ERROR" "failed to rename $tmp over $dest"; rm -f "$tmp"; PENDING_TMP=""; return 1; }
+    PENDING_TMP=""
+}
+
 # ═══════════════════════════════════════════════════════════════
 # MAIN
 # ═══════════════════════════════════════════════════════════════
@@ -169,23 +216,15 @@ ERRORS=0
 
 # ── Step 1: Intermediate CRLs (daily) ────────────────────────
 log "INFO" "Generating PQ Intermediate CRL..."
-if $OPENSSL ca -gencrl -config "$PQ_INT_CNF" -out "$PQ_INT_CRL" 2>>"$LOG_FILE"; then
-    verify_crl "$PQ_INT_CRL" "$PQ_INT_DIR/certs/intermediate-ca.crt" "PQ-Intermediate" || ERRORS=$((ERRORS + 1))
-else
-    log "ERROR" "Failed to generate PQ Intermediate CRL"
-    ERRORS=$((ERRORS + 1))
-fi
+gen_crl_atomic "$PQ_INT_CNF" "$PQ_INT_CRL" "$PQ_INT_DIR/certs/intermediate-ca.crt" "PQ-Intermediate" \
+    || ERRORS=$((ERRORS + 1))
 
 # ── Step 2: Root CRLs (periodic, every ROOT_CRL_INTERVAL days)
 if root_crl_needs_renewal "$PQ_ROOT_CRL"; then
     if root_key_available; then
         log "INFO" "Generating PQ Root CRL (periodic renewal)..."
-        if $OPENSSL ca -gencrl -config "$PQ_ROOT_CNF" -out "$PQ_ROOT_CRL" 2>>"$LOG_FILE"; then
-            verify_crl "$PQ_ROOT_CRL" "$PQ_ROOT_DIR/certs/root-ca.crt" "PQ-Root" || ERRORS=$((ERRORS + 1))
-        else
-            log "ERROR" "Failed to generate PQ Root CRL"
-            ERRORS=$((ERRORS + 1))
-        fi
+        gen_crl_atomic "$PQ_ROOT_CNF" "$PQ_ROOT_CRL" "$PQ_ROOT_DIR/certs/root-ca.crt" "PQ-Root" \
+            || ERRORS=$((ERRORS + 1))
     else
         # Expected in the crl-renewer container: root/private is masked, so
         # signing a root CRL is impossible here and that is the whole point.
@@ -219,30 +258,33 @@ fi
 
 # ── Step 3: Combine CRLs ─────────────────────────────────────
 log "INFO" "Combining CRLs..."
-TEMP_CRL=$(mktemp)
-cat "$PQ_INT_CRL" "$PQ_ROOT_CRL" > "$TEMP_CRL" 2>>"$LOG_FILE"
-CRL_COUNT=$(grep -c "BEGIN X509 CRL" "$TEMP_CRL" || true)
-
-if [ "$CRL_COUNT" -lt 2 ]; then
-    log "ERROR" "Combined CRL has only $CRL_COUNT entries, PQ CRLs required"
-    rm -f "$TEMP_CRL"
-    ERRORS=$((ERRORS + 1))
+# Both inputs were parsed when they were generated (or on a previous run), but
+# re-check here: the combined file is what the edge enforces, and a component
+# that no longer parses must stop publication rather than ship inside it.
+if verify_crl "$PQ_INT_CRL" "" "PQ-Intermediate (combine input)" \
+   && verify_crl "$PQ_ROOT_CRL" "" "PQ-Root (combine input)"; then
+    publish_atomic "$HYBRID_CRL" "$PQ_INT_CRL" "$PQ_ROOT_CRL" || ERRORS=$((ERRORS + 1))
+    CRL_COUNT=$(grep -c "BEGIN X509 CRL" "$HYBRID_CRL" || true)
+    if [ "$CRL_COUNT" -lt 2 ]; then
+        log "ERROR" "Combined CRL has only $CRL_COUNT entries, PQ CRLs required"
+        ERRORS=$((ERRORS + 1))
+    else
+        log "INFO" "Hybrid combined CRL updated: $CRL_COUNT CRL(s)"
+    fi
 else
-    mv "$TEMP_CRL" "$HYBRID_CRL"
-    chmod 644 "$HYBRID_CRL"
-    log "INFO" "Hybrid combined CRL updated: $CRL_COUNT CRL(s)"
+    log "ERROR" "A CRL component does not parse; combined CRL NOT replaced"
+    ERRORS=$((ERRORS + 1))
 fi
 
 # ── Step 4: Also update legacy combined-crl.pem for PQ-only ──
-cat "$PQ_INT_CRL" "$PQ_ROOT_CRL" > "${PKI_BASE}/combined-crl.pem" 2>>"$LOG_FILE"
+publish_atomic "${PKI_BASE}/combined-crl.pem" "$PQ_INT_CRL" "$PQ_ROOT_CRL" || ERRORS=$((ERRORS + 1))
 
 # ── Step 4b: Sync PKI distribution for HTTP serving ──────────
 PKI_DIST="/var/www/pki"
 if [ -d "$PKI_DIST" ]; then
     log "INFO" "Syncing CRLs to PKI distribution directory..."
-    cp "$PQ_INT_CRL" "$PKI_DIST/intermediate-ca.crl" 2>>"$LOG_FILE"
-    cp "$PQ_ROOT_CRL" "$PKI_DIST/root-ca.crl" 2>>"$LOG_FILE"
-    chmod 644 "$PKI_DIST"/*.crl
+    publish_atomic "$PKI_DIST/intermediate-ca.crl" "$PQ_INT_CRL" || ERRORS=$((ERRORS + 1))
+    publish_atomic "$PKI_DIST/root-ca.crl" "$PQ_ROOT_CRL" || ERRORS=$((ERRORS + 1))
     log "INFO" "PKI distribution directory updated"
 fi
 

@@ -24,9 +24,14 @@
 -- also restarts on every worker start, so each reload reset its cycle; it was
 -- second by construction. Keep this STRICTLY BELOW NGINX_RELOAD_POLL_INTERVAL
 -- or the fast path goes silent again. bench/crl-fastpath.sh asserts it leads.
+--
+-- 1 s (was 2 s): with the crl-renewer now checking its sentinel every second,
+-- this re-read is the second-largest term in revoke-to-refusal time. Each
+-- worker runs its own timer (worker_processes auto), and an unchanged CRL costs
+-- one ~12 KB read per worker per second; openssl is spawned only on change.
 
 local M = {}
-local delay = 2 -- seconds; see the note above before raising this
+local delay = 1 -- seconds; see the note above before raising this
 
 -- Last CRL text seen, so a short interval does not mean spawning openssl every
 -- cycle. The file is ~10 KB: reading it is a couple of syscalls, re-parsing an

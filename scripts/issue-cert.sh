@@ -25,6 +25,8 @@
 #   PQC_ENROLL_CA        CA that signed the :8443 enrollment cert
 #                        (default: /etc/pki/pqc-ca/enroll-classical-ca.crt;
 #                         falls back to PQC_CA_CHAIN when that file is absent)
+#   PQC_ENROLL_URL       Enrollment endpoint           (default: https://<PQC_GATEWAY host>:8443/enroll;
+#                         set it for a gateway published on non-default ports)
 #   ENROLLMENT_TOKEN     Pre-issued enrollment token   (if set, skips admin step)
 #   PQC_ADMIN_CERT       Admin client cert             (required only without ENROLLMENT_TOKEN)
 #   PQC_ADMIN_KEY        Admin client key              (required only without ENROLLMENT_TOKEN)
@@ -137,7 +139,11 @@ KEY_ALG=ML-DSA-65
 # Enrollment is served on port 8443 (no mTLS required).
 # Derive the enrollment URL from GW by extracting the host and appending :8443.
 GW_HOST=$(echo "$GW" | sed 's|https://||; s|[:/].*||')
-ENROLL_URL="https://${GW_HOST}:8443/enroll"
+GW_PORT=$(echo "$GW" | sed 's|https://||' | grep -oE '^[^/]*:[0-9]+' | sed 's|.*:||' || true)
+GW_PORT="${GW_PORT:-443}"
+# Overridable so a gateway published on non-default ports (e.g. a side-by-side
+# test stack) is never silently paired with the enrollment listener on :8443.
+ENROLL_URL="${PQC_ENROLL_URL:-https://${GW_HOST}:8443/enroll}"
 
 # ── PQ capability detection ───────────────────────────────────────────────────
 
@@ -341,7 +347,7 @@ if has_pq_curl; then
 else
     REACHABLE=0
     echo | OPENSSL_CONF=/etc/ssl/openssl.cnf "$OSSL" s_client \
-        -connect "${GW_HOST}:443" -CAfile "$CA_CHAIN" 2>/dev/null \
+        -connect "${GW_HOST}:${GW_PORT}" -CAfile "$CA_CHAIN" 2>/dev/null \
         | grep -q "^CONNECTED" && REACHABLE=1
 fi
 if [[ "$REACHABLE" != "1" ]]; then

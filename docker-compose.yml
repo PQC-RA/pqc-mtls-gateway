@@ -284,6 +284,9 @@ services:
   environment:
    # Watch this sentinel (touched by management-api on revoke) for on-demand CRL regen.
    - CRL_RENEW_SIGNAL_FILE=/signals/renew-crl
+   # Sentinel check interval (s). Dominates revoke-to-refusal time; see
+   # docker/crl-renewer/entrypoint.sh before raising it.
+   - CRL_POLL_INTERVAL=1
   networks:
    - pqc-pki
   # Stays root, deliberately, unlike ocsp-pq above: the renewal script writes

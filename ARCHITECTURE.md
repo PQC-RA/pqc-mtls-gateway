@@ -74,7 +74,7 @@ The design principle is: **post-quantum key exchange and authentication on the a
 - **Key exchange:** X25519MLKEM768 (hybrid classical + ML-KEM-768 post-quantum)
 - **Authentication:** ML-DSA-65 certificates on both sides, server cert presented by the gateway, client cert presented by service operators (`ssl_verify_client on`; `ssl_conf_command ClientSignatureAlgorithms ML-DSA-65` restricts client auth to ML-DSA-65)
 - **Protocol:** TLS 1.3 only, older versions are not negotiated
-- **CRL enforcement:** The gateway loads the combined CRL at startup and a background worker polls for updates. Revoked certificates are rejected at the TLS handshake.
+- **CRL enforcement:** Two layers. nginx's `ssl_crl` rejects a revoked certificate at the TLS handshake; it refreshes on the reload the crl-renewer signals after each regeneration. To cover the time before that reload, `crl_worker.lua` re-reads the combined CRL every second in each worker, and every location on :443 (the routed prefixes, `/admin/` and `/`) closes the connection without a response (444) for a revoked serial. The crl-renewer checks the management-api's revocation sentinel every second, so a revocation reaches the data plane after one sentinel check, one CRL signing and one worker re-read, not on a 15 s cycle. Each CRL file is published atomically (written beside its destination, then renamed), so a reader never sees a half-written CRL. `bench/crl-fastpath.sh` asserts the Lua layer fires on all three locations and times it from the revoke call; `bench/test-crl-renewer.sh` tests the renewer hermetically.
 
 **Enrollment bootstrap plane, port 8443 (MLKEM KE + classical server auth, no mTLS):**
 
