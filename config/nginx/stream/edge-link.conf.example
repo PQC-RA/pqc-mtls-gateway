@@ -16,6 +16,9 @@ server {
 	# The plain end: bind it to the address the SCADA side reaches and admit only
 	# the SCADA hosts. Without both, every container network of the gateway could
 	# talk plain Modbus (writes included) to the device under the gateway's name.
+	# The address must be the gateway's FIXED address on the SCADA network
+	# (ipv4_address in compose): if it is not on the container when nginx starts,
+	# the bind fails and the whole gateway, :443 included, does not start.
 	listen 192.0.2.1:1502 so_keepalive=60s:10s:6;
 	allow 192.0.2.50;
 	deny all;

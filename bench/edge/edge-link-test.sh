@@ -85,6 +85,8 @@ for v in rogue:rogue-server wrongname:wrongname-server classical:classical-serve
 	d=${v%%:*}; c=${v#*:}; mkdir -p "$W/$d"
 	cp -r "$W/edge/"* "$W/$d/"; cp "$W/pki/$c.crt" "$W/$d/edge-server.crt"; cp "$W/pki/$c.key" "$W/$d/edge-server.key"
 done
+# the classical impostor is willing to sign with ECDSA: only the central side's offer can stop it
+sed -i -e '/ssl_conf_command SignatureAlgorithms/d' -e '/ssl_conf_command ClientSignatureAlgorithms/d' "$W/classical/nginx.conf"
 # central side
 sed -e "s/192.0.2.10:8502/$EDGE_ADDR:8502/" -e "s/listen 192.0.2.1:1502/listen $CENTRAL_CTL:1502/" -e "s/allow 192.0.2.50;/allow $SCADA_ADDR;/" \
 	"$REPO/config/nginx/stream/edge-link.conf.example" > "$W/stream/edge-link.conf"
@@ -185,7 +187,8 @@ refused(){ echo "$1" | grep -qE '^no connection$|failed|refused|reset|unreachabl
 check "E3 the device is not reachable from the control or the wan network" "refused '$r1' && refused '$r2'"
 # the plain end: another host on the control network, and the gateway's other networks
 r1=$(docker run --rm --network $NET_CTL --ip $OTHER_ADDR -v "$W:/w:ro" "$MB_IMAGE" python /w/client.py central 1502 read 1 2>&1 | tail -1)
-r2=$(on "$first" $CENTRAL 1502 read 1 2>&1 | tail -1)
+CENTRAL_FIRST_IP=$(docker inspect -f "{{(index .NetworkSettings.Networks \"$first\").IPAddress}}" $CENTRAL)
+r2=$(on "$first" "$CENTRAL_FIRST_IP" 1502 read 1 2>&1 | tail -1)
 echo "  E10: other control host: $r1; from $first: $r2"
 check "E10 the plain listener serves only the SCADA host: another control-network host and the gateway's own networks get nothing" "refused '$r1' && refused '$r2'"
 
@@ -242,7 +245,7 @@ impostor(){ # impostor LABEL DIR DESCRIPTION LOG-PATTERN
 }
 impostor E9 rogue "a box with another CA's certificate under the right name" 'upstream SSL certificate verify error'
 impostor E9b wrongname "a box with the right CA's certificate under another name" 'upstream SSL certificate does not match'
-impostor E9c classical "a box with the right CA's classical (EC) certificate under the right name" 'SSL_do_handshake\(\) failed'
+impostor E9c classical "a box with the right CA's classical (EC) certificate, willing to sign with ECDSA" 'alert handshake failure'
 docker exec $CENTRAL sh -c 'cat /var/log/nginx/error.log' > "$W/central-error.log" 2>/dev/null
 
 docker exec $CENTRAL sh -c 'cat /var/log/nginx/pqc-edge-link.log' > "$W/central-link.log" 2>/dev/null

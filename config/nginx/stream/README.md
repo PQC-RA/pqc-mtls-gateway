@@ -18,7 +18,10 @@ edge box (`config/edge/`). To enable:
    as the box.
 3. The listener is the plain end: bind it to the address the SCADA side reaches
    and admit only the SCADA hosts (`listen <address>:1502`, `allow`, `deny all`,
-   as in the example), and publish the port only towards that side.
+   as in the example), and publish the port only towards that side. Give the
+   gateway a fixed address on that network first (`ipv4_address` in compose):
+   a bind to an address the container does not have stops the whole gateway
+   from starting, and `nginx -t` does not catch it.
 
 The gateway verifies the box (`proxy_ssl_verify on`, name, CA, ML-DSA-65 only);
 without that anyone on the path could stand in for the box. Limits are listed in
