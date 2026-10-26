@@ -255,7 +255,10 @@ for ca in root intermediate; do
     echo 1000 > "$PKI_DIR/$ca/db/crlnumber"
 done
 echo "unique_subject = yes" > "$PKI_DIR/root/db/index.txt.attr"
-echo "unique_subject = yes" > "$PKI_DIR/intermediate/db/index.txt.attr"
+# The intermediate allows a renewal to overlap its predecessor; the custodian
+# enforces one active certificate per CN (plus one named successor) under its
+# CA lock. index.txt.attr overrides the cnf, so both say the same.
+echo "unique_subject = no" > "$PKI_DIR/intermediate/db/index.txt.attr"
 
 # --- render CA configs (substitute the base dir) -----------------------------
 ROOT_CNF="$PKI_DIR/root/openssl-root.cnf"

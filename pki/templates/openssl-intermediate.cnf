@@ -45,7 +45,9 @@ copy_extensions   = none              # NEVER copy extensions from a CSR: with `
                                       # gateway's own name verifies as a TLS server for it)
 x509_extensions   = v3_m2m_leaf       # every certificate signed without an explicit -extensions
                                       # (i.e. every leaf the custodian signs) gets the minimal M2M profile
-unique_subject    = yes               # Reissue via revoke-then-reenroll; blocks duplicate active CNs (defence in depth)
+unique_subject    = no                # a renewal overlaps its predecessor; the custodian enforces one active
+                                      # certificate per CN (plus one named successor) inside its CA lock.
+                                      # index.txt.attr overrides this file; setup-pki.sh writes the same value.
 
 # GDPR-compliant: no personal data is required for M2M
 [ policy_loose ]
