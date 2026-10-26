@@ -21,8 +21,11 @@
 #   E6 no client certificate: refused
 #   E7 a classical client (X25519 only): refused
 #   E8 the strict listener of the central gateway still answers its ML-DSA-65 client
-#   E9 a box with a certificate from another CA under the same name: the central
-#      gateway refuses it, the SCADA gets nothing
+#   E10 the plain listener serves only the SCADA host (bound address, allow/deny)
+#   P2 the box still answers after the refusals
+#   E9 boxes the central gateway refuses, the SCADA getting nothing: another CA's
+#      certificate (E9), the right CA under another name (E9b), the right CA's
+#      classical certificate (E9c)
 #   L  latency (recorded, no threshold): new connection per read and one
 #      connection for all reads, through the link and straight on the cell network
 #
@@ -42,7 +45,7 @@ O(){ LD_LIBRARY_PATH=$LIBDIR OPENSSL_CONF=/dev/null "$OSSL" "$@"; }
 pass=0; fail=0
 check(){ if eval "$2"; then echo "PASS  $1"; pass=$((pass+1)); else echo "FAIL  $1"; fail=$((fail+1)); fi; }
 cleanup(){
-	docker rm -f $CENTRAL $EDGE $DEVICE $T-rogue >/dev/null 2>&1
+	docker rm -f $CENTRAL $EDGE $DEVICE $T-E9 $T-E9b $T-E9c >/dev/null 2>&1
 	docker network rm $NET_CTL $NET_WAN $NET_CELL >/dev/null 2>&1
 	find "$W" -name '*.key' -exec shred -u {} + 2>/dev/null
 }
@@ -63,6 +66,8 @@ ca ca "Edge Test CA"; ca rogue-ca "Rogue CA"
 SRV=("keyUsage=critical,digitalSignature" "extendedKeyUsage=serverAuth" "subjectAltName=DNS:edge.example")
 CLI=("keyUsage=critical,digitalSignature" "extendedKeyUsage=clientAuth")
 leaf ca edge-server ML "${SRV[@]}"; leaf rogue-ca rogue-server ML "${SRV[@]}"
+leaf ca wrongname-server ML "keyUsage=critical,digitalSignature" "extendedKeyUsage=serverAuth" "subjectAltName=DNS:other.example"
+leaf ca classical-server EC "keyUsage=critical,digitalSignature" "extendedKeyUsage=serverAuth" "subjectAltName=DNS:edge.example"
 leaf ca central-gateway ML "${CLI[@]}"; leaf ca other-client ML "${CLI[@]}"; leaf ca classical-client EC "${CLI[@]}"
 fpr(){ O x509 -in "$1" -outform DER | sha256sum | cut -d' ' -f1; }
 
@@ -70,16 +75,22 @@ fpr(){ O x509 -in "$1" -outform DER | sha256sum | cut -d' ' -f1; }
 cp "$W/pki/edge-server.crt" "$W/pki/edge-server.key" "$W/edge/"; cp "$W/pki/ca.crt" "$W/edge/central-ca.pem"
 printf '# the central gateway\n%s\n' "$(fpr "$W/pki/central-gateway.crt")" > "$W/edge/allowed-clients.txt"
 # fixed addresses: the box on wan (the same for the rogue box later), the device on cell
-SUB=10.$((200 + RANDOM % 50)).$((RANDOM % 250)); EDGE_ADDR=$SUB.10; DEV_ADDR=$SUB.140
+SUB=10.$((200 + RANDOM % 25)).$((RANDOM % 250)); EDGE_ADDR=$SUB.10; DEV_ADDR=$SUB.140
+SUBC=10.$((225 + RANDOM % 25)).$((RANDOM % 250)); CENTRAL_CTL=$SUBC.2; SCADA_ADDR=$SUBC.50; OTHER_ADDR=$SUBC.60
 sed "s/192.0.2.20:502/$DEV_ADDR:502/" "$REPO/config/edge/nginx.conf" > "$W/edge/nginx.conf"
 mkdir -p "$W/edge/lua"   # mount point for the box's Lua (the directory is mounted read-only)
 # rogue box: same configuration, another CA's certificate under the same name
-cp -r "$W/edge/"* "$W/rogue/"; cp "$W/pki/rogue-server.crt" "$W/rogue/edge-server.crt"; cp "$W/pki/rogue-server.key" "$W/rogue/edge-server.key"
+# and two more boxes from the RIGHT CA: one under another name, one with a classical certificate
+for v in rogue:rogue-server wrongname:wrongname-server classical:classical-server; do
+	d=${v%%:*}; c=${v#*:}; mkdir -p "$W/$d"
+	cp -r "$W/edge/"* "$W/$d/"; cp "$W/pki/$c.crt" "$W/$d/edge-server.crt"; cp "$W/pki/$c.key" "$W/$d/edge-server.key"
+done
 # central side
-sed "s/192.0.2.10:8502/$EDGE_ADDR:8502/" "$REPO/config/nginx/stream/edge-link.conf.example" > "$W/stream/edge-link.conf"
+sed -e "s/192.0.2.10:8502/$EDGE_ADDR:8502/" -e "s/listen 192.0.2.1:1502/listen $CENTRAL_CTL:1502/" -e "s/allow 192.0.2.50;/allow $SCADA_ADDR;/" \
+	"$REPO/config/nginx/stream/edge-link.conf.example" > "$W/stream/edge-link.conf"
 cp "$W/pki/central-gateway.crt" "$W/stream/central-client.crt"; cp "$W/pki/central-gateway.key" "$W/stream/central-client.key"
 cp "$W/pki/ca.crt" "$W/stream/edge-ca.pem"
-chmod -R a+rX "$W/edge" "$W/rogue" "$W/stream"
+chmod -R a+rX "$W/edge" "$W/rogue" "$W/wrongname" "$W/classical" "$W/stream"
 
 # ── the Modbus device and the tools ──
 cat > "$W/device.py" <<'PY'
@@ -127,7 +138,7 @@ else:
 PY
 chmod a+r "$W/device.py" "$W/client.py"
 
-docker network create $NET_CTL >/dev/null
+docker network create --subnet $SUBC.0/24 $NET_CTL >/dev/null || { echo "subnet $SUBC.0/24 taken, run again"; exit 1; }
 docker network create --subnet $SUB.0/25 $NET_WAN >/dev/null || { echo "subnet $SUB.0/25 taken, run again"; exit 1; }
 docker network create --internal --subnet $SUB.128/25 $NET_CELL >/dev/null || { echo "subnet $SUB.128/25 taken, run again"; exit 1; }
 docker run -d --name $DEVICE --network $NET_CELL --ip $DEV_ADDR --network-alias device.example -v "$W:/w:ro" "$MB_IMAGE" python /w/device.py >/dev/null
@@ -149,7 +160,7 @@ docker create --name $CENTRAL --network "$first" --network-alias central \
 	-v "$SECRETS_DIR/enroll-hmac.key:/run/secrets/enroll-hmac:ro" \
 	--entrypoint sh "$GW_IMAGE" -c 'mkdir -p /var/cache/nginx/client_temp /var/log/nginx /var/cache/pqc-gw/routes; exec nginx -g "daemon off;"' >/dev/null
 for n in ${NETWORKS#* } $NET_CTL $NET_WAN; do [ "$n" != "$first" ] && docker network connect "$n" $CENTRAL; done
-docker network disconnect "$NET_CTL" $CENTRAL 2>/dev/null; docker network connect --alias central $NET_CTL $CENTRAL
+docker network disconnect "$NET_CTL" $CENTRAL 2>/dev/null; docker network connect --ip $CENTRAL_CTL --alias central $NET_CTL $CENTRAL
 docker start $CENTRAL >/dev/null
 sleep 3
 docker ps -a --filter name=$T --format '{{.Names}} {{.Status}}'
@@ -157,10 +168,12 @@ for c in $EDGE $CENTRAL; do [ "$(docker inspect -f '{{.State.Running}}' $c)" = t
 
 MB=(docker run --rm -v "$W:/w:ro" "$MB_IMAGE" python /w/client.py)
 on(){ local net=$1; shift; docker run --rm --network "$net" -v "$W:/w:ro" "$MB_IMAGE" python /w/client.py "$@"; }
+scada(){ docker run --rm --network $NET_CTL --ip $SCADA_ADDR -v "$W:/w:ro" "$MB_IMAGE" python /w/client.py "$@"; }
 
 # E1, E2
-r=$(on $NET_CTL central 1502 read 1 2>&1 | tail -1); echo "  E1: $r"
+r=$(scada central 1502 read 1 2>&1 | tail -1); echo "  E1: $r"
 check "E1 the SCADA reads the device's registers through the link" "[ '$r' = 'registers 4242 1717 2026' ]"
+for i in $(seq 1 10); do docker exec $EDGE grep -q 'CN=central-gateway' /var/log/nginx/pqc-edge.log && break; sleep 0.5; done
 docker exec $EDGE sh -c 'tail -1 /var/log/nginx/pqc-edge.log' > "$W/e2.log"; echo "  E2: $(cat "$W/e2.log")"
 check "E2 the box logged TLS 1.3, X25519MLKEM768 (0x11ec), a verified client: the central gateway" \
 	"grep -q '\"proto\":\"TLSv1.3\"' '$W/e2.log' && grep -qE '\"group\":\"(X25519MLKEM768|0x11ec)\"' '$W/e2.log' && grep -q '\"verify\":\"SUCCESS\"' '$W/e2.log' && grep -q 'CN=central-gateway' '$W/e2.log'"
@@ -168,7 +181,13 @@ check "E2 the box logged TLS 1.3, X25519MLKEM768 (0x11ec), a verified client: th
 # E3 isolation
 r1=$(on $NET_CTL device.example 502 read 1 2>&1 | tail -1); r2=$(on $NET_WAN device.example 502 read 1 2>&1 | tail -1)
 echo "  E3: from control: $r1; from wan: $r2"
-check "E3 the device is not reachable from the control or the wan network" "! echo '$r1 $r2' | grep -q registers"
+refused(){ echo "$1" | grep -qE '^no connection$|failed|refused|reset|unreachable' && ! echo "$1" | grep -q registers; }
+check "E3 the device is not reachable from the control or the wan network" "refused '$r1' && refused '$r2'"
+# the plain end: another host on the control network, and the gateway's other networks
+r1=$(docker run --rm --network $NET_CTL --ip $OTHER_ADDR -v "$W:/w:ro" "$MB_IMAGE" python /w/client.py central 1502 read 1 2>&1 | tail -1)
+r2=$(on "$first" $CENTRAL 1502 read 1 2>&1 | tail -1)
+echo "  E10: other control host: $r1; from $first: $r2"
+check "E10 the plain listener serves only the SCADA host: another control-network host and the gateway's own networks get nothing" "refused '$r1' && refused '$r2'"
 
 # straight to the box with s_client, sending one Modbus read (transaction 1, unit 1, FC 3, 3 registers)
 EDGE_IP=$(docker inspect -f "{{(index .NetworkSettings.Networks \"$NET_WAN\").IPAddress}}" $EDGE)
@@ -187,11 +206,15 @@ b=$(direct e5 -groups X25519MLKEM768 -cert "$W/pki/classical-client.crt" -key "$
 check "E5 a classical (EC) certificate from the same CA: no answer" "[ '$b' = 0 ]"
 b=$(direct e6 -groups X25519MLKEM768); echo "  E6: $b bytes, $(grep -m1 -oE 'alert [a-z ]+' "$W/e6.err")"
 check "E6 no client certificate: no answer" "[ '$b' = 0 ]"
-docker exec $EDGE sh -c "tail -n +$((lines_before + 1)) /var/log/nginx/pqc-edge.log" > "$W/e56.log"
-echo "  E5/E6 box log: $(wc -l < "$W/e56.log") line(s): $(grep -oE '"verify":"[^"]*"|"bytes_out":[0-9]+' "$W/e56.log" | tr '\n' ' ')"
-check "E5/E6 on the box: neither session verified, nothing reached the device" "! grep -q '\"verify\":\"SUCCESS\"' '$W/e56.log' && ! grep -qE '\"bytes_out\":[1-9]' '$W/e56.log'"
+sleep 1; docker exec $EDGE sh -c "tail -n +$((lines_before + 1)) /var/log/nginx/pqc-edge.log" > "$W/e56.log"
+echo "  E5/E6 box log: $(wc -l < "$W/e56.log") line(s): $(grep -oE '"verify":"[^"]*"|"upstream":"[^"]*"|"to_device":"[^"]*"' "$W/e56.log" | tr '\n' ' ')"
+check "E5/E6 on the box: two sessions, neither verified, no upstream opened, nothing sent to the device" \
+	"[ \$(wc -l < '$W/e56.log') = 2 ] && [ \$(grep -cE '\"verify\":\"(NONE|FAILED[^\"]*)\"' '$W/e56.log') = 2 ] && [ \$(grep -c '\"upstream\":\"\"' '$W/e56.log') = 2 ] && ! grep -qE '\"to_device\":\"[1-9]' '$W/e56.log'"
 b=$(direct e7 -groups X25519:P-256 -cert "$W/pki/central-gateway.crt" -key "$W/pki/central-gateway.key"); echo "  E7: $b bytes, $(grep -m1 -oE 'alert [a-z ]+' "$W/e7.err")"
 check "E7 a classical key exchange (X25519, P-256), even with the right certificate: no answer" "[ '$b' = 0 ] && grep -q 'alert handshake failure' '$W/e7.err'"
+
+b=$(direct p2 -groups X25519MLKEM768 -cert "$W/pki/central-gateway.crt" -key "$W/pki/central-gateway.key"); echo "  P2: $b bytes"
+check "P2 after the refusals the box still answers the central gateway's certificate" "[ '$b' -ge 9 ]"
 
 # E8 the central gateway's HTTP side is unchanged
 CENTRAL_IP=$(docker inspect -f "{{(index .NetworkSettings.Networks \"$NET_WAN\").IPAddress}}" $CENTRAL)
@@ -201,19 +224,27 @@ echo "  E8: $(grep -m1 -oE 'HTTP/1.1 [0-9]+' "$W/e8.out")"
 check "E8 the central gateway's strict :443 still answers its ML-DSA-65 client" "grep -qE 'HTTP/1.1 [0-9]{3}' '$W/e8.out'"
 
 # L latency, recorded
-lat_link_new=$(on $NET_CTL central 1502 new "$N_LAT" 2>&1 | tail -1); lat_link_keep=$(on $NET_CTL central 1502 keep "$N_LAT" 2>&1 | tail -1)
+lat_link_new=$(scada central 1502 new "$N_LAT" 2>&1 | tail -1); lat_link_keep=$(scada central 1502 keep "$N_LAT" 2>&1 | tail -1)
 lat_cell_new=$(on $NET_CELL device.example 502 new "$N_LAT" 2>&1 | tail -1); lat_cell_keep=$(on $NET_CELL device.example 502 keep "$N_LAT" 2>&1 | tail -1)
 printf 'link new  %s\nlink keep %s\ncell new  %s\ncell keep %s\n' "$lat_link_new" "$lat_link_keep" "$lat_cell_new" "$lat_cell_keep" | tee "$W/latency.txt" | sed 's/^/  L: /'
 check "L latency recorded for all four paths" "[ \$(grep -c median_ms '$W/latency.txt') = 4 ]"
 
-# E9 a box with another CA's certificate under the same name
-docker rm -f $EDGE >/dev/null; edge_up $T-rogue "$W/rogue"; sleep 2
-r=$(on $NET_CTL central 1502 read 1 2>&1 | tail -1); echo "  E9: $r"
+# E9 boxes the central gateway must refuse, each standing in at the box's address
+docker rm -f $EDGE >/dev/null
+impostor(){ # impostor LABEL DIR DESCRIPTION LOG-PATTERN
+	local before; before=$(docker exec $CENTRAL sh -c 'cat /var/log/nginx/error.log' | grep -cE "$4")
+	edge_up $T-$1 "$W/$2"; sleep 2
+	r=$(scada central 1502 read 1 2>&1 | tail -1)
+	local after; after=$(docker exec $CENTRAL sh -c 'cat /var/log/nginx/error.log' | grep -cE "$4")
+	echo "  $1: $r (central log matches: $before -> $after)"
+	check "$1 $3: the central gateway refuses it, the SCADA gets nothing" "! echo '$r' | grep -q registers && [ $after -gt $before ]"
+	docker rm -f $T-$1 >/dev/null
+}
+impostor E9 rogue "a box with another CA's certificate under the right name" 'upstream SSL certificate verify error'
+impostor E9b wrongname "a box with the right CA's certificate under another name" 'upstream SSL certificate does not match'
+impostor E9c classical "a box with the right CA's classical (EC) certificate under the right name" 'SSL_do_handshake\(\) failed'
 docker exec $CENTRAL sh -c 'cat /var/log/nginx/error.log' > "$W/central-error.log" 2>/dev/null
-check "E9 a box with another CA's certificate: the central gateway refuses it, the SCADA gets nothing" \
-	"! echo '$r' | grep -q registers && grep -q 'upstream SSL certificate verify error' '$W/central-error.log'"
 
 docker exec $CENTRAL sh -c 'cat /var/log/nginx/pqc-edge-link.log' > "$W/central-link.log" 2>/dev/null
-docker logs $T-rogue > "$W/rogue.out" 2>&1
 echo "== result: $pass passed, $fail failed"
 exit $fail

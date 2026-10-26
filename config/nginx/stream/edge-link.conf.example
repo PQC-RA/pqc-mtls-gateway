@@ -13,14 +13,25 @@ log_format pqc_edge_link_json escape=json
 	'"connect_time":"$upstream_connect_time"}';
 
 server {
-	listen 1502;
+	# The plain end: bind it to the address the SCADA side reaches and admit only
+	# the SCADA hosts. Without both, every container network of the gateway could
+	# talk plain Modbus (writes included) to the device under the gateway's name.
+	listen 192.0.2.1:1502 so_keepalive=60s:10s:6;
+	allow 192.0.2.50;
+	deny all;
 
 	# The box's ADDRESS, not its name: nginx resolves a name once, at start, and
 	# an unresolvable one stops the whole gateway from starting. The box's
 	# identity is checked by name below (proxy_ssl_name), not by address.
 	proxy_pass 192.0.2.10:8502;
-	proxy_connect_timeout 10s;
+	# Covers the TCP connect AND the post-quantum handshake (about 10 KB of ML-DSA
+	# certificates and signatures): allow for slow links.
+	proxy_connect_timeout 30s;
+	# An IDLE timer: a session quiet for longer is cut. Set it above the
+	# protocol's own keep-alive or poll interval.
 	proxy_timeout 1h;
+	# Find half-open sessions after a link cut instead of waiting for the idle timer.
+	proxy_socket_keepalive on;
 
 	proxy_ssl on;
 	proxy_ssl_protocols TLSv1.3;

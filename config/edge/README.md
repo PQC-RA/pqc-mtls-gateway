@@ -17,11 +17,15 @@ this directory's `nginx.conf` and `lua/` together with:
 | File in `/etc/pqc-edge` | What |
 |---|---|
 | `edge-server.crt`, `edge-server.key` | the box's ML-DSA-65 certificate: `serverAuth`, SAN = the name the central side checks (`proxy_ssl_name`) |
-| `central-ca.pem` | the CA that issued the central gateway's client certificate |
-| `allowed-clients.txt` | SHA-256 fingerprints of the client certificates allowed through (one per line). The CA issues other client certificates too; only these reach the device. Absent or empty: nobody. |
+| `central-ca.pem` | the ML-DSA-65 CA that issued the central gateway's client certificate, and nothing else (a classical CA here would let a classical chain through) |
+| `allowed-clients.txt` | SHA-256 fingerprints of the client certificates allowed through: one per line, 64 hex characters (`openssl x509 -in c.crt -outform DER \| sha256sum`, not the colon form of `-fingerprint`). The CA issues other client certificates too; only these reach the device. Absent, empty or unreadable: nobody. It is read by the worker processes (user `nobody`), so it must be readable by them, and re-read on `nginx -s reload`. |
 
 Set the device's address in `proxy_pass` (an address, not a name: nginx resolves
-a name once at start and will not start if it cannot).
+a name once at start and will not start if it cannot; a changed address needs a
+reload). `proxy_timeout` is an idle timer: a session quiet for longer is cut, so
+set it above the protocol's poll interval. TCP keep-alive (`so_keepalive`,
+`proxy_socket_keepalive`) finds half-open sessions after a link cut. Outside the
+gateway's entrypoint nothing rotates `/var/log/nginx`; arrange it.
 
 ## Rules
 
