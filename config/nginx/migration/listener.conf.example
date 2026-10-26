@@ -37,10 +37,14 @@
 	'"class":"$pqc_pq_class"'
 	'}';
 
+# Its own port (or address): never the gateway's :443 or :8443. Servers sharing a
+# port share the default server's TLS settings, which would open the strict
+# listener to TLS 1.2 and classical key exchange.
 server {
 	listen 9443 ssl;
 	http2 on;
-	server_name _;
+	# The service's own name: also the "endpoint" of every inventory record.
+	server_name api.example.com;
 
 	# Post-quantum certificate first, the service's classical one second. OpenSSL
 	# picks the one the client can verify, from the signature algorithms it offers.
@@ -51,12 +55,24 @@ server {
 
 	# TLS 1.2 stays open for classical clients; post-quantum key exchange needs 1.3.
 	ssl_protocols TLSv1.2 TLSv1.3;
-	ssl_conf_command Groups X25519MLKEM768:X25519:P-256:P-384;
+	ssl_ciphers ECDHE+AESGCM:ECDHE+CHACHA20;
+	ssl_prefer_server_ciphers on;
+	# Two preference tuples: a client that supports X25519MLKEM768 but sent only an
+	# X25519 key share is asked (HelloRetryRequest) for the post-quantum one.
+	ssl_conf_command Groups X25519MLKEM768/X25519:P-256:P-384;
+	# No resumption: a resumed connection does not show which server certificate
+	# the session began with, so it could be judged at most pq-kex (migration.lua).
+	# Every connection here is judged on a full handshake; keep-alive keeps the
+	# cost per request low.
+	ssl_session_tickets off;
+	ssl_session_cache off;
 
 	# Client certificates: "on" if the service already required them, else "optional".
 	ssl_verify_client optional;
 	ssl_client_certificate /etc/nginx/migration/client-ca-bundle.pem;
 	ssl_verify_depth 3;
+	# Revocation: the gateway's own CRL is checked per request (migration_access.lua).
+	# The customer CA's CRL is not handled yet; see README.md before enabling ssl_crl.
 	# ssl_crl /etc/nginx/migration/crl-bundle.pem;
 	# Unlike the strict :443, classical client signatures are accepted here.
 	ssl_conf_command ClientSignatureAlgorithms ML-DSA-65:ECDSA+SHA256:ECDSA+SHA384:rsa_pss_rsae_sha256:rsa_pss_rsae_sha384:rsa_pss_pss_sha256:RSA+SHA256;
@@ -72,12 +88,18 @@ server {
 
 	include /etc/nginx/security-headers.conf;
 
+	# Every location needs the access hook and the whole header set below: a
+	# location with any proxy_set_header of its own inherits none of these, and
+	# headers it does not set are passed through from the client as sent.
 	location / {
 		access_by_lua_file /etc/nginx/lua/migration_access.lua;
 		proxy_set_header Host $host;
 		proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 		proxy_set_header X-Forwarded-Proto $scheme;
+		proxy_set_header X-Real-IP $remote_addr;
+		proxy_set_header X-PQ-Class $pqc_pq_class;
 		proxy_set_header X-Client-CN $ssl_client_s_dn;
+		proxy_set_header X-Client-Serial $ssl_client_serial;
 		proxy_set_header X-Client-Verify $ssl_client_verify;
 		# The existing service:
 		proxy_pass http://backend.example:8080;
