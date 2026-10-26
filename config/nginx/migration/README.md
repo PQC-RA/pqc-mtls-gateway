@@ -80,12 +80,29 @@ clients (logged once a minute) rather than dropping old ones.
 - **Revocation is only as fresh as `crl-bundle.pem`.** Every request is checked
   against the CRL of its certificate's issuer (by issuer and serial). A client
   certificate is refused with 403 when it is revoked (`certificate_revoked`),
-  when its issuer has no CRL loaded (`no_crl_for_issuer`; set
+  when its issuer has no usable CRL (`no_crl_for_issuer`; set
   `$pqc_migration_crl_required off` to accept such clients knowingly), or when
-  its issuer's CRL is past nextUpdate (`crl_stale`; `$pqc_migration_crl_stale
-  accept` to accept knowingly). A revocation, once loaded, is never dropped
-  until the gateway restarts. OCSP for client certificates is not consulted.
-  What is loaded, per issuer, is listed under `crls` in the inventory.
+  its issuer's CRL is past nextUpdate or has none (`crl_stale`;
+  `$pqc_migration_crl_stale accept` to accept knowingly). A revocation, once
+  loaded, is never dropped until the gateway restarts. OCSP for client
+  certificates is not consulted. What is loaded, per issuer, is listed under
+  `crls` in the inventory. The same holds for the gateway's own CRL: if the
+  crl-renewer stops, its clients are refused here once that CRL passes
+  nextUpdate, as on the strict listeners.
+- **What counts as a usable CRL.** A full CRL (a delta CRL alone is read as
+  complete), signed by the CA itself, whose certificate is in
+  `client-ca-bundle.pem`, intermediates included, even if clients also send
+  them. Only the client's own certificate is checked: withdraw a compromised
+  intermediate by removing it from the bundle. If the bundle holds two CA
+  certificates with the same name (a key rolled over under the same name),
+  that name has no usable CRL and its clients are refused until one of the two
+  is removed. If a CRL's revocations do not all fit in `lua_shared_dict
+  migration_crl` (about 4,000 per MB, 32 MB in `nginx.conf`), its issuer has no
+  usable CRL.
+- **Upgrading from the first version of this listener** (no CRL handling): with
+  no `crl-bundle.pem`, every client certificate from a customer CA is now
+  refused (`no_crl_for_issuer`). Add the CRLs, or set
+  `$pqc_migration_crl_required off` knowingly.
 - **No session resumption.** The example turns it off: a resumed connection does
   not show which server certificate the session began with, so it is classified
   at most `pq-kex`. With resumption on, migrated clients would be refused by
