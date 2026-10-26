@@ -22,19 +22,25 @@
 #   chain; redis-check-rdb passes; the recorded compose hash equals a fresh one.
 #
 # Usage: backup-state.sh live|stand OUTDIR
-#   stand  the isolated pqcfix stack (/root/pqcfix, containers pqcfix-*)
-#   live   the pqc-gw stack (/etc/pki/pqc-ca, containers pqc-*); run only with
-#          the owner's yes for the stage it precedes
+#   stand  an isolated stand: STAND_DIR, STAND_PROJECT, STAND_COMPOSE from its
+#          stand.env (scripts/stand-up.sh)
+#   live   the deployment made by scripts/deploy.sh (/etc/pki/pqc-ca, /etc/ssl/pqc,
+#          containers pqc-*): LIVE_DIR = its checkout (default this repository),
+#          LIVE_PROJECT = its compose project (default read from pqc-gateway)
 set -euo pipefail
 TARGET=${1:?live|stand}; OUT=${2:?outdir}
-O=${OPENSSL:-/opt/openssl-3.6.2/bin/openssl}; export LD_LIBRARY_PATH=${LD_LIBRARY_PATH:-/opt/openssl-3.6.2/lib64} OPENSSL_CONF=/dev/null
+OSSL=${OPENSSL:-${OSSL:-}}; . "$(cd "$(dirname "$0")/lib" && pwd)/pq-openssl.sh"
 case "$TARGET" in
 stand)
-	PKI=/root/pqcfix/pki; SSL=/root/pqcfix/ssl; PREFIX=pqcfix; VOLP=pqcfix
-	COMPOSE=(/root/pqcfix/fixc) ;;
+	SD=${STAND_DIR:?source STAND_DIR/stand.env first}; PREFIX=${STAND_PROJECT:?}; VOLP=$PREFIX
+	live_p=$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' pqc-gateway 2>/dev/null || true)
+	[ -n "$live_p" ] && [ "$PREFIX" = "$live_p" ] && { echo "stand project '$PREFIX' is the live one" >&2; exit 2; }
+	PKI=$SD/pki; SSL=$SD/ssl; COMPOSE=(${STAND_COMPOSE:-$SD/compose}) ;;
 live)
-	PKI=/etc/pki/pqc-ca; SSL=/etc/ssl/pqc; PREFIX=pqc; VOLP=pqc-gw
-	COMPOSE=(docker compose -p pqc-gw --project-directory /root/pqc-tls-gateway) ;;
+	LIVE_DIR=${LIVE_DIR:-$(cd "$(dirname "$0")/.." && pwd)}
+	LIVE_PROJECT=${LIVE_PROJECT:-$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' pqc-gateway)}
+	PKI=/etc/pki/pqc-ca; SSL=/etc/ssl/pqc; PREFIX=pqc; VOLP=$LIVE_PROJECT
+	COMPOSE=(docker compose -p "$LIVE_PROJECT" --project-directory "$LIVE_DIR") ;;
 *) echo "target must be live or stand" >&2; exit 2 ;;
 esac
 TS=$(date -u +%Y%m%dT%H%M%SZ)
@@ -75,10 +81,10 @@ done
 # 4. What was running: resolved compose config, image IDs, git heads
 "${COMPOSE[@]}" config > "$B/compose-config.yml" 2>/dev/null
 sha256sum < "$B/compose-config.yml" | cut -d' ' -f1 > "$B/compose-config.sha256"
-docker ps -a --filter "label=com.docker.compose.project=$( [ "$TARGET" = stand ] && echo pqcfix || echo pqc-gw )" \
+docker ps -a --filter "label=com.docker.compose.project=$VOLP" \
 	--format '{{.Names}} {{.Image}} {{.ID}}' > "$B/containers.txt"
 while read -r name image _; do echo "$name $(docker inspect -f '{{.Image}}' "$name")"; done < "$B/containers.txt" > "$B/image-ids.txt"
-for r in /root/pqc-tls-gateway /root/pqc-tls-gateway-fix /root/mgmt-api-src /root/pqc-mtls-gateway; do
+for r in "$(cd "$(dirname "$0")/.." && pwd)" ${LIVE_DIR:-} ${API_SRC:-}; do
 	[ -d "$r/.git" ] || [ -f "$r/.git" ] || continue
 	echo "$r $(git -C "$r" rev-parse HEAD) $(git -C "$r" branch --show-current)"
 done > "$B/git-heads.txt"

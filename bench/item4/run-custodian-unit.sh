@@ -13,4 +13,4 @@ docker run --rm --network none -v "$P:/etc/pki/pqc-ca" -v "$T:/t" \
   -v "$(cd "$(dirname "$0")/../.." && pwd)/docker/pqc-ca-custodian/custodian.js:/c.js:ro" \
   -e CUSTODIAN_HMAC_SECRET_FILE=/t/hmac -e RENEWAL_ENABLED=1 -e CUSTODIAN_DEMO_PROFILE=1 \
   -e CRL_FILE=/etc/pki/pqc-ca/hybrid-combined-crl.pem --entrypoint sh "$IMG" \
-  -c 'node /c.js > /t/cust.log 2>&1 & sleep 1.5; node /t/client.js'
+  -c 'node /c.js > /tmp/cust.log 2>&1 & sleep 1.5; node /t/client.js; rc=$?; [ $rc = 0 ] || tail -20 /tmp/cust.log; exit $rc'

@@ -498,7 +498,7 @@ services:
   # Pinned by digest for the same reason base.lock is, a tag can be moved under
   # you. To bump: take the digest from the publish run's job summary in
   # pqc-mtls-management-api and change it here, in this one place.
-  image: ghcr.io/pqc-ra/pqc-mtls-management-api@sha256:f27f68d509d6ce118ef21da8cd993e16078cee1fe48f7025e5e5cc1b98711ecd
+  image: ghcr.io/pqc-ra/pqc-mtls-management-api@sha256:47de5211dced1bb7f1fe2caf6be207727f857dd9dbf599e71d8b86700b1e7a57
   # Dedicated non-root account (matches the image + setup-pki.sh host perms).
   user: "1001:1001"
   depends_on:

@@ -24,9 +24,9 @@
 #
 # Usage: unique-subject-rehearsal.sh WORKDIR
 set -uo pipefail
-O=/opt/openssl-3.6.2/bin/openssl; export LD_LIBRARY_PATH=/opt/openssl-3.6.2/lib64 OPENSSL_CONF=/dev/null OPENSSL=$O
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts/lib" && pwd)/pq-openssl.sh"; export OPENSSL=$O
 W=${1:?workdir}; HERE=$(cd "$(dirname "$0")" && pwd); TOOL="$HERE/../../scripts/ca-unique-subject.sh"
-LIVE=/etc/pki/pqc-ca/intermediate; STAND=/root/pqcfix/pki/intermediate
+LIVE=/etc/pki/pqc-ca/intermediate; STAND=${STAND_DIR:?source STAND_DIR/stand.env first}/pki/intermediate
 [ -e "$W" ] && { echo "$W exists"; exit 2; }
 fail=0; step() { printf '\n== %s\n' "$*"; }
 ok() { echo "PASS: $*"; }; bad() { echo "FAIL: $*"; fail=$((fail+1)); }

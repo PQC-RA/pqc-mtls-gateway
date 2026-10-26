@@ -83,6 +83,8 @@ else
     fi
 fi
 
+# BASES_ONLY=1: stop here (scripts/stand-up.sh builds the services with its own tags).
+[ "${BASES_ONLY:-0}" = 1 ] && { echo "Base images ready."; exit 0; }
 echo "2. Building Docker Compose services..."
 docker compose -f docker-compose.yml build
 

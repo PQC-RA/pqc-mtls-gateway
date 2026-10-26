@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # e2e-renew-stand-2.sh: item 4 failure cases on the ISOLATED stand only.
 # Same guard as e2e-renew-stand.sh (both stand ports chain to the throwaway CA,
-# not to the live CA, and belong to pqcfix-gateway).
+# not to the live CA, and belong to $GW).
 #
 #   A. lost response: the renewal is issued but the client never sees it; the
 #      retry with the same pending key gets the SAME successor (replay)
@@ -17,26 +17,14 @@
 #
 # Usage: e2e-renew-stand-2.sh WORKDIR
 set -uo pipefail
-O=/opt/openssl-3.6.2/bin/openssl; export LD_LIBRARY_PATH=/opt/openssl-3.6.2/lib64 OPENSSL_CONF=/dev/null
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/stand-env.sh"
 W=${1:?workdir}; mkdir -p "$W"
 HERE=$(cd "$(dirname "$0")" && pwd)
-CA=/root/pqcfix/pki/ca-chain.crt; LIVE_CA=/etc/pki/pqc-ca/ca-chain.crt
-DB=/root/pqcfix/pki/intermediate/db
-ADM_C=/root/pqcfix/admin/fix-tmp-admin.crt; ADM_K=/root/pqcfix/admin/fix-tmp-admin.key
-ADMIN=https://pqc-gw.local:19443; ENROLL=https://pqc-gw.local:18443/enroll; URL=https://pqc-gw.local:19443
-RES=(--resolve pqc-gw.local:19443:127.0.0.1 --resolve pqc-gw.local:18443:127.0.0.1)
 die(){ echo "GUARD ABORT: $*"; exit 90; }
 pass=0 fail=0
 check(){ if eval "$2"; then echo "PASS  $1"; pass=$((pass+1)); else echo "FAIL  $1"; fail=$((fail+1)); fi; }
 
-for p in 19443 18443; do
-	echo | timeout 8 $O s_client -connect 127.0.0.1:$p -servername pqc-gw.local -showcerts 2>/dev/null | sed -n '/BEGIN CERT/,/END CERT/p' > "$W/srv-$p.pem"
-	$O verify -CAfile $CA -untrusted "$W/srv-$p.pem" "$W/srv-$p.pem" >/dev/null 2>&1 || die "$p does not chain to the throwaway CA"
-	if $O verify -CAfile $LIVE_CA "$W/srv-$p.pem" >/dev/null 2>&1; then die "$p chains to LIVE"; fi
-done
-[ "$(docker port pqcfix-gateway 443/tcp)" = "127.0.0.1:19443" ] && [ "$(docker port pqcfix-gateway 8443/tcp)" = "127.0.0.1:18443" ] || die "ports are not pqcfix-gateway"
-[ "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' pqcfix-ca-custodian)" = pqcfix ] || die "custodian is not the stand's"
-echo "GUARD OK"
+stand_guard "$W"
 
 TS=$(date -u +%H%M%S)
 serial_of(){ $O x509 -in "$1" -noout -serial | cut -d= -f2; }
@@ -77,7 +65,7 @@ wait_open(){ # wait until renewal opens (half the lifetime after the real issue 
 	local open=$(( nb + 60 + (na - nb - 60) / 2 + 2 )); local now; now=$(date -u +%s)
 	[ "$now" -lt "$open" ] && sleep $(( open - now )); return 0
 }
-CLIENT=(bash "$HERE/renew-client.sh" --url $URL --resolve pqc-gw.local:19443:127.0.0.1)
+CLIENT=(bash "$HERE/renew-client.sh" --url $URL --resolve $STAND_HOST:$STAND_TLS_PORT:127.0.0.1)
 gen_key(){ $O genpkey -algorithm ML-DSA-65 -out "$1" 2>/dev/null; }
 
 echo "== A. lost response"
@@ -90,12 +78,12 @@ check "the retry with the same key gets the same successor" "[ -n '$LOST' ] && [
 
 echo "== B. custodian down"
 B="$W/B"; bootstrap "e2e-down-$TS" demo-120s "$B" || die "bootstrap B failed"; wait_open "$B"
-docker stop pqcfix-ca-custodian >/dev/null
+docker stop $CUST >/dev/null
 rc=0; "${CLIENT[@]}" --dir "$B" --once > "$B/down.out" 2>&1 || rc=$?; sed 's/^/      /' "$B/down.out"
 check "with the custodian down the client is told to retry (exit 4)" "[ $rc -eq 4 ]"
 PEND=$($O pkey -in "$B/pending.key" -pubout | $O dgst -sha256 -r)
-docker start pqcfix-ca-custodian >/dev/null
-for i in $(seq 1 90); do [ "$(docker inspect -f '{{.State.Health.Status}}' pqcfix-ca-custodian)" = healthy ] && break; sleep 1; done
+docker start $CUST >/dev/null
+for i in $(seq 1 90); do [ "$(docker inspect -f '{{.State.Health.Status}}' $CUST)" = healthy ] && break; sleep 1; done
 "${CLIENT[@]}" --dir "$B" --once > "$B/up.out" 2>&1; sed 's/^/      /' "$B/up.out"
 check "after the custodian is back the same pending key renews" "grep -q RENEWED '$B/up.out' && [ \"\$($O pkey -in '$B/client.key' -pubout | $O dgst -sha256 -r)\" = \"$PEND\" ]"
 

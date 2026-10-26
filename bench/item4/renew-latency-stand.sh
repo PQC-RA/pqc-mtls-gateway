@@ -13,20 +13,10 @@
 #
 # Usage: renew-latency-stand.sh WORKDIR [N]
 set -uo pipefail
-O=/opt/openssl-3.6.2/bin/openssl; export LD_LIBRARY_PATH=/opt/openssl-3.6.2/lib64 OPENSSL_CONF=/dev/null
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/stand-env.sh"
 W=${1:?workdir}; N=${2:-25}; mkdir -p "$W"; HERE=$(cd "$(dirname "$0")" && pwd)
-CA=/root/pqcfix/pki/ca-chain.crt; LIVE_CA=/etc/pki/pqc-ca/ca-chain.crt
-ADM_C=/root/pqcfix/admin/fix-tmp-admin.crt; ADM_K=/root/pqcfix/admin/fix-tmp-admin.key
-ADMIN=https://pqc-gw.local:19443; ENROLL=https://pqc-gw.local:18443/enroll
-RES=(--resolve pqc-gw.local:19443:127.0.0.1 --resolve pqc-gw.local:18443:127.0.0.1)
 die(){ echo "GUARD ABORT: $*"; exit 90; }
-for p in 19443 18443; do
-	echo | timeout 8 $O s_client -connect 127.0.0.1:$p -servername pqc-gw.local -showcerts 2>/dev/null | sed -n '/BEGIN CERT/,/END CERT/p' > "$W/srv-$p.pem"
-	$O verify -CAfile $CA -untrusted "$W/srv-$p.pem" "$W/srv-$p.pem" >/dev/null 2>&1 || die "$p does not chain to the throwaway CA"
-	if $O verify -CAfile $LIVE_CA "$W/srv-$p.pem" >/dev/null 2>&1; then die "$p chains to LIVE"; fi
-done
-[ "$(docker port pqcfix-gateway 443/tcp)" = "127.0.0.1:19443" ] || die "ports are not pqcfix-gateway"
-echo "GUARD OK"
+stand_guard "$W"
 
 enroll(){ # enroll CN PROFILE DIR
 	local d=$3 q="cn=$1&ttl=300" t body; [ -n "$2" ] && q="$q&profile=$2"; mkdir -p "$d"; cp $CA "$d/ca-chain.crt"
@@ -36,7 +26,7 @@ enroll(){ # enroll CN PROFILE DIR
 	curl -sS "${RES[@]}" --cacert $CA --max-time 20 -X POST "$ENROLL" -H 'Content-Type: application/json' -d "$body" -o "$d/enroll.json"
 	python3 -I -c 'import json,sys; open(sys.argv[2],"w").write(json.load(open(sys.argv[1]))["certificate"])' "$d/enroll.json" "$d/client.crt"
 }
-TS=$(date -u +%H%M%S); ACC0=$(docker exec pqcfix-gateway sh -c 'wc -l < /var/log/nginx/pqc-mtls-access.log')
+TS=$(date -u +%H%M%S); ACC0=$(docker exec $GW sh -c 'wc -l < /var/log/nginx/pqc-mtls-access.log')
 echo "cn serial_old serial_new client_s exit" > "$W/client.tsv"
 renew_one(){ # renew_one i: wait until past half of the lifetime, then renew once and time it
 	local d="$W/c$1" old new nb t0 t1 rc
@@ -44,7 +34,7 @@ renew_one(){ # renew_one i: wait until past half of the lifetime, then renew onc
 	nb=$(date -u -d "$($O x509 -in "$d/client.crt" -noout -startdate | cut -d= -f2)" +%s)
 	# notBefore is backdated 60 s; half of 120 s after the real issue time is nb+60+60.
 	while [ "$(date +%s)" -lt $(( nb + 60 + 63 )) ]; do sleep 1; done
-	t0=$(date +%s.%N); bash "$HERE/renew-client.sh" --dir "$d" --url https://pqc-gw.local:19443 --resolve pqc-gw.local:19443:127.0.0.1 --once > "$d/renew.out" 2>&1; rc=$?; t1=$(date +%s.%N)
+	t0=$(date +%s.%N); bash "$HERE/renew-client.sh" --dir "$d" --url $ADMIN --resolve $STAND_HOST:$STAND_TLS_PORT:127.0.0.1 --once > "$d/renew.out" 2>&1; rc=$?; t1=$(date +%s.%N)
 	new=$($O x509 -in "$d/client.crt" -noout -serial | cut -d= -f2)
 	echo "lat-$TS-$1 $old $new $(echo "$t1 - $t0" | bc) $rc" >> "$W/client.tsv"
 }
@@ -58,7 +48,7 @@ for i in $(seq -w 1 "$N"); do
 	while [ "$(date +%s)" -lt $(( t + 12 )) ]; do sleep 1; done
 done
 wait
-docker exec pqcfix-gateway sh -c "tail -n +$((ACC0+1)) /var/log/nginx/pqc-mtls-access.log" | grep '"uri":"/renew"' | grep "CN=lat-$TS-" > "$W/access-renew.log"
+docker exec $GW sh -c "tail -n +$((ACC0+1)) /var/log/nginx/pqc-mtls-access.log" | grep '"uri":"/renew"' | grep "CN=lat-$TS-" > "$W/access-renew.log"
 python3 -I - "$W/client.tsv" "$W/access-renew.log" <<'PY'
 import json, statistics, sys
 rows = [l.split() for l in open(sys.argv[1]).read().splitlines()[1:]]
@@ -72,4 +62,7 @@ st = [a["rt"] * 1000 for a in acc if a["status"] == 201]
 print(f"renewed {len(ok)} of {len(rows)} distinct CNs; gateway POST /renew statuses: " + str(sorted({a['status'] for a in acc})) + f", {len(acc)} requests")
 for name, v in (("client wall time", cl), ("gateway rt (API+custodian)", st)):
     if v: print(f"{name:28s} n={len(v)} p50={pct(v,50):.0f} ms p95={pct(v,95):.0f} ms min={min(v):.0f} max={max(v):.0f} mean={statistics.mean(v):.0f}")
+ok_all = len(ok) == len(rows) and len(rows) > 0 and sorted({a["status"] for a in acc}) == [201] and len(st) == len(rows)
+print(("PASS  " if ok_all else "FAIL  ") + f"every CN renewed once, every POST /renew 201 ({len(ok)} of {len(rows)})")
+print(f"== result: {int(ok_all)} passed, {int(not ok_all)} failed"); sys.exit(0 if ok_all else 1)
 PY

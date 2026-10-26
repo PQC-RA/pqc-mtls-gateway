@@ -52,6 +52,9 @@ if META:get("revoked_:" .. string.lower(serial)) then
     return ngx.exit(444)
 end
 
+-- Expiry, per request: a keep-alive connection outlives the handshake check.
+require("client_cert_expiry").refuse_if_expired("/renew")
+
 if ngx.var.ssl_session_reused == "r" then
     return fail(403, "session_resumed", "Renewal needs a full handshake; open a new connection")
 end

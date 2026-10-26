@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # e2e-renew-stand.sh: item 4 end-to-end on the ISOLATED stand only
-# (127.0.0.1:19443 mTLS, 127.0.0.1:18443 enrollment, throwaway PKI in /root/pqcfix/pki).
+# (127.0.0.1:$STAND_TLS_PORT mTLS, 127.0.0.1:18443 enrollment, throwaway PKI in $STAND_DIR/pki).
 #
 #   1. guard: both ports chain to the throwaway CA and NOT to the live CA,
-#      and belong to pqcfix-gateway
+#      and belong to $GW
 #   2. bootstrap: admin token with profile demo-120s, enrollment on :18443
 #   3. renewal refused before half of the lifetime (too_early)
 #   4. the reference client renews twice unattended (--loop)
@@ -14,24 +14,14 @@
 #
 # Usage: e2e-renew-stand.sh WORKDIR
 set -uo pipefail
-O=/opt/openssl-3.6.2/bin/openssl; export LD_LIBRARY_PATH=/opt/openssl-3.6.2/lib64 OPENSSL_CONF=/dev/null
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/stand-env.sh"
 W=${1:?workdir}; mkdir -p "$W"
 HERE=$(cd "$(dirname "$0")" && pwd)
-CA=/root/pqcfix/pki/ca-chain.crt; LIVE_CA=/etc/pki/pqc-ca/ca-chain.crt
-ADM_C=/root/pqcfix/admin/fix-tmp-admin.crt; ADM_K=/root/pqcfix/admin/fix-tmp-admin.key
-ADMIN=https://pqc-gw.local:19443; ENROLL=https://pqc-gw.local:18443/enroll
-RES=(--resolve pqc-gw.local:19443:127.0.0.1 --resolve pqc-gw.local:18443:127.0.0.1)
 die(){ echo "GUARD ABORT: $*"; exit 90; }
 pass=0 fail=0
 check(){ if eval "$2"; then echo "PASS  $1"; pass=$((pass+1)); else echo "FAIL  $1"; fail=$((fail+1)); fi; }
 
-for p in 19443 18443; do
-	echo | timeout 8 $O s_client -connect 127.0.0.1:$p -servername pqc-gw.local -showcerts 2>/dev/null | sed -n '/BEGIN CERT/,/END CERT/p' > "$W/srv-$p.pem"
-	$O verify -CAfile $CA -untrusted "$W/srv-$p.pem" "$W/srv-$p.pem" >/dev/null 2>&1 || die "$p does not chain to the throwaway CA"
-	if $O verify -CAfile $LIVE_CA "$W/srv-$p.pem" >/dev/null 2>&1; then die "$p chains to LIVE"; fi
-done
-[ "$(docker port pqcfix-gateway 443/tcp)" = "127.0.0.1:19443" ] && [ "$(docker port pqcfix-gateway 8443/tcp)" = "127.0.0.1:18443" ] || die "ports are not pqcfix-gateway"
-echo "GUARD OK"
+stand_guard "$W"
 
 TS=$(date -u +%H%M%S)
 enroll() { # enroll CN PROFILE DIR -> client.crt/client.key in DIR
@@ -48,13 +38,14 @@ enroll() { # enroll CN PROFILE DIR -> client.crt/client.key in DIR
 	[ -s "$d/client.crt" ]
 }
 lifetime() { local nb na; nb=$(date -u -d "$($O x509 -in "$1" -noout -startdate | cut -d= -f2)" +%s); na=$(date -u -d "$($O x509 -in "$1" -noout -enddate | cut -d= -f2)" +%s); echo $((na-nb)); }
-CLIENT=(bash "$HERE/renew-client.sh" --url https://pqc-gw.local:19443 --resolve pqc-gw.local:19443:127.0.0.1)
+CLIENT=(bash "$HERE/renew-client.sh" --url $ADMIN --resolve $STAND_HOST:$STAND_TLS_PORT:127.0.0.1)
 
 echo "== 2. bootstrap (demo-120s)"
 D="$W/demo"; CN="e2e-renew-$TS"
 check "bootstrap enrollment with profile demo-120s" "enroll $CN demo-120s $D"
 S0=$($O x509 -in "$D/client.crt" -noout -serial | cut -d= -f2); echo "      serial $S0, lifetime $(lifetime "$D/client.crt") s (60 s backdate included)"
 $O x509 -in "$D/client.crt" -noout -ext basicConstraints,keyUsage,extendedKeyUsage 2>&1 | sed 's/^/      /'
+cp "$D/client.crt" "$W/first.crt"; T_BOOT=$(date -u +%Y-%m-%dT%H:%M:%S)
 
 echo "== 3. too early"
 rc=0; "${CLIENT[@]}" --dir "$D" --once > "$W/too-early.out" 2>&1 || rc=$?
@@ -70,7 +61,31 @@ sed 's/^/      /' "$W/loop.out"
 check "two renewals without a person" "[ \$(grep -c RENEWED '$W/loop.out') -ge 2 ]"
 S2=$($O x509 -in "$D/client.crt" -noout -serial | cut -d= -f2)
 check "the current certificate carries the current key" "[ \"\$($O x509 -in '$D/client.crt' -noout -pubkey | $O dgst -sha256 -r)\" = \"\$($O pkey -in '$D/client.key' -pubout | $O dgst -sha256 -r)\" ]"
-docker exec pqcfix-gateway sh -c 'grep "\"/renew\"\|POST /renew" /var/log/nginx/pqc-mtls-access.log | tail -6' > "$W/access-renew.log" 2>/dev/null
+docker exec $GW sh -c 'grep "\"/renew\"\|POST /renew" /var/log/nginx/pqc-mtls-access.log | tail -6' > "$W/access-renew.log" 2>/dev/null
+# R-A2: every certificate of the chain has the configured lifetime, read from the
+# certificate itself: 120 s plus the custodian's 60 s backdate.
+for f in "$W/first.crt" "$D/prev.crt" "$D/client.crt"; do
+	check "R-A2 lifetime of $($O x509 -in "$f" -noout -serial | cut -d= -f2) is 180 s (120 s + 60 s backdate)" "[ \$(lifetime '$f') = 180 ]"
+done
+# R-A1: between the bootstrap and the second renewal the admin-action log shows
+# two cert.renew entries for this CN and NO action by an admin or auditor identity.
+python3 -I - $MGMT_LOG "$T_BOOT" "$CN" > "$W/r-a1.txt" <<'PY2'
+import json, sys
+log, start, cn = sys.argv[1], sys.argv[2], sys.argv[3]
+ev = [json.loads(l) for l in open(log) if l.strip()]
+# The window opens at this CN's bootstrap enrollment entry (not at a wall-clock
+# second, which also caught the token minted in the same second).
+boot = [i for i, e in enumerate(ev) if e["action"] == "cert.enroll" and f"cn={cn} " in (e.get("target") or "") + " " and e["result"]["httpStatus"] == 201]
+ev = ev[boot[-1] + 1:] if boot else []
+renews = [e for e in ev if e["action"] == "cert.renew" and f"cn={cn} " in (e.get("target") or "") + " " and e["result"]["httpStatus"] == 201]
+end = renews[1]["ts"] if len(renews) >= 2 else None
+window = [e for e in ev if end and e["ts"] <= end]
+admin = [e for e in window if (e.get("actor") or {}).get("role")]
+print(f"renewals_201={len(renews)} admin_actions_in_window={len(admin)} window_entries={len(window)}")
+for e in admin: print("ADMIN", e["ts"], e["action"], e.get("target"))
+PY2
+cat "$W/r-a1.txt" | sed 's/^/      /'
+check "R-A1 two renewals in the admin-action log and no admin action between bootstrap and the second renewal" "grep -q 'renewals_201=2 admin_actions_in_window=0' '$W/r-a1.txt' || grep -qE 'renewals_201=[2-9] admin_actions_in_window=0' '$W/r-a1.txt'"
 echo "      access log lines for /renew: $(wc -l < "$W/access-renew.log")"
 
 echo "== 5. conflict rule"
@@ -82,16 +97,18 @@ rc=0; "${CLIENT[@]}" --dir "$C" --once > "$W/conflict.out" 2>&1 || rc=$?
 sed 's/^/      /' "$W/conflict.out"
 check "a second key for one predecessor is refused as a conflict" "grep -q 'reason.:.renewal_conflict' '$W/conflict.out'"
 sleep 3
-IDX=/root/pqcfix/pki/intermediate/db/index.txt
 check "predecessor $PREV revoked keyCompromise" "awk -F'\t' -v s=$PREV '\$4==s && \$1==\"R\" && \$3 ~ /keyCompromise/' $IDX | grep -q ."
 check "its successor $S2 revoked keyCompromise" "awk -F'\t' -v s=$S2 '\$4==s && \$1==\"R\" && \$3 ~ /keyCompromise/' $IDX | grep -q ."
-check "lineage frozen" "python3 -I -c 'import json,sys; L=json.load(open(\"/root/pqcfix/pki/intermediate/db/lineage.json\")); sys.exit(0 if L.get(\"$S2\",{}).get(\"frozen\") else 1)'"
+check "lineage frozen" "python3 -I -c 'import json,sys; L=json.load(open(\"$STAND_DIR/pki/intermediate/db/lineage.json\")); sys.exit(0 if L.get(\"$S2\",{}).get(\"frozen\") else 1)'"
 
 echo "== 6. revoked certificate refused"
 sleep 3
 rc=0; "${CLIENT[@]}" --dir "$D" --once > "$W/revoked.out" 2>&1 || rc=$?
 sed 's/^/      /' "$W/revoked.out"
-check "the revoked current certificate cannot renew" "[ $rc -ne 0 ] && ! grep -q RENEWED '$W/revoked.out'"
+RSER=$($O x509 -in "$D/client.crt" -noout -serial | cut -d= -f2)
+RLINE=$(docker exec $GW sh -c "grep '\"uri\":\"/renew\"' /var/log/nginx/pqc-mtls-access.log | grep '\"serial\":\"$RSER\"' | tail -1")
+echo "      gateway: $(echo "$RLINE" | cut -c1-200)"
+check "the revoked current certificate cannot renew: refused at the gateway (400, verify FAILED: certificate revoked), nothing issued" "[ $rc -ne 0 ] && ! grep -q RENEWED '$W/revoked.out' && echo '$RLINE' | grep -q '\"status\":400' && echo '$RLINE' | grep -q 'certificate revoked'"
 
 echo "== 7. legacy certificate refused"
 L="$W/legacy"
