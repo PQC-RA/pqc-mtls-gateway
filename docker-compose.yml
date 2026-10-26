@@ -112,6 +112,8 @@ services:
    - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
    - ./config/nginx/security-headers.conf:/etc/nginx/security-headers.conf:ro
    - ./config/nginx/lua:/etc/nginx/lua:ro
+   # Migration listener configuration (empty by default, see its README).
+   - ./config/nginx/migration:/etc/nginx/migration:ro
    # Mount point for a public enrollment page, served read-only. ONLY an enrollment
    # bundle belongs here, never the admin console.
    - ./config/enroll-ui:/etc/nginx/enroll-ui:ro
