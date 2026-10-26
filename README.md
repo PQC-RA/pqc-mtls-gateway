@@ -484,6 +484,28 @@ actionlint and an OpenSSL version-consistency gate.
   and accepted a classical fallback group; it is now post-quantum-only, like `:443`.
 
 <details>
+<summary><b>Upgrading a deployment made before 2026-10: fix the CA profile by hand</b></summary>
+
+New deployments render a CA configuration that never copies extensions from a CSR and signs every
+client leaf with the minimal `v3_m2m_leaf` profile (`CA:FALSE`, `digitalSignature`, `clientAuth`).
+An **existing** CA keeps the configuration it was created with, and the old one copied every
+extension a CSR asked for: a holder of an enrollment token could obtain a certificate marked
+`CA:TRUE` or valid for `serverAuth`, with any SAN. `scripts/setup-pki.sh` warns when it finds the old
+setting but does not change a live CA. Edit `intermediate/openssl-intermediate.cnf` in the CA
+directory, in `[ CA_default ]`:
+
+```ini
+copy_extensions   = none
+x509_extensions   = v3_m2m_leaf
+```
+
+and add the `[ v3_m2m_leaf ]` section from `pki/templates/openssl-intermediate.cnf`. No restart is
+needed: the custodian reads the file on every signing. Check with one enrollment whose CSR asks
+for `basicConstraints=critical,CA:TRUE`: the issued leaf must say `CA:FALSE`.
+
+</details>
+
+<details>
 <summary><b>Admin authorisation, in practice</b></summary>
 
 `deploy.sh` issues a bootstrap admin certificate and writes its fingerprint into
