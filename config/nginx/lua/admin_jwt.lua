@@ -34,6 +34,23 @@ if ngx.var.ssl_client_verify ~= "SUCCESS" then
     return ngx.exit(ngx.HTTP_UNAUTHORIZED)
 end
 
+-- Active Enforcement: the same revocation check policy_router.lua runs, before
+-- any attestation is minted. ssl_client_verify above reflects nginx's STATIC
+-- ssl_crl, which only refreshes on reload; between a revocation and that reload
+-- a revoked certificate still verifies as SUCCESS. crl_worker.lua writes the
+-- serial into the shared dict ahead of the reload, so this is what closes that
+-- window. Without it, /admin/ (the higher-privilege path, proxied to the
+-- management-api with a freshly signed admin JWT) would be the one route
+-- lacking the check that /api/ has.
+local client_serial = ngx.var.ssl_client_serial
+if client_serial then
+    local revoked = ngx.shared.pqc_route_meta:get("revoked_:" .. string.lower(client_serial))
+    if revoked then
+        ngx.log(ngx.WARN, "CRITICAL PROTECTION: Dropping revoked PQC admin serial: ", client_serial)
+        return ngx.exit(444)
+    end
+end
+
 local function extract_cn(dn)
     return dn and dn:match("CN=([^,/]+)") or ""
 end

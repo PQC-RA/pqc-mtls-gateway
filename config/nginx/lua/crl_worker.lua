@@ -12,9 +12,34 @@
 --     or emits no CRL, it logs at ERR (fail-loud) instead of no-op'ing quietly.
 --   * Never removes serials once seen, a transient poll failure cannot
 --     "un-revoke" a certificate (fail-closed).
+--
+-- Why the interval is short, and must stay shorter than the reload watcher:
+-- this poller exists to drop revoked serials BEFORE the nginx reload that
+-- refreshes the static ssl_crl. That reload is driven by the entrypoint's
+-- /signals/reload-nginx watcher at NGINX_RELOAD_POLL_INTERVAL. At the earlier
+-- 10 s interval this poller always lost that race, so the inline check in
+-- policy_router.lua never fired: nginx was already refusing the certificate at
+-- the TLS layer by the time the dict was written, and with ssl_verify_client
+-- on, a failed verify is answered before access_by_lua runs at all. The poller
+-- also restarts on every worker start, so each reload reset its cycle; it was
+-- second by construction. Keep this STRICTLY BELOW NGINX_RELOAD_POLL_INTERVAL
+-- or the fast path goes silent again. bench/crl-fastpath.sh asserts it leads.
 
 local M = {}
-local delay = 10 -- seconds
+local delay = 2 -- seconds; see the note above before raising this
+
+-- Last CRL text seen, so a short interval does not mean spawning openssl every
+-- cycle. The file is ~10 KB: reading it is a couple of syscalls, re-parsing an
+-- unchanged one is a process. Only set after a SUCCESSFUL parse, so a transient
+-- failure is retried rather than cached as "already handled".
+local last_pem = nil
+-- Liveness bookkeeping. Change-detection means the "CRL poll OK" line only
+-- appears when the CRL actually changes, so on a quiet system the log could no
+-- longer distinguish "nothing to do" from "the poller died". Emit a heartbeat
+-- about once a minute instead.
+local held      = 0
+local last_beat = 0
+local BEAT_EVERY = 60 -- seconds
 
 -- Match the binary the rest of the gateway ships (see Dockerfile / healthcheck).
 -- Hardcoded rather than sourced from an env var: this path is interpolated
@@ -23,9 +48,39 @@ local delay = 10 -- seconds
 local OPENSSL  = "/opt/openssl/bin/openssl"
 local CRL_FILE = "/etc/pki/pqc-ca/hybrid-combined-crl.pem"
 
-local function poll_crl(premature)
+-- Forward declaration: reschedule() refers to poll_crl, which refers back to
+-- reschedule(). Declared local so neither ever becomes a global: a global here
+-- would be shared across every request in the worker's Lua VM.
+local poll_crl
+
+local function reschedule()
+    local ok, err = ngx.timer.at(delay, poll_crl)
+    if not ok then
+        ngx.log(ngx.ERR, "[crl_worker] failed to reschedule CRL poller: ", err)
+    end
+end
+
+poll_crl = function(premature)
     if premature then
         return
+    end
+
+    -- Cheap change detection. An unreadable file falls through to the openssl
+    -- path below so the existing fail-loud handling still reports it.
+    local pem
+    local fh = io.open(CRL_FILE, "r")
+    if fh then
+        pem = fh:read("*a")
+        fh:close()
+        if pem and last_pem and pem == last_pem then
+            local now = ngx.now()
+            if now - last_beat >= BEAT_EVERY then
+                last_beat = now
+                ngx.log(ngx.WARN, "[crl_worker] CRL unchanged, poller alive, ",
+                    held, " revoked serial(s) held")
+            end
+            return reschedule()   -- unchanged since the last successful parse
+        end
     end
 
     -- 2>&1 so an openssl failure (missing binary, malformed CRL) shows up in the
@@ -72,14 +127,17 @@ local function poll_crl(premature)
                 "[crl_worker] CRL poll produced no parsable CRL from ", CRL_FILE,
                 " via ", OPENSSL, ", revocation list NOT refreshed this cycle")
         else
+            -- Only now is the file's content known-good, so only now may it be
+            -- remembered. Caching it earlier would skip re-parsing a file whose
+            -- serials never made it into the dict.
+            last_pem  = pem
+            held      = loaded
+            last_beat = ngx.now()
             ngx.log(ngx.WARN, "[crl_worker] CRL poll OK, ", loaded, " revoked serial(s) loaded")
         end
     end
 
-    local ok, err2 = ngx.timer.at(delay, poll_crl)
-    if not ok then
-        ngx.log(ngx.ERR, "[crl_worker] failed to reschedule CRL poller: ", err2)
-    end
+    reschedule()
 end
 
 function M.start_polling()
