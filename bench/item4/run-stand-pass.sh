@@ -70,9 +70,11 @@ switch(){ # switch on|off: the stand's renewal switch (stage 2 / stage 1 setting
 }
 custodian_unit(){ local p; p=$(mktemp -d); cp -a $FIX/pki/. "$p/"; bash "$HERE/run-custodian-unit.sh" "$p" "$(docker inspect -f '{{.Config.Image}}' $CUST)"; local rc=$?
 	find "$p" -name '*.key' -exec shred -u {} + 2>/dev/null; rm -rf "$p"; return $rc; }
-api_unit(){ docker image inspect item4-probe-mgmt-builder:wip >/dev/null 2>&1 || { echo "SKIPPED: no item4-probe-mgmt-builder:wip image on this host"; return 2; }
-	docker run --rm --network none -v "$API_SRC/src:/usr/src/app/src:ro" -v "$API_SRC/test:/usr/src/app/test:ro" \
-	item4-probe-mgmt-builder:wip sh -c 'cd /usr/src/app && npx jest 2>&1 | tail -6'; }
+# management-api's own unit tests run in its repository's CI (pqc-mtls-management-api);
+# with API_SRC set to a checkout of it they run here too, in a stock Node image.
+api_unit(){ [ -n "${API_SRC:-}" ] || { echo "SKIPPED: management-api unit tests run in pqc-mtls-management-api's CI; set API_SRC to run them here"; return 2; }
+	docker run --rm -v "$API_SRC:/src:ro" node:22-bookworm-slim sh -c \
+		'cp -r /src /w && cd /w && rm -rf node_modules && corepack enable >/dev/null 2>&1 && pnpm install --frozen-lockfile >/dev/null 2>&1 && pnpm exec jest --ci 2>&1 | tail -6'; }
 
 W="$OUT/work"; mkdir -p "$W"
 run unit-lua-expiry      bash "$HERE/client-cert-expiry-unit.sh"
