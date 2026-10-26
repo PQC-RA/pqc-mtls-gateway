@@ -197,7 +197,9 @@ gen_crl_atomic() {
     tmp=$(mktemp "$(dirname "$dest")/.$(basename "$dest").XXXXXX") || {
         log "ERROR" "cannot create temp file beside $dest"; return 1; }
     PENDING_TMP="$tmp"
-    if ! $OPENSSL ca -gencrl -config "$cnf" -out "$tmp" 2>>"$LOG_FILE"; then
+    # Under the CA database lock the custodian also takes (db/.ca-db.lock):
+    # `openssl ca` does no locking of its own.
+    if ! flock -w 20 "$(dirname "$cnf")/db/.ca-db.lock" $OPENSSL ca -gencrl -config "$cnf" -out "$tmp" 2>>"$LOG_FILE"; then
         log "ERROR" "Failed to generate $label CRL"; rm -f "$tmp"; PENDING_TMP=""; return 1
     fi
     if ! verify_crl "$tmp" "$cacrt" "$label"; then
@@ -213,6 +215,15 @@ gen_crl_atomic() {
 # ═══════════════════════════════════════════════════════════════
 log "INFO" "=== CRL renewal started ==="
 ERRORS=0
+
+# ── Step 0: mark expired certificates E in the intermediate index ──
+# Short-lived renewal profiles make expired rows common; until -updatedb runs
+# they still read V. A failure here is logged and does not stop the CRL.
+if flock -w 20 "${PQ_INT_DIR}/db/.ca-db.lock" $OPENSSL ca -config "$PQ_INT_CNF" -updatedb >>"$LOG_FILE" 2>&1; then
+    log "INFO" "Intermediate index updated (expired certificates marked E)"
+else
+    log "WARN" "openssl ca -updatedb failed; continuing with the CRL"
+fi
 
 # ── Step 1: Intermediate CRLs (daily) ────────────────────────
 log "INFO" "Generating PQ Intermediate CRL..."
