@@ -47,7 +47,10 @@ server {
 	server_name api.example.com;
 
 	# Post-quantum certificate first, the service's classical one second. OpenSSL
-	# picks the one the client can verify, from the signature algorithms it offers.
+	# picks by the signature algorithms the client offers, NOT by what it trusts:
+	# any client offering ML-DSA (current Chromium, OpenSSL 3.5+) gets the ML-DSA-65
+	# certificate and fails unless it trusts its root. On a name that browsers or
+	# unmanaged clients reach, leave the ML-DSA-65 pair out (README.md, limits).
 	ssl_certificate     /etc/ssl/pqc/server-mldsa65.crt;
 	ssl_certificate_key /etc/ssl/pqc/server-mldsa65.key;
 	ssl_certificate     /etc/nginx/migration/classical-server.crt;

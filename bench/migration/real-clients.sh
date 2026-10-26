@@ -8,6 +8,7 @@
 #   python:3.11-slim-bookworm  CPython ssl on OpenSSL 3.0
 #   eclipse-temurin:21-jdk     Java 21 JSSE (HttpsURLConnection)
 #   curlimages/curl            curl on OpenSSL 3.5 (post-quantum capable)
+#   pqc-test-chromium:local    Chromium from Alpine (FROM alpine:3, apk add chromium nss-tools)
 #
 # Cases:
 #   10 OpenSSL 1.1.1 client  -> served, class classical
@@ -15,6 +16,9 @@
 #   12 Java 21 client        -> served, class classical
 #   13 Java 21 with the customer-CA client certificate (pq-required) -> 403 pq_required
 #   14 curl on OpenSSL 3.5   -> served, class pq-kex or pq (what it negotiated is logged)
+#   15a Chromium (headless) trusting the gateway CA (NSS) -> served, class pq
+#   15b Chromium not trusting it, the classical certificate pinned by SPKI -> NOT
+#       served: Chromium offers ML-DSA, gets the ML-DSA-65 certificate, rejects it
 
 RC=$W/rc; mkdir -p "$RC"
 cp "$W/cl/ca.crt" "$RC/customer-ca.crt"
@@ -68,6 +72,7 @@ chmod -R a+rX "$RC"
 
 URL=https://$H:$P_MIG/
 RUN=(docker run --rm --network host --add-host "$H:127.0.0.1" -v "$RC:/rc:ro")
+last_sig(){ docker exec $NAME sh -c 'tail -1 /var/log/nginx/pqc-migration-access.log' | grep -oE '"server_sig":"[^"]*"'; }
 last_class(){ docker exec $NAME sh -c 'tail -1 /var/log/nginx/pqc-migration-access.log' | grep -oE '"group":"[^"]*"|"class":"[^"]*"' | tr '\n' ' '; }
 
 r=$("${RUN[@]}" python:3.9-slim-bullseye python -I /rc/probe.py $H $P_MIG /rc/customer-ca.crt 2>&1 | tail -1); echo "  10: $r | $(last_class)"
@@ -81,4 +86,26 @@ check "13 Java 21 with the customer-CA client certificate under pq-required: 403
 r=$("${RUN[@]}" curlimages/curl -s --cacert /rc/both-ca.pem -w ' | %{http_code}' "$URL" 2>&1 | tr -d '\n'); echo "  14: $r | $(last_class)"
 check "14 curl on OpenSSL 3.5: served, post-quantum key exchange (pq or pq-kex)" "echo '$r' | grep -qE '^class=pq(-kex)? hdr=pq(-kex)? \| 200\$'"
 
+# Chromium offers mldsa44/65/87 first among its signature algorithms, so OpenSSL
+# serves it the ML-DSA-65 certificate. With the gateway's CA in its NSS store it is
+# served post-quantum (15a); without it, the handshake fails even though a
+# classical certificate is available (15b): the hazard in the README.
+cp "$PKI_DIR/ca-chain.crt" "$RC/gateway-ca-chain.crt"; chmod a+r "$RC/gateway-ca-chain.crt"
+before=$(docker exec $NAME sh -c 'wc -l < /var/log/nginx/pqc-migration-access.log')
+r=$(timeout 90 "${RUN[@]}" --name $NAME-chr-a --entrypoint sh pqc-test-chromium:local -c '
+	mkdir -p $HOME/.pki/nssdb && certutil -d sql:$HOME/.pki/nssdb -N --empty-password &&
+	awk "/BEGIN/{n++} {print > \"/tmp/ca\" n \".pem\"}" /rc/gateway-ca-chain.crt &&
+	for f in /tmp/ca*.pem; do certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "$(basename $f)" -i "$f"; done &&
+	chromium-browser --headless --no-sandbox --disable-gpu --disable-background-networking --no-first-run --user-data-dir=/tmp/u --dump-dom "$0"' "$URL" 2>"$RC/chromium-15a.err" | grep -oE 'class=[a-z-]+ hdr=[a-z-]*' | head -1)
+echo "  15a: $("${RUN[@]}" pqc-test-chromium:local --version 2>/dev/null) | $r | $(last_class) $(last_sig)"
+check "15a Chromium trusting the gateway CA: served, class pq (ML-DSA-65, X25519MLKEM768)" "echo '$r' | grep -q '^class=pq hdr=pq\$'"
+SPKI=$(O x509 -in "$W/cl/server.crt" -pubkey -noout | O pkey -pubin -outform DER | O dgst -sha256 -binary | base64)
+mid=$(docker exec $NAME sh -c 'wc -l < /var/log/nginx/pqc-migration-access.log')
+r=$(timeout 90 "${RUN[@]}" --name $NAME-chr-b pqc-test-chromium:local --headless --no-sandbox --disable-gpu --disable-background-networking --no-first-run --user-data-dir=/tmp/u \
+	--ignore-certificate-errors-spki-list="$SPKI" --dump-dom "$URL" 2>"$RC/chromium-15b.err" | grep -oE 'class=[a-z-]+ hdr=[a-z-]*' | head -1)
+after=$(docker exec $NAME sh -c 'wc -l < /var/log/nginx/pqc-migration-access.log')
+echo "  15b: '${r}' | requests logged: 15a $((mid-before)), 15b $((after-mid))"
+check "15b Chromium NOT trusting the gateway CA (classical certificate pinned) is not served: it gets ML-DSA-65" "[ -z '$r' ] && [ $((after-mid)) = 0 ]"
+
+docker rm -f $NAME-chr-a $NAME-chr-b >/dev/null 2>&1
 find "$RC" -name '*.p12' -exec shred -u {} +

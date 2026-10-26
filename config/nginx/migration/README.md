@@ -35,15 +35,19 @@ The strict `:443` listener is not changed by any of this.
 
 ## Reading the inventory
 
-`GET /migration/inventory` on `:8081` needs the control-plane HMAC, as
-`/update-routes` does: `X-Timestamp: <unix seconds>` and
-`X-Hub-Signature-256: sha256=<hex HMAC-SHA256(control-plane-hmac,
-"<timestamp>\nGET\n/migration/inventory\n")>`.
+`GET /migration/inventory` on `:8081` needs an HMAC under the inventory's own
+key, in the scheme `/update-routes` uses: `X-Timestamp: <unix seconds>` and
+`X-Hub-Signature-256: sha256=<hex HMAC-SHA256(inventory key,
+"<timestamp>\nGET\n/migration/inventory\n")>`. The key is
+`inventory-hmac.key` in this directory (at least 16 bytes, mode 600, read once
+at start, never the routing key); without it the inventory answers 503.
 
 ```sh
+openssl rand -hex 32 > config/nginx/migration/inventory-hmac.key
+chmod 600 config/nginx/migration/inventory-hmac.key
 ts=$(date +%s)
 sig=$(printf '%s\nGET\n/migration/inventory\n' "$ts" |
-      openssl dgst -sha256 -hmac "$(cat secrets/control-plane-hmac.key)" -r | cut -d' ' -f1)
+      openssl dgst -sha256 -hmac "$(cat config/nginx/migration/inventory-hmac.key)" -r | cut -d' ' -f1)
 curl -s --cacert internal-tls-ca.crt -H "X-Timestamp: $ts" \
      -H "X-Hub-Signature-256: sha256=$sig" https://gateway:8081/migration/inventory
 ```
@@ -53,17 +57,30 @@ clients (logged once a minute) rather than dropping old ones.
 
 ## Know the limits
 
+- **Every client that offers ML-DSA gets the ML-DSA-65 certificate, and must
+  trust its root.** OpenSSL picks the certificate from the signature algorithms
+  the client offers, not from what it trusts. Current Chromium offers
+  `mldsa44/65/87` first: with the gateway's CA in its trust store it is served
+  fully post-quantum; without it, it fails with `ERR_CERT_AUTHORITY_INVALID`,
+  although the classical certificate is there. OpenSSL 3.5+ clients behave the
+  same way. So put the ML-DSA-65 certificate only on names whose clients have
+  been given its root (machine-to-machine APIs, managed fleets); a name that
+  browsers or other unmanaged clients reach gets a listener with the classical
+  certificate alone, and is still classified and inventoried.
+
 - **Policy per certificate needs the certificate.** Under
   `ssl_verify_client optional` a client may leave its certificate out; it is then
   identified by address and gets the `default` policy. Use
   `ssl_verify_client on`, or `"default": "pq-required"`, where that matters.
-- **Revocation of classical client certificates is not handled yet.** The
-  gateway's own CRL is checked on every request, by serial number. A customer
-  CA's revocations are not, and its certificates are matched against the
-  gateway's CRL by serial alone: a customer certificate whose serial equals a
-  serial revoked by the gateway's CA is refused. `ssl_crl` would need every CA's
-  CRL in one file, read only at reload, and refuses all clients of a CA once its
-  CRL passes nextUpdate.
+- **Revocation of classical client certificates is not handled yet.** A
+  certificate the customer's CA has revoked is still accepted here and reaches
+  the backend with `X-Client-Verify: SUCCESS`. Do not trust a customer CA in
+  `client-ca-bundle.pem` if you may need to revoke its certificates before this
+  is fixed. The gateway's own CRL is checked on every request, by serial number
+  alone, so a customer certificate whose serial equals one the gateway's CA
+  revoked is refused. `ssl_crl` is no way out: it needs every CA's CRL in one
+  file, is read only at reload, and refuses all clients of a CA once its CRL
+  passes nextUpdate.
 - **No session resumption.** The example turns it off: a resumed connection does
   not show which server certificate the session began with, so it is classified
   at most `pq-kex`. With resumption on, migrated clients would be refused by

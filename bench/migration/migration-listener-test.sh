@@ -18,7 +18,8 @@
 #   6 classical client certificate from a customer CA   -> accepted, classical
 #   7 the same client under pq-required (policy.json)    -> 403 pq_required
 #   8 the inventory (control-plane listener, HMAC) holds pq, pq-kex and classical
-#     records and the customer-CA client as classical; unsigned, it answers 401
+#     records and the customer-CA client as classical; unsigned or signed with
+#     the routing key, it answers 401
 #   9 the strict listener in the same container refuses a classical client
 #     certificate even over X25519MLKEM768, and serves the ML-DSA-65 one
 #  R  a second connection with the first one's session is a full handshake
@@ -60,16 +61,17 @@ cp "$W/cl/server.crt" "$W/mig/classical-server.crt"; cp "$W/cl/server.key" "$W/m
 cat "$PKI_DIR/hybrid-ca-chain.crt" "$W/cl/ca.crt" > "$W/mig/client-ca-bundle.pem"
 CL_FPR=$(O x509 -in "$W/cl/client.crt" -outform DER | sha256sum | cut -d' ' -f1)
 printf '{\n  "default": "observe"\n}\n' > "$W/mig/policy.json"
+head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$W/mig/inventory-hmac.key"
 # The test answers from the content phase (after the access phase that classifies)
 # instead of proxying to a backend.
 python3 -I - "$REPO/config/nginx/migration/listener.conf.example" "$W/mig/listener.conf" <<'PY2'
 import sys
 s = open(sys.argv[1]).read()
-s = s.replace("proxy_pass http://backend.example:8080;", 'content_by_lua_block { ngx.say("class=", ngx.var.pqc_pq_class, " hdr=", ngx.req.get_headers()["x-pq-class"] or "") }')
+s = s.replace("proxy_pass http://backend.example:8080;", 'content_by_lua_block { ngx.header["Content-Type"] = "text/plain"; ngx.say("class=", ngx.var.pqc_pq_class, " hdr=", ngx.req.get_headers()["x-pq-class"] or "") }')
 s = s.replace("server_name api.example.com;", "server_name pqc-gw.local;")
 open(sys.argv[2], "w").write(s)
 PY2
-chmod -R a+rX "$W/mig"; chmod 640 "$W/mig/classical-server.key"
+chmod -R a+rX "$W/mig"; chmod 640 "$W/mig/classical-server.key"; chmod 600 "$W/mig/inventory-hmac.key"
 
 start(){ # (re)start the throwaway gateway with the current $W/mig
 	docker rm -f $NAME >/dev/null 2>&1
@@ -135,14 +137,15 @@ inv(){ # inv OUTFILE [unsigned] -> HTTP status of GET /migration/inventory
 	local ts sig hdr=()
 	if [ "${2:-}" != unsigned ]; then
 		ts=$(date +%s)
-		sig=$(python3 -I -c 'import hmac,hashlib,sys; k=open(sys.argv[1],"rb").read().rstrip(); print(hmac.new(k,(sys.argv[2]+"\nGET\n/migration/inventory\n").encode(),hashlib.sha256).hexdigest())' "$SECRETS_DIR/control-plane-hmac.key" "$ts")
+		sig=$(python3 -I -c 'import hmac,hashlib,sys; k=open(sys.argv[1],"rb").read().rstrip(); print(hmac.new(k,(sys.argv[2]+"\nGET\n/migration/inventory\n").encode(),hashlib.sha256).hexdigest())' "${SIGN_KEY:-$W/mig/inventory-hmac.key}" "$ts")
 		hdr=(-H "X-Timestamp: $ts" -H "X-Hub-Signature-256: sha256=$sig")
 	fi
 	curl -s -o "$1" -w '%{http_code}' --cacert "$PKI_DIR/internal-tls-ca.crt" --resolve gateway:$P_CTL:127.0.0.1 "${hdr[@]}" https://gateway:$P_CTL/migration/inventory 2>/dev/null || \
 		curl -sk -o "$1" -w '%{http_code}' "${hdr[@]}" https://127.0.0.1:$P_CTL/migration/inventory
 }
 code_unsigned=$(inv "$W/inventory-unsigned.json" unsigned); code=$(inv "$W/inventory.json")
-echo "   8: inventory HTTP $code, unsigned HTTP $code_unsigned"
+code_cp=$(SIGN_KEY="$SECRETS_DIR/control-plane-hmac.key" inv "$W/inventory-cpkey.json")
+echo "   8: inventory HTTP $code, unsigned HTTP $code_unsigned, signed with the routing key HTTP $code_cp"
 check "U the self-signed certificate is refused (400) and appears nowhere in the inventory" "grep -q 'HTTP/1.1 400' '$W/cu.out' && ! grep -q '$FORGED_FPR' '$W/inventory.json' && ! grep -q 'payments-prod' '$W/inventory.json'"
 python3 -I - "$W/inventory.json" "$CL_FPR" <<'PY' > "$W/inventory-check.txt"
 import json, sys
@@ -154,14 +157,14 @@ cl = [r for r in d["records"] if r["identity"] == "sha256:" + fpr]
 print("classes", " ".join(sorted(seen)), "records", len(d["records"]), "classical_client", cl[0]["class"] if cl else "missing", cl[0].get("client_key", "") if cl else "")
 PY
 echo "   8: $(cat "$W/inventory-check.txt")"
-check "8 the inventory (HMAC) holds pq, pq-kex and classical, the customer-CA client as classical (EC key); unsigned 401" "[ '$code' = 200 ] && [ '$code_unsigned' = 401 ] && grep -q 'classes classical pq pq-kex' '$W/inventory-check.txt' && grep -q 'classical_client classical EC' '$W/inventory-check.txt'"
+check "8 the inventory (HMAC) holds pq, pq-kex and classical, the customer-CA client as classical (EC key); unsigned or routing-key 401" "[ '$code' = 200 ] && [ '$code_unsigned' = 401 ] && [ '$code_cp' = 401 ] && grep -q 'classes classical pq pq-kex' '$W/inventory-check.txt' && grep -q 'classical_client classical EC' '$W/inventory-check.txt'"
 
 strict(){ printf 'GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' $H | timeout 10 env LD_LIBRARY_PATH=$LIBDIR OPENSSL_CONF=/dev/null "$OSSL" s_client \
 	-connect 127.0.0.1:$P_STRICT -servername $H -ign_eof -groups X25519MLKEM768 -CAfile "$PKI_DIR/ca-chain.crt" "$@"; }
 strict -cert "$W/cl/client.crt" -key "$W/cl/client.key" > "$W/c9.out" 2>&1
 strict -cert "$ADMIN_CRT" -key "$ADMIN_KEY" > "$W/c9-control.out" 2>&1
 echo "   9: classical cert -> $(grep -m1 -oE 'HTTP/1.1 [0-9]+|alert [a-z ]+' "$W/c9.out" || echo 'no response'); ML-DSA-65 cert -> $(grep -m1 -oE 'HTTP/1.1 [0-9]+' "$W/c9-control.out")"
-check "9 the strict listener refuses the classical client certificate over X25519MLKEM768 and answers the ML-DSA-65 one" "grep -qE 'HTTP/1.1 [0-9]{3}' '$W/c9-control.out' && ! grep -qE 'HTTP/1.1 (200|404)' '$W/c9.out'"
+check "9 the strict listener refuses the classical client certificate over X25519MLKEM768 (400, no certificate accepted) and answers the ML-DSA-65 one" "grep -qE 'HTTP/1.1 [0-9]{3}' '$W/c9-control.out' && grep -q 'HTTP/1.1 400' '$W/c9.out' && grep -q 'No required SSL certificate was sent' '$W/c9.out'"
 # 10 to 14: real classical stacks (CPython on OpenSSL 1.1.1 and 3.0, Java 21, curl on
 # OpenSSL 3.5) in their own containers; see real-clients.sh for the images.
 [ "${REAL_CLIENTS:-0}" = 1 ] && . "$REPO/bench/migration/real-clients.sh"

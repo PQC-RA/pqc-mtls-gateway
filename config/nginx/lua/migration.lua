@@ -24,8 +24,8 @@
 --
 -- Inventory (shared dict migration_inventory): one JSON record per identity and
 -- endpoint (the listener's server_name and port, never the client's Host),
--- served on the control-plane listener at /migration/inventory behind the
--- control-plane HMAC.
+-- served on the control-plane listener at /migration/inventory behind an HMAC
+-- under its own key (inventory-hmac.key in the migration directory).
 
 local cjson = require "cjson.safe"
 local telemetry = require "tls_telemetry"
@@ -128,7 +128,10 @@ function M.log()
     rec.group = m.d.group
     if m.d.server_sig ~= "" then rec.server_sig = m.d.server_sig end
     if m.d.client_sig ~= "" then rec.client_sig = m.d.client_sig end
-    rec.client_key = m.d.client_key ~= "" and m.d.client_key or rec.client_key
+    -- What a certificate says goes in only once it verified (see identity()).
+    if m.has_cert and ngx.var.ssl_client_verify == "SUCCESS" then
+        rec.client_key = m.d.client_key
+    end
     rec.resumed = m.d.resumed or nil
     rec.verify = ngx.var.ssl_client_verify
     if m.has_cert and rec.verify == "SUCCESS" then
@@ -159,29 +162,34 @@ function M.inventory_json()
     return cjson.encode({ generated = ngx.time(), records = out })
 end
 
--- The inventory names clients, so reading it needs the control-plane HMAC, the
--- scheme lua/control_plane.lua uses: X-Timestamp (unix seconds, within 5
+-- The inventory names clients, so reading it needs an HMAC in the scheme
+-- lua/control_plane.lua uses, under the inventory's own key (loaded at start
+-- into pqc_route_meta "migration_inventory_key"; not the routing key, so a
+-- reader cannot also sign /update-routes): X-Timestamp (unix seconds, within 5
 -- minutes) and X-Hub-Signature-256 = "sha256=" .. hex(HMAC(key,
 -- timestamp .. "\n" .. method .. "\n" .. uri .. "\n" .. body)), body empty here.
+-- Returns true, or false and "no_key" / "bad_signature".
 function M.inventory_authorized()
-    local secret = ngx.shared.pqc_route_meta:get("cp_hmac_key")
+    local secret = ngx.shared.pqc_route_meta:get("migration_inventory_key")
+    if not secret then return false, "no_key" end
     local ts = ngx.var.http_x_timestamp
     local sig = (ngx.var.http_x_hub_signature_256 or ""):match("^sha256=(%x+)$")
-    if not secret or not sig or not ts or not ts:match("^%d+$") then return false end
-    if math.abs(ngx.time() - tonumber(ts)) > 300 then return false end
+    if not sig or not ts or not ts:match("^%d+$") then return false, "bad_signature" end
+    if math.abs(ngx.time() - tonumber(ts)) > 300 then return false, "bad_signature" end
     local want = hmac.hex(secret, ts .. "\n" .. ngx.req.get_method() .. "\n" .. ngx.var.uri .. "\n")
     sig = sig:lower()
-    if not want or #want ~= #sig then return false end
+    if not want or #want ~= #sig then return false, "bad_signature" end
     local acc = 0
     for i = 1, #want do acc = bit.bor(acc, bit.bxor(want:byte(i), sig:byte(i))) end
-    return acc == 0
+    if acc ~= 0 then return false, "bad_signature" end
+    return true
 end
 
 -- Worker start (and every reload): load the policy file, a JSON object
 -- identity -> policy plus an optional "default". No file: everyone is observed
 -- (a removed file takes effect at the next reload; the dictionary outlives it).
 -- A malformed file keeps the policy already loaded. Unknown values are ignored
--- with a warning; fingerprints are matched in lower case.
+-- with a warning; "sha256:" and "ip:" keys are matched in lower case.
 function M.load_policy(path)
     local dict = ngx.shared.migration_policy
     local f = io.open(path, "r")
@@ -195,7 +203,8 @@ function M.load_policy(path)
     dict:flush_all()
     for k, v in pairs(p) do
         k = tostring(k)
-        if k:sub(1, 7) == "sha256:" then k = k:lower() end
+        local lk = k:lower()
+        if lk:sub(1, 7) == "sha256:" or lk:sub(1, 3) == "ip:" then k = lk end
         if v ~= "observe" and v ~= "pq-required" then
             ngx.log(ngx.WARN, "[migration] ignoring policy ", k, "=", tostring(v))
         else
