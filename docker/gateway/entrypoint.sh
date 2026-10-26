@@ -105,4 +105,65 @@ RELOAD_STATE=/tmp/.reload-nginx-last-mtime
     done
 ) &
 
+# ── Log rotation ──────────────────────────────────────────────────────────────
+# /var/log/nginx is a named volume (so logs survive container recreation), which
+# means nothing else bounds its size. No logrotate in the image and no sidecar
+# for it, so rotate here: every LOG_ROTATE_CHECK_S seconds, any *.log larger
+# than LOG_ROTATE_MAX_BYTES is renamed to .1, the master reopens its log files
+# (one `nginx -s reopen` per pass), and only then is .1 compressed, so gzip
+# never reads a file nginx is still writing. LOG_ROTATE_KEEP compressed
+# generations are kept. Worst case per log file ~ MAX_BYTES * (KEEP + 1)
+# (compressed generations are usually far smaller).
+LOG_DIR=/var/log/nginx
+LOG_ROTATE_MAX_BYTES="${LOG_ROTATE_MAX_BYTES:-10485760}"   # 10 MiB
+LOG_ROTATE_KEEP="${LOG_ROTATE_KEEP:-5}"
+LOG_ROTATE_CHECK_S="${LOG_ROTATE_CHECK_S:-60}"
+(
+    # Each step handles its own failure; errexit inherited from the top of this
+    # script would end the loop silently on the first unexpected status.
+    set +e
+    while [ ! -f /run/nginx.pid ]; do sleep 1; done
+    while true; do
+        sleep "$LOG_ROTATE_CHECK_S"
+        # Finish an earlier pass whose reopen failed: nginx may still be writing
+        # into the uncompressed .1, so reopen first and compress only after.
+        pending=$(ls "$LOG_DIR"/*.log.1 2>/dev/null)
+        if [ -n "$pending" ]; then
+            if nginx -s reopen 2>&1; then
+                for p in $pending; do gzip -f "$p" || echo "[log-rotate] WARN: gzip failed for $p" >&2; done
+                echo "[log-rotate] completed pending rotation:" $pending
+            else
+                echo "[log-rotate] ERROR: nginx -s reopen still failing; pending:" $pending >&2
+            fi
+        fi
+        rotated=""
+        for f in "$LOG_DIR"/*.log; do
+            [ -f "$f" ] || continue
+            # Never overwrite an uncompressed .1 that is still pending.
+            [ -f "$f.1" ] && continue
+            size=$(stat -c %s "$f" 2>/dev/null || echo 0)
+            [ "$size" -gt "$LOG_ROTATE_MAX_BYTES" ] || continue
+            rm -f "$f.$LOG_ROTATE_KEEP.gz"
+            i=$((LOG_ROTATE_KEEP - 1))
+            while [ "$i" -ge 1 ]; do
+                [ -f "$f.$i.gz" ] && mv -f "$f.$i.gz" "$f.$((i + 1)).gz"
+                i=$((i - 1))
+            done
+            mv -f "$f" "$f.1"
+            rotated="$rotated $f"
+        done
+        [ -n "$rotated" ] || continue
+        if nginx -s reopen 2>&1; then
+            for f in $rotated; do
+                gzip -f "$f.1" || echo "[log-rotate] WARN: gzip failed for $f.1" >&2
+            done
+            echo "[log-rotate] rotated:$rotated"
+        else
+            # Without a reopen nginx keeps writing into the renamed .1 file;
+            # leave it uncompressed so no log line is lost, and say so.
+            echo "[log-rotate] ERROR: nginx -s reopen failed; rotated files left uncompressed:$rotated" >&2
+        fi
+    done
+) &
+
 exec /usr/sbin/nginx -g "daemon off;"

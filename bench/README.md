@@ -235,6 +235,7 @@ order; the rest are run on their own when you have a specific question.
 | `check-ocsp-and-policy-values.sh` | Three more: zero-reload policy latency, OCSP `-rother` comparison, the quantum buffer via `sendRawCert` |
 | `crl-fastpath.sh` | The Lua revocation layer fires on `/api/`, `/admin/` and `/` before nginx reloads its CRL, timed from the revoke call. Pauses the reload watcher in a running gateway and leaves a revoked certificate, so it needs `CRLFAST_I_UNDERSTAND=1` |
 | `test-crl-renewer.sh` | Hermetic, no running stack: a revocation during a renewal is not lost, a failed renewal is retried with backoff, a burst coalesces, and CRL publication is never seen half-written. `IMAGE=` a crl-renewer image built from this tree |
+| `check-tls-log-evidence.sh` | Every kind of connection on :443 leaves a log entry that names what was negotiated or why it was refused: valid client, no certificate, classical-only and pure ML-KEM key exchange, TLS 1.2. Reads the gateway's log volume |
 
 ### Specific questions
 

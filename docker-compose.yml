@@ -18,6 +18,7 @@ volumes:
  pqc-routes-cache:
  pqc-mgmt-data:    # management-api route-persistence state (off the read-only CA tree)
  pqc-redis-data:   # durable routing-policy + enrollment-token store
+ pqc-logs-nginx:   # gateway access/error/handshake logs; survives container recreation (rotated by the gateway entrypoint)
 
 services:
  shadow-mock:
@@ -129,6 +130,10 @@ services:
    # ssl_crl at the TLS-handshake layer without a full restart. Gateway only
    # ever reads this signal, never writes it.
    - pqc-signals:/signals:ro
+   # nginx logs on a named volume (was tmpfs: every recreate erased the access
+   # log, including every refusal and CRITICAL PROTECTION line). Size is bounded
+   # by the rotation loop in docker/gateway/entrypoint.sh (LOG_ROTATE_*).
+   - pqc-logs-nginx:/var/log/nginx:rw
   extra_hosts:
    - "host.docker.internal:host-gateway"
   security_opt:
@@ -139,7 +144,6 @@ services:
    - /run
    - /var/cache/nginx
    - /etc/nginx/logs
-   - /var/log/nginx
   cap_drop:
    - ALL
   cap_add:
