@@ -297,11 +297,14 @@ chmod 600 "$SSL_DIR/server-mldsa65.key"
     -in  "$SSL_DIR/server-mldsa65.csr" \
     -out "$SSL_DIR/server-mldsa65.crt"
 
-# --- Classical enroll-server certificate (:8443 browser bootstrap) -----------
-# The :8443 enrollment endpoint must be browser-reachable, and browsers cannot
-# validate the ML-DSA-65 leaf above. Generate a classical ECDSA P-256 CA + leaf
-# for :8443 SERVER auth only (key exchange stays post-quantum). See the script
-# header for the full rationale. SANs mirror the ML-DSA server cert.
+# --- Classical enroll-server certificate (optional :8443 browser bootstrap) ---
+# The default nginx.conf serves :8443 with the ML-DSA-65 leaf above
+# (post-quantum-only), so this certificate is not used by it. It is still
+# generated so that a deployment that needs browser enrollment can switch
+# :8443 back to the classical server certificate (the earlier nginx.conf, in
+# git history) without re-running the PKI bootstrap, and so bench/ can report
+# its size. Classical ECDSA P-256 CA + leaf for :8443 SERVER auth only; see the
+# script header. SANs mirror the ML-DSA server cert.
 echo "==> Enrollment classical server certificate (:8443)"
 # Intentionally NOT passing OPENSSL_BIN: ECDSA needs no PQC build, so the helper
 # uses the plain system openssl (with its working default config).

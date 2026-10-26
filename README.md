@@ -259,21 +259,20 @@ PQC_ADMIN_KEY=./admin-cert/gateway-admin.key \
 
 Passing a backend URL also creates the routing policy in the same step.
 
-**From a remote machine**, copy the credentials `deploy.sh` prints, plus the enrollment CA:
+**From a remote machine**, copy the credentials `deploy.sh` prints, plus the CA chain:
 
 ```bash
 scp root@<server>:<repo>/admin-cert/gateway-admin.{crt,key} .
 scp root@<server>:/etc/pki/pqc-ca/ca-chain.crt .
-scp root@<server>:/etc/pki/pqc-ca/enroll-classical-ca.crt ./enroll-ca.crt
 chmod 600 gateway-admin.key
 
-PQC_GATEWAY=https://<server-ip> PQC_ENROLL_CA=./enroll-ca.crt \
+PQC_GATEWAY=https://<server-ip> PQC_CA_CHAIN=./ca-chain.crt \
   ./issue-cert.sh <cn> <backend-url>
 ```
 
-`PQC_ENROLL_CA` is the CA behind the **:8443 enrollment listener's** server certificate, a
-classical ECDSA cert distinct from the ML-DSA chain. It is auto-detected on the server itself and
-only needed remotely.
+The **:8443 enrollment listener** presents the same ML-DSA-65 server certificate as `:443`, so
+`ca-chain.crt` verifies both. `PQC_ENROLL_CA` overrides the chain used for `:8443` only; it is
+needed only against a gateway that still runs the older classical `:8443` configuration.
 
 </details>
 
@@ -292,12 +291,23 @@ The operator then enrolls autonomously against port 8443, with no mTLS client ce
 
 ```bash
 ENROLLMENT_TOKEN=enroll_xxx PQC_GATEWAY=https://<server-ip> \
-PQC_CA_CHAIN=./ca-chain.crt PQC_ENROLL_CA=./enroll-ca.crt \
+PQC_CA_CHAIN=./ca-chain.crt \
 ./issue-cert.sh <cn>
 ```
 
 Tokens are single-use, TTL-bounded and atomically consumed. The CSR subject CN must match
 `allowedCn` exactly; a mismatch returns 403 **without** consuming the token.
+
+**Enrollment clients.** Port 8443 is post-quantum-only: TLS 1.3, X25519MLKEM768 with no
+classical fallback, and the ML-DSA-65 server certificate. A client must offer the
+`X25519MLKEM768` group and the `mldsa65` signature scheme and trust `ca-chain.crt`, which in
+practice means OpenSSL 3.5 or later (`issue-cert.sh` uses it, or a Docker fallback that carries
+it). Anything else fails in the TLS handshake, before any HTTP request, so the token is never
+sent and never consumed; the gateway names the reason (`no_tls13`, `no_pq_group`,
+`no_pq_sigalg`) in `pqc-enroll-handshake.log`. That excludes current browsers (they offer the
+hybrid group but no ML-DSA signature scheme), curl on OpenSSL 3.0, and, by the same reasoning,
+stock Java 21 and LibreSSL curl. `bench/test-enroll-8443.sh` asserts both sides against a running
+gateway.
 
 </details>
 
@@ -462,11 +472,12 @@ actionlint and an OpenSSL version-consistency gate.
   Signing, revocation and reads of the CA index go through the `pqc-ca-custodian` sidecar over an
   HMAC-authenticated internal API. The gateway mounts the CA tree with the private-key
   subdirectories masked, so the internet-facing component never sees a CA private key.
-- **Four classical elements remain, and naming them is part of the result:** the ECDSA P-256 server
-  certificate on the `:8443` enrollment bootstrap channel and its self-signed CA, the classical
-  fallback group offered there, and the RS256/RSA-2048 JWT used for backend identity hand-off. The
-  JWT is a deliberate trade: an ML-DSA-65 signature on a token that rides every proxied request would
-  recreate the header-size problem this project exists to document.
+- **Classical elements remain only on internal hops, and naming them is part of the result:** the
+  RS256/RSA-2048 JWT used for backend identity hand-off and the RSA-2048 internal-TLS chain that
+  carries the JWKS fetch. The JWT is a deliberate trade: an ML-DSA-65 signature on a token that rides
+  every proxied request would recreate the header-size problem this project exists to document.
+  Until 2026-10 the `:8443` enrollment listener also presented a classical ECDSA P-256 certificate
+  and accepted a classical fallback group; it is now post-quantum-only, like `:443`.
 
 <details>
 <summary><b>Admin authorisation, in practice</b></summary>

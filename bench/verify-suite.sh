@@ -90,8 +90,10 @@ for alg in rsa ec mldsa44; do
         -X POST "https://127.0.0.1/admin/certs/enrollment-tokens?cn=badalg-$alg&ttl=120" 2>/dev/null \
         | python3 -c "import json,sys;print(json.load(sys.stdin)['token'])" 2>/dev/null)
   P=$(CSR=$TD/c.csr T="$TOK" python3 -c "import json,os;print(json.dumps({'csr':open(os.environ['CSR']).read(),'enrollmentToken':os.environ['T']}))")
-  R=$(timeout 30 curl -sS --cacert $PKI/enroll-classical-ca.crt -X POST https://127.0.0.1:8443/enroll \
+  # :8443 is post-quantum-only since 2026-10: verified with the PQ chain.
+  R=$(timeout 30 curl -sS --cacert $CA -X POST https://127.0.0.1:8443/enroll \
       -H "Content-Type: application/json" -d "$P" -w "\n%{http_code}" 2>/dev/null)
+  [ "$(echo "$R"|tail -1)" = "000" ] && echo "     $alg: TLS handshake with :8443 failed. The endpoint is post-quantum-only; the client needs OpenSSL 3.5 or later and the PQ CA chain ($CA)."
   echo "     $alg -> HTTP $(echo "$R"|tail -1)  $(echo "$R"|sed '$d'|head -c 110)"
 done
 rm -rf $TD

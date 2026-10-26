@@ -4,10 +4,12 @@
 # cert live) or from an integration CI that has a running stack.
 #
 # WHY THIS EXISTS
-#   Issuance spans the gateway, the enrollment listener and the CA custodian,
-#   each with its own trust anchor: :8443 presents a classical ECDSA certificate
-#   while the data plane presents the ML-DSA chain. A unit test of any one part
-#   passes while the path between them is broken. This drives the real flow end
+#   Issuance spans the gateway, the enrollment listener and the CA custodian.
+#   The :8443 enrollment listener has had its own trust anchor before (a
+#   classical ECDSA certificate) and now shares the ML-DSA chain with the data
+#   plane; each change of that kind breaks a client that still expects the
+#   other. A unit test of any one part passes while the path between them is
+#   broken. This drives the real flow end
 #   to end and fails loudly if any step regresses.
 #
 # WHAT IT CHECKS
@@ -28,7 +30,8 @@ cd "$ROOT_DIR"
 
 GW="${PQC_GATEWAY:-https://127.0.0.1}"
 CA_CHAIN="${PQC_CA_CHAIN:-/etc/pki/pqc-ca/ca-chain.crt}"
-ENROLL_CA="${PQC_ENROLL_CA:-/etc/pki/pqc-ca/enroll-classical-ca.crt}"
+# :8443 is post-quantum-only since 2026-10 and is verified with the PQ chain.
+ENROLL_CA="${PQC_ENROLL_CA:-$CA_CHAIN}"
 ADMIN_CERT="${PQC_ADMIN_CERT:-$ROOT_DIR/admin-cert/gateway-admin.crt}"
 ADMIN_KEY="${PQC_ADMIN_KEY:-$ROOT_DIR/admin-cert/gateway-admin.key}"
 OSSL="${PQC_OPENSSL:-/opt/openssl/bin/openssl}"

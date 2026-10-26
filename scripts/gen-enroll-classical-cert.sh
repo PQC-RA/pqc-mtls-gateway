@@ -4,6 +4,12 @@
 # Generate a CLASSICAL (ECDSA P-256) CA + enroll-server leaf for the public
 # :8443 enrollment bootstrap endpoint.
 #
+# NOT used by the default nginx.conf: :8443 is post-quantum-only and presents
+# the ML-DSA-65 server certificate. This leaf is for a deployment that chooses
+# browser enrollment and switches :8443 back to the classical configuration
+# (the earlier nginx.conf, in git history). The rationale below is the case
+# for that choice, not the default.
+#
 # Why classical server auth here (and ONLY here):
 #   Browsers cannot validate the ML-DSA-65 server cert used on :443
 #   (SSL_ERROR_NO_CYPHER_OVERLAP), so an operator with no client cert yet cannot

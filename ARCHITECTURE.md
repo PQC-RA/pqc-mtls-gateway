@@ -41,7 +41,7 @@ The management API binds only to `127.0.0.1:3000` and is never directly reachabl
 | Port | Protocol | Purpose |
 |---|---|---|
 | 443 | TLS 1.3 + mTLS | Main data/admin plane, `ssl_verify_client on`, ML-DSA-65 server cert, ML-DSA-65 client cert required |
-| 8443 | TLS 1.3 | Enrollment bootstrap, MLKEM key exchange + **classical (ECDSA P-256)** server cert, no client cert; proxies only the CSR-signing route |
+| 8443 | TLS 1.3 | Enrollment bootstrap, post-quantum-only: X25519MLKEM768 key exchange and the ML-DSA-65 server cert, no client cert; proxies only the CSR-signing route |
 | 8081 | TLS (internal) | Gateway control plane, HMAC-authenticated, restricted to loopback and 172.16.0.0/12 (the default Docker bridge range), never published to host. Also serves the JWKS and `/metrics` (`pqc_crl_age_seconds`, seconds since the CRL worker last confirmed a good CRL; -1 if it never has) |
 
 ---
@@ -49,17 +49,17 @@ The management API binds only to `127.0.0.1:3000` and is never directly reachabl
 ## PKI hierarchy
 
 ```
-ML-DSA-65 Root CA                          (data/admin plane, port 443)
+ML-DSA-65 Root CA                          (ports 443 and 8443)
 └── ML-DSA-65 Intermediate CA
     ├── Gateway TLS server certificate  (SAN: server IP + domain names)
     ├── OCSP signing certificate
     └── Client certificates  (issued to service operators)
 
-ECDSA P-256 enroll-classical-ca            (bootstrap plane, port 8443 only)
+ECDSA P-256 enroll-classical-ca            (optional; not served by default)
 └── enroll-classical leaf  (same SANs as the ML-DSA server cert)
 ```
 
-The data/admin plane (443) uses ML-DSA-65 for all keys and signatures (NIST PQC standard, lattice-based). TLS key exchange everywhere uses X25519MLKEM768 (hybrid classical + ML-KEM-768 post-quantum). The only classical *certificate* is the `enroll-classical` leaf presented on the pre-enrollment bootstrap channel (port 8443), see [TLS and mTLS](#tls-and-mtls) for why classical server auth is acceptable there. The only other classical element is the internal RS256/RSA-2048 JWT used for backend identity hand-off. The enrollment CA is a separate self-signed ECDSA root generated per-deployment by `scripts/gen-enroll-classical-cert.sh`; operators import `enroll-classical-ca.crt` to trust the bootstrap page.
+Both client-facing listeners (443 and 8443) present the ML-DSA-65 server certificate, and the PQ hierarchy uses ML-DSA-65 for all keys and signatures (NIST PQC standard, lattice-based). TLS key exchange everywhere uses X25519MLKEM768 (hybrid classical + ML-KEM-768 post-quantum). The remaining classical elements are the internal RS256/RSA-2048 JWT used for backend identity hand-off and the internal-TLS chain. `scripts/setup-pki.sh` still generates a separate self-signed ECDSA `enroll-classical-ca` and leaf (`scripts/gen-enroll-classical-cert.sh`). The default configuration does not serve them; they exist so a deployment that needs browser enrollment can switch :8443 back to classical server authentication, the configuration this listener had until 2026-10 (see [TLS and mTLS](#tls-and-mtls)).
 
 The intermediate CA private key is held solely by the `pqc-ca-custodian` container, which runs as non-root and exposes a narrow signing and revocation interface on the PKI network. The management-api has no mount of the CA tree and never reads the key; it requests every signature and revocation over that interface. The CA files are mounted read-only into the gateway and OCSP containers, with the private-key-bearing directories masked.
 
@@ -67,7 +67,7 @@ The intermediate CA private key is held solely by the `pqc-ca-custodian` contain
 
 ## TLS and mTLS
 
-The design principle is: **post-quantum key exchange and authentication on the authenticated plane (:443), where a classical group is rejected outright.** Four classical dependencies remain, all of them on the pre-enrollment listener or on internal hops: the ECDSA P-256 server certificate on :8443, the X25519 key-exchange fallback on :8443 (`Groups X25519MLKEM768:X25519`), the three RSA-2048 keys signing the RS256 identity tokens handed to backends, to the admin API and to cert-lookup, and the RSA-2048 internal-TLS chain that carries the JWKS fetch. Symmetric HMAC-SHA256, on the control-plane and custodian channels, is not affected by quantum search in the way asymmetric primitives are.
+The design principle is: **post-quantum key exchange and authentication on the authenticated plane (:443), where a classical group is rejected outright.** The enrollment listener (:8443) gets the same server authentication and key exchange, since the enrollment token crosses it. Two classical dependencies remain, both on internal hops: the three RSA-2048 keys signing the RS256 identity tokens handed to backends, to the admin API and to cert-lookup, and the RSA-2048 internal-TLS chain that carries the JWKS fetch. Symmetric HMAC-SHA256, on the control-plane and custodian channels, is not affected by quantum search in the way asymmetric primitives are.
 
 **Data/admin plane, port 443 (fully ML-DSA mutual TLS):**
 
@@ -77,12 +77,13 @@ The design principle is: **post-quantum key exchange and authentication on the a
 - **CRL enforcement:** Two layers. nginx's `ssl_crl` rejects a revoked certificate at the TLS handshake; it refreshes on the reload the crl-renewer signals after each regeneration. To cover the time before that reload, `crl_worker.lua` re-reads the combined CRL every second in each worker, and every location on :443 (the routed prefixes, `/admin/` and `/`) closes the connection without a response (444) for a revoked serial. The crl-renewer checks the management-api's revocation sentinel every second, so a revocation reaches the data plane after one sentinel check, one CRL signing and one worker re-read, not on a 15 s cycle. Each CRL file is published atomically (written beside its destination, then renamed), so a reader never sees a half-written CRL. `bench/crl-fastpath.sh` asserts the Lua layer fires on all three locations and times it from the revoke call; `bench/test-crl-renewer.sh` tests the renewer hermetically.
 - **TLS telemetry:** the JSON access log (`pqc-mtls-access.log`) records, per request, the negotiated key-exchange group three ways (`kex`, read from the connection's own SSL object; `group`, nginx's `$ssl_curve` mapped to a name; `kex_native`, `$ssl_curve` itself, which prints the hybrid group as its codepoint `0x11ec`), the client and server CertificateVerify schemes (`client_sig`, `server_sig`, empty on a resumed session by protocol), the client certificate's key type (`client_key`), `resumed` and `sni`. It is filled at server level, so requests refused before a location is chosen (no certificate, failed verification) are described too. A ClientHello that cannot be served (no X25519MLKEM768, no TLS 1.3) never becomes a request; `tls_hello.lua` logs one warn line naming the reason and what was offered, and nginx's own reason goes to `pqc-mtls-handshake.log`. No certificates, keys or tokens are logged. `/var/log/nginx` is the named volume `pqc-logs-nginx`, so logs survive a container recreate; the gateway entrypoint rotates any log over 10 MiB and keeps five compressed generations (`LOG_ROTATE_*`). `bench/check-tls-log-evidence.sh` asserts the entry for each case.
 
-**Enrollment bootstrap plane, port 8443 (MLKEM KE + classical server auth, no mTLS):**
+**Enrollment bootstrap plane, port 8443 (post-quantum-only, no mTLS):**
 
-- **Key exchange:** X25519MLKEM768, **still post-quantum.** Confidentiality of the channel is unchanged; only the server certificate's signature is classical.
-- **Server authentication:** a **classical ECDSA P-256** certificate (`enroll-classical`), *not* ML-DSA-65. Browsers and standard TLS clients cannot validate an ML-DSA-65 server certificate (they fail with `SSL_ERROR_NO_CYPHER_OVERLAP`), so an operator who does not yet have a client certificate could not even load the enrollment page over the ML-DSA leaf.
+- **Key exchange:** X25519MLKEM768 only, no classical fallback.
+- **Server authentication:** the same ML-DSA-65 server certificate as :443; clients verify it with `ca-chain.crt`.
 - **No client certificate:** operators enroll *before* they have a cert; the single-use, CN-constrained enrollment token is the sole authorization.
-- **Why classical server auth is acceptable here (and nowhere else):** no long-term secret transits this channel, the operator's private key never crosses the wire (only the CSR does), the enrollment token is single-use and short-TTL, and the CSR and issued certificate are public. Forging the classical server certificate in real time would require a cryptographically-relevant quantum computer (CRQC) operating as a live MITM, which does not exist. The exposure is therefore a non-issue today, while the benefit (a browser-reachable enrollment page) is immediate. The key exchange remaining post-quantum means the channel is not even retrospectively decryptable. Port 443 is untouched by this and stays fully ML-DSA mutual TLS.
+- **Who can enroll:** a client that offers X25519MLKEM768 and the `mldsa65` signature scheme, in practice one built on OpenSSL 3.5 or later. Current browsers offer the hybrid group but no ML-DSA signature scheme, so they cannot verify the server certificate; `bench/test-enroll-8443.sh` reproduces that offer and asserts the refusal, and does the same for curl on OpenSSL 3.0, which has no ML-KEM. Stock Java 21 and LibreSSL curl lack both algorithms and are expected to fail the same way. Such a client fails in the handshake, before any HTTP request, so the token is never sent and never consumed. `tls_hello.lua` logs the refusal reason (`no_tls13`, `no_pq_group`, `no_pq_sigalg`) to `pqc-enroll-handshake.log`, and every request that does arrive is in `pqc-enroll-access.log` with the same TLS fields as :443.
+- **Why not classical server auth any more:** until 2026-10 this listener presented a classical ECDSA P-256 certificate (and accepted X25519) so that a browser could load an enrollment page. The token crosses this channel, and a classical server signature is the one part of the exchange a future quantum adversary could forge as a live MITM, so the channel now matches :443. The cost is browser enrollment; `scripts/issue-cert.sh` enrolls without a browser.
 
 ---
 

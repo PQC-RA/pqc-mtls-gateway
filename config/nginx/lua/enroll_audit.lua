@@ -5,9 +5,10 @@
 -- record of its own. This appends exactly one NDJSON
 -- line per request to a DEDICATED audit log on the rw pqc-logs-audit volume.
 --
--- This is the ONLY durable record of the :8443 enrollment endpoint. nginx's
--- JSON access_log is attached to the :443 mTLS server only; :8443 has no
--- access_log directive at all.
+-- :8443 also has the pqc_json access log (pqc-enroll-access.log) with the
+-- same TLS fields as :443. This location's log_by_lua replaces the
+-- server-level tls_log.lua, so this handler fills those variables too, and
+-- copies the negotiated group and server signature into the audit entry.
 --
 -- It is also the only place REJECTED enrollments appear. The management-api's
 -- hash-chained admin-actions.log records `cert.enroll`, but only once a
@@ -33,6 +34,18 @@
 
 local cjson = require("cjson.safe")
 
+-- pcall: under a server block that does not declare the $pqc_tls_* variables
+-- (an nginx.conf from before they existed), assigning them raises, and that
+-- must never cost the audit line below.
+local tel_ok, telemetry = pcall(require, "tls_telemetry")
+if tel_ok then
+    pcall(telemetry.log_phase)
+end
+local function var(name)
+    local ok, v = pcall(function() return ngx.var[name] end)
+    return ok and v or ""
+end
+
 local AUDIT_PATH = "/var/log/pqc-gw/enroll-audit.log"
 
 local status = tonumber(ngx.var.status) or 0
@@ -55,6 +68,8 @@ local entry = {
     tls = {
         version = ngx.var.ssl_protocol or "",
         cipher  = ngx.var.ssl_cipher or "",
+        group   = var("pqc_tls_group"),
+        server_sig = var("pqc_tls_server_sig"),
     },
     http = {
         method      = ngx.var.request_method,
