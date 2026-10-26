@@ -341,6 +341,36 @@ gateway.
 
 ---
 
+## Renewing client certificates
+
+Off by default; on with `RENEWAL_ENABLED=1` in `.env` (custodian and management-api).
+A client then renews its own certificate over mTLS, without an administrator:
+
+- **`POST /renew`** on the mTLS listener. The gateway checks the client's current
+  certificate (valid, not revoked, not expired, checked per request) and attests it to the
+  management-api with its own key (`secrets/renew-hmac.key`, made by
+  `scripts/generate-gateway-secrets.sh`). The request carries a CSR for a **new** ML-DSA-65
+  key and a signature by the **current** key over the CSR, the current serial and a time.
+- **Profiles**, named by the enrollment token: `client-30d` (30-day leaves, renewed at 2/3 of
+  their lifetime, refused before 1/2 with `renewal_too_early`) and `demo-120s` (two-minute
+  leaves for demonstrations, only with `CUSTODIAN_DEMO_PROFILE=1`). Tokens without a profile
+  issue the usual 365-day leaves.
+- **One successor per certificate**, and a **365-day lineage cap** from the first enrollment;
+  a retried request with the same key gets the same successor (a lost answer is not a second
+  certificate). The predecessor is not revoked: it expires.
+- **Enrollment tokens are reserved, then committed** only once the CA has signed: a failed or
+  ambiguous signing no longer burns a token, and a retry with the same key gets the
+  certificate already issued.
+- The CA database runs with `unique_subject = no` (a successor overlaps its predecessor; the
+  custodian keeps one active certificate per name itself). `scripts/setup-pki.sh` writes it
+  for a new PKI; for an existing one see the upgrade notes.
+
+`bench/item4/renew-client.sh` is a reference client: it keeps the pending key and CSR on disk
+before sending (so a lost answer is retried with the same key) and swaps `identity.pem` in one
+rename. A service must open new connections to use a renewed certificate.
+
+---
+
 ## Migration listener
 
 The strict listeners accept post-quantum clients only. To put the gateway in front of an existing
@@ -355,6 +385,20 @@ Measured against real stacks (`bench/migration/`): CPython on OpenSSL 1.1.1 and 
 are served as `classical`; curl on OpenSSL 3.5 and Chromium 155 that trust the gateway's CA are
 served fully post-quantum. Setup, the inventory API and the limits, including where the ML-DSA-65
 certificate must not be served, are in [`config/nginx/migration/README.md`](config/nginx/migration/README.md).
+
+---
+
+## Edge links
+
+For devices that cannot speak post-quantum TLS (Modbus/TCP, IEC 104, DNP3 over TCP): the
+SCADA connects in plain TCP to a stream listener on the gateway (`config/nginx/stream/`, off by
+default), which carries the connection over TLS 1.3 with X25519MLKEM768 and ML-DSA-65 on both
+sides to an edge box (`config/edge/`, the gateway image with its own configuration) beside the
+device. Both sides verify each other; the box lets only listed client fingerprints through;
+revoking either side ends its open sessions within the shutdown timeout (measured 60 s and
+11 s). `bench/edge/edge-link-test.sh` runs it end to end against a simulated Modbus device.
+The rules a deployment must follow (two network ports, CRLs of the whole chain, clock, never
+in a control path for a first trial) are in [`config/edge/README.md`](config/edge/README.md).
 
 ---
 
@@ -387,6 +431,29 @@ reload**, over the HMAC-authenticated control channel.
 
 > The backend must resolve on a gateway network. `shadow-mock` is the bundled test service;
 > `http://my-backend:8080` in any example is a placeholder. Replace it, or you will get a `502`.
+
+---
+
+## Reproducing the whole product on an isolated stand
+
+Everything this repository ships can be stood up and tested from a clean clone, beside any
+running deployment and without touching it:
+
+```bash
+# root; docker with compose; an OpenSSL 3.5+ (found by scripts/lib/pq-openssl.sh)
+sudo scripts/stand-up.sh /srv/pqc-stand mystand 29443 28443 23000
+source /srv/pqc-stand/stand.env
+sudo -E bash bench/item4/run-stand-pass.sh /srv/pqc-stand-pass        # renewal, revocation, rollback
+sudo -E bash bench/migration/migration-listener-test.sh /srv/mig-test  # migration listener
+sudo -E bash bench/edge/edge-link-test.sh /srv/edge-test                # edge link (needs pqc-test-modbus:local, see the script)
+sudo scripts/stand-down.sh /srv/pqc-stand
+```
+
+`stand-up.sh` builds every image from the checked-out commit under the stand's own tags, takes
+the base images from `base.lock` and the management-api image pinned in `docker-compose.yml`,
+makes a throwaway PKI, secrets and admin identity, and refuses production project names,
+paths and ports. `run-stand-pass.sh` records the provenance (commit, image digests, config
+hashes) and packs a key-free results bundle.
 
 ---
 
@@ -551,6 +618,12 @@ The renewer reports the state on every run, in `docker logs pqc-crl-renewer` and
 ---
 
 ## Upgrading to 2026-10
+
+**Client certificate renewal (off until enabled).** Generate the new secret
+(`scripts/generate-gateway-secrets.sh` writes `secrets/renew-hmac.key`; without it `/renew`
+answers 503), recreate the stack, and only then set `RENEWAL_ENABLED=1`. An existing CA
+database must be switched to `unique_subject = no` with `scripts/ca-unique-subject.sh` after
+the new custodian and crl-renewer run (they take the CA database lock the tool needs).
 
 **Reloads now end old connections after 60 s.** `nginx.conf` sets
 `worker_shutdown_timeout 60s`: after a reload, which happens on every CRL change

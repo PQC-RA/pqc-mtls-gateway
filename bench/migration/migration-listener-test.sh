@@ -37,6 +37,16 @@
 set -uo pipefail
 W=${1:?workdir}; mkdir -p "$W"; [ -z "$(ls -A "$W")" ] || { echo "$W not empty"; exit 2; }
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+# On a stand made by scripts/stand-up.sh (source its stand.env), everything below
+# defaults to that stand.
+if [ -n "${STAND_DIR:-}" ]; then
+	PKI_DIR=${PKI_DIR:-$STAND_DIR/pki}; SSL_DIR=${SSL_DIR:-$STAND_DIR/ssl}; SECRETS_DIR=${SECRETS_DIR:-$STAND_DIR/tree/secrets}
+	ADMIN_CRT=${ADMIN_CRT:-$STAND_ADMIN_CERT}; ADMIN_KEY=${ADMIN_KEY:-$STAND_ADMIN_KEY}
+	NETWORKS=${NETWORKS:-"${STAND_PROJECT}_pqc-edge ${STAND_PROJECT}_pqc-mgmt ${STAND_PROJECT}_pqc-internal ${STAND_PROJECT}_pqc-pki"}
+	GW_IMAGE=${GW_IMAGE:-$(docker inspect -f '{{.Config.Image}}' "$STAND_PROJECT-gateway" 2>/dev/null)}
+fi
+# only the path: the library path stays local to O() below, so curl and python3 keep theirs
+[ -n "${OSSL:-}" ] || OSSL=$(bash -c '. "$1" && echo "$O"' _ "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts/lib" && pwd)/pq-openssl.sh")
 GW_IMAGE=${GW_IMAGE:-pqc-gateway:1.0.0}
 PKI_DIR=${PKI_DIR:?PKI_DIR}; SSL_DIR=${SSL_DIR:?SSL_DIR}; SECRETS_DIR=${SECRETS_DIR:?SECRETS_DIR}
 ADMIN_CRT=${ADMIN_CRT:?ADMIN_CRT}; ADMIN_KEY=${ADMIN_KEY:?ADMIN_KEY}
