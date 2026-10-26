@@ -308,7 +308,7 @@ classical fallback, and the ML-DSA-65 server certificate. A client must offer th
 practice means OpenSSL 3.5 or later (`issue-cert.sh` uses it, or a Docker fallback that carries
 it). Anything else fails in the TLS handshake, before any HTTP request, so the token is never
 sent and never consumed; the gateway names the reason (`no_tls13`, `no_pq_group`,
-`no_pq_sigalg`) in `pqc-enroll-handshake.log`. That excludes current browsers (they offer the
+`no_pq_sigalg`) in `pqc-enroll-handshake.log`. That excludes browsers as of 2026-10 (they offer the
 hybrid group but no ML-DSA signature scheme), curl on OpenSSL 3.0, and, by the same reasoning,
 stock Java 21 and LibreSSL curl. `bench/test-enroll-8443.sh` asserts both sides against a running
 gateway.
@@ -484,28 +484,6 @@ actionlint and an OpenSSL version-consistency gate.
   and accepted a classical fallback group; it is now post-quantum-only, like `:443`.
 
 <details>
-<summary><b>Upgrading a deployment made before 2026-10: fix the CA profile by hand</b></summary>
-
-New deployments render a CA configuration that never copies extensions from a CSR and signs every
-client leaf with the minimal `v3_m2m_leaf` profile (`CA:FALSE`, `digitalSignature`, `clientAuth`).
-An **existing** CA keeps the configuration it was created with, and the old one copied every
-extension a CSR asked for: a holder of an enrollment token could obtain a certificate marked
-`CA:TRUE` or valid for `serverAuth`, with any SAN. `scripts/setup-pki.sh` warns when it finds the old
-setting but does not change a live CA. Edit `intermediate/openssl-intermediate.cnf` in the CA
-directory, in `[ CA_default ]`:
-
-```ini
-copy_extensions   = none
-x509_extensions   = v3_m2m_leaf
-```
-
-and add the `[ v3_m2m_leaf ]` section from `pki/templates/openssl-intermediate.cnf`. No restart is
-needed: the custodian reads the file on every signing. Check with one enrollment whose CSR asks
-for `basicConstraints=critical,CA:TRUE`: the issued leaf must say `CA:FALSE`.
-
-</details>
-
-<details>
 <summary><b>Admin authorisation, in practice</b></summary>
 
 `deploy.sh` issues a bootstrap admin certificate and writes its fingerprint into
@@ -521,6 +499,106 @@ docker compose up -d management-api
 
 The allowlist **fails closed** if empty. `scripts/verify-admin-sha256.sh` checks the whole path from
 a real certificate.
+
+</details>
+
+---
+
+## Renewing the root CRL
+
+The root CA key is not available to any container: every service that mounts the CA tree masks
+`root/private`, including `crl-renewer`. The renewer therefore regenerates the **intermediate** CRL
+on its own (daily and on every revocation) but cannot sign the **root** CRL. That is an operator
+task, done where the root key lives (by default the gateway host, `/etc/pki/pqc-ca/root/private`).
+
+The root CRL is issued for 180 days (`default_crl_days` in `openssl-root.cnf`). Renew it at least
+every 90 days. An expired root CRL inside the combined CRL fails chain validation at the handshake,
+and every client is refused. On the host, as root:
+
+```bash
+O=/opt/openssl/bin/openssl; R=/etc/pki/pqc-ca/root
+$O ca -gencrl -config $R/openssl-root.cnf -out $R/crl/root-ca.crl.new \
+  && $O crl -in $R/crl/root-ca.crl.new -noout -verify -CAfile $R/certs/root-ca.crt \
+  && chmod 644 $R/crl/root-ca.crl.new && mv -f $R/crl/root-ca.crl.new $R/crl/root-ca.crl
+docker exec pqc-crl-renewer touch /signals/renew-crl   # republish the combined CRL now
+```
+
+The renewer reports the state on every run, in `docker logs pqc-crl-renewer` and in
+`crl-renewal.log` on the `pqc-logs-crl` volume. Alert on:
+
+- `[WARN] PQ Root CRL is due for renewal but the root CA key is not readable here`: fewer than 90
+  days left. Schedule the renewal.
+- `[ERROR] PQ Root CRL expires in N day(s) and cannot be renewed from this container`: fewer than
+  14 days left. Renew now.
+
+---
+
+## Upgrading to 2026-10
+
+A deployment made before this release needs these steps beyond `deploy.sh`:
+
+1. **`:8443` is post-quantum-only and `/enroll-ca.crt` is gone.** Clients verify `:8443` with
+   `ca-chain.crt`. Copies of `issue-cert.sh` from before 2026-10 fetched `enroll-ca.crt` from
+   `:8443`, and any client run with `PQC_ENROLL_CA=enroll-ca.crt` (or `enroll-classical-ca.crt`)
+   now fails verification: update the script and drop that variable. Clients need OpenSSL 3.5 or
+   later (see "Enrollment clients" above).
+2. **`ocsp-pq` runs as uid 1002.** Its key must be `640 root:1002` before the new container starts,
+   or the responder cannot read it. `setup-pki.sh` does this, also on an existing PKI, and
+   `deploy.sh` runs it before `docker compose up -d`. If you bring the stack up by hand, run
+   `scripts/setup-pki.sh` first.
+3. **`crl-renewer` runs with `cap_drop: ALL` plus `DAC_OVERRIDE`**, and masks `ocsp/` and
+   `root/private`. Rebuild its image (`deploy.sh` does): the poll interval, retry and marker fixes
+   are in its entrypoint.
+4. **nginx logs now persist** on the `pqc-logs-nginx` volume instead of tmpfs, so client IP
+   addresses and certificate subjects (CNs) survive container recreation. Each log rotates at
+   10 MiB with five compressed generations (`LOG_ROTATE_*`); set your retention to match your
+   policy.
+5. **Fix the CA profile by hand** and revoke anything the old profile let through (below).
+6. **Renew the root CRL on the host**, now and every 90 days ([Renewing the root CRL](#renewing-the-root-crl)).
+
+<details>
+<summary><b>Upgrading a deployment made before 2026-10: fix the CA profile by hand</b></summary>
+
+New deployments render a CA configuration that never copies extensions from a CSR and signs every
+client leaf with the minimal `v3_m2m_leaf` profile (`CA:FALSE`, `digitalSignature`, `clientAuth`).
+An **existing** CA keeps the configuration it was created with, and the old one copied every
+extension a CSR asked for: a holder of an enrollment token could obtain a certificate marked
+`CA:TRUE` or valid for `serverAuth`, with any SAN. `scripts/setup-pki.sh` warns when it finds the old
+setting but does not change an existing CA. Edit `intermediate/openssl-intermediate.cnf` in the CA
+directory, in `[ CA_default ]`:
+
+```ini
+copy_extensions   = none
+x509_extensions   = v3_m2m_leaf
+```
+
+and add the `[ v3_m2m_leaf ]` section from `pki/templates/openssl-intermediate.cnf`. No restart is
+needed: the custodian reads the file on every signing. Check with one enrollment whose CSR asks
+for `basicConstraints=critical,CA:TRUE`: the issued leaf must say `CA:FALSE`.
+
+Then look for certificates the old setting already let through. This lists every still-valid leaf
+in the CA index that is a CA, is valid for server authentication, OCSP signing or any purpose, or
+carries a SAN, skipping the gateway's own server and OCSP certificates, which legitimately do:
+
+```bash
+O=/opt/openssl/bin/openssl; CA=/etc/pki/pqc-ca
+skip="$($O x509 -in /etc/ssl/pqc/server-mldsa65.crt -noout -serial) $($O x509 -in $CA/ocsp/ocsp-pq.crt -noout -serial)"
+awk -F'\t' '$1=="V"{print $4}' "$CA/intermediate/db/index.txt" | while read -r s; do
+  case "$skip" in *"serial=$s"*) continue ;; esac
+  f="$CA/intermediate/issued/$s.pem"
+  $O x509 -in "$f" -noout -ext basicConstraints,extendedKeyUsage,subjectAltName 2>/dev/null \
+    | grep -qE 'CA:TRUE|Server Authentication|OCSP Signing|Any Extended Key Usage|Subject Alternative Name' \
+    && echo "REVOKE $s $($O x509 -in "$f" -noout -subject)"
+done
+```
+
+Revoke every serial it prints through the admin API, which also regenerates the CRL:
+
+```bash
+curl -sS --cacert $CA/ca-chain.crt --cert ./admin-cert/gateway-admin.crt --key ./admin-cert/gateway-admin.key \
+  -H "X-PQC-CSRF: 1" -H "Content-Type: application/json" -X POST https://127.0.0.1/admin/certs/revoke \
+  -d '{"serial":"<serial>","reason":"cessationOfOperation"}'
+```
 
 </details>
 
