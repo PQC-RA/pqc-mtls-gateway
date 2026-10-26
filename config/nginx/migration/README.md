@@ -25,11 +25,16 @@ To enable:
 3. Build `client-ca-bundle.pem`: the gateway's ML-DSA-65 chain
    (`/etc/pki/pqc-ca/hybrid-ca-chain.crt`) followed by the CA(s) that issued the
    service's existing classical client certificates.
-4. Optional: `policy.json` (see `policy.json.example`). Identities are
+4. Put the current CRL of each of those classical CAs, concatenated, in
+   `crl-bundle.pem`, and keep it current (for example a cron job that fetches
+   each CA's CRL distribution point). It is re-read within a second of a change,
+   without a reload; each CRL is used only if its signature verifies against
+   `client-ca-bundle.pem`. The gateway's own CRL is read from its usual place.
+5. Optional: `policy.json` (see `policy.json.example`). Identities are
    `sha256:<64 hex of the client certificate>` or `ip:<address>` for clients
    without a certificate; `"default"` sets the policy for everyone else. A change
    takes effect at the next `nginx -s reload`.
-5. Publish the listener's port in the compose file and recreate the gateway.
+6. Publish the listener's port in the compose file and recreate the gateway.
 
 The strict `:443` listener is not changed by any of this.
 
@@ -72,15 +77,15 @@ clients (logged once a minute) rather than dropping old ones.
   `ssl_verify_client optional` a client may leave its certificate out; it is then
   identified by address and gets the `default` policy. Use
   `ssl_verify_client on`, or `"default": "pq-required"`, where that matters.
-- **Revocation of classical client certificates is not handled yet.** A
-  certificate the customer's CA has revoked is still accepted here and reaches
-  the backend with `X-Client-Verify: SUCCESS`. Do not trust a customer CA in
-  `client-ca-bundle.pem` if you may need to revoke its certificates before this
-  is fixed. The gateway's own CRL is checked on every request, by serial number
-  alone, so a customer certificate whose serial equals one the gateway's CA
-  revoked is refused. `ssl_crl` is no way out: it needs every CA's CRL in one
-  file, is read only at reload, and refuses all clients of a CA once its CRL
-  passes nextUpdate.
+- **Revocation is only as fresh as `crl-bundle.pem`.** Every request is checked
+  against the CRL of its certificate's issuer (by issuer and serial). A client
+  certificate is refused with 403 when it is revoked (`certificate_revoked`),
+  when its issuer has no CRL loaded (`no_crl_for_issuer`; set
+  `$pqc_migration_crl_required off` to accept such clients knowingly), or when
+  its issuer's CRL is past nextUpdate (`crl_stale`; `$pqc_migration_crl_stale
+  accept` to accept knowingly). A revocation, once loaded, is never dropped
+  until the gateway restarts. OCSP for client certificates is not consulted.
+  What is loaded, per issuer, is listed under `crls` in the inventory.
 - **No session resumption.** The example turns it off: a resumed connection does
   not show which server certificate the session began with, so it is classified
   at most `pq-kex`. With resumption on, migrated clients would be refused by

@@ -159,7 +159,8 @@ function M.inventory_json()
     table.sort(out, function(a, b)
         return (a.identity or "") .. (a.endpoint or "") < (b.identity or "") .. (b.endpoint or "")
     end)
-    return cjson.encode({ generated = ngx.time(), records = out })
+    local ok, crl = pcall(function() return require("migration_crl").status() end)
+    return cjson.encode({ generated = ngx.time(), records = out, crls = ok and crl or nil })
 end
 
 -- The inventory names clients, so reading it needs an HMAC in the scheme

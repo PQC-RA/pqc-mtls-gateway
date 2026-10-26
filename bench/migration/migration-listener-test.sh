@@ -22,6 +22,9 @@
 #     the routing key, it answers 401
 #   9 the strict listener in the same container refuses a classical client
 #     certificate even over X25519MLKEM768, and serves the ML-DSA-65 one
+#  V1-V6 revocation per issuer: revoked 403, same CA served, a CA without CRL 403,
+#     a forged CRL ignored, a CRL added without reload, a stale CRL 403;
+#  V7 a customer serial equal to one the gateway's CA revoked is served
 #  R  a second connection with the first one's session is a full handshake
 #  T  a client that sends only an X25519 key share is asked for X25519MLKEM768
 #  X  a client-sent X-PQ-Class is replaced by the measured class
@@ -45,20 +48,41 @@ check(){ if eval "$2"; then echo "PASS  $1"; pass=$((pass+1)); else echo "FAIL  
 cleanup(){ docker rm -f $NAME >/dev/null 2>&1; find "$W" \( -name '*.key' -o -name '*.p12' -o -name 'sess.pem' \) -exec shred -u {} + 2>/dev/null; }
 trap cleanup EXIT
 
-# ── throwaway classical PKI: a customer CA, its server and client certificates ──
-mkdir -p "$W/mig" "$W/cl"
-O req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout "$W/cl/ca.key" -out "$W/cl/ca.crt" -subj "/O=Customer/CN=Customer Classical CA" -days 2 \
-	-addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" 2>/dev/null
-for n in server client; do
-	O req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout "$W/cl/$n.key" -out "$W/cl/$n.csr" -subj "/O=Customer/CN=classical-$n" 2>/dev/null
-	ext=$([ $n = server ] && echo "subjectAltName=DNS:$H
+# ── throwaway classical PKI ──
+# cl/  the customer's CA: the server certificate, client certificates "client",
+#      "spare" and "revoked" (revoked in its CRL)
+# cl2/ a second customer CA, trusted, at first without a CRL: client "client"
+# evil/ a key that is not the customer CA's, under the customer CA's name
+mkdir -p "$W/mig" "$W/cl" "$W/cl2" "$W/evil"
+mkca(){ # mkca DIR SUBJECT
+	O req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout "$1/ca.key" -out "$1/ca.crt" -subj "$2" -days 2 \
+		-addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" 2>/dev/null
+	: > "$1/index.txt"; echo 1000 > "$1/crlnumber"
+	printf '[ca]\ndefault_ca=d\n[d]\ndatabase=%s/index.txt\ncrlnumber=%s/crlnumber\ndefault_md=sha256\ndefault_crl_days=1\nunique_subject=no\n' "$1" "$1" > "$1/ca.cnf"
+}
+issue(){ # issue DIR NAME server|client
+	local ext
+	O req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout "$1/$2.key" -out "$1/$2.csr" -subj "/O=Customer/CN=classical-$2" 2>/dev/null
+	ext=$([ "$3" = server ] && echo "subjectAltName=DNS:$H
 keyUsage=critical,digitalSignature
 extendedKeyUsage=serverAuth" || echo "keyUsage=critical,digitalSignature
 extendedKeyUsage=clientAuth")
-	O x509 -req -in "$W/cl/$n.csr" -CA "$W/cl/ca.crt" -CAkey "$W/cl/ca.key" -CAcreateserial -days 2 -out "$W/cl/$n.crt" -extfile <(echo "$ext") 2>/dev/null
-done
+	O x509 -req -in "$1/$2.csr" -CA "$1/ca.crt" -CAkey "$1/ca.key" -CAcreateserial -days 2 -out "$1/$2.crt" -extfile <(echo "$ext") 2>/dev/null
+}
+gencrl(){ # gencrl DIR OUT [extra args]
+	local d=$1 out=$2; shift 2
+	O ca -config "$d/ca.cnf" -cert "$d/ca.crt" -keyfile "$d/ca.key" -gencrl -out "$out" "$@" 2>/dev/null
+}
+mkca "$W/cl" "/O=Customer/CN=Customer Classical CA"
+mkca "$W/cl2" "/O=Customer/CN=Customer Second CA"
+mkca "$W/evil" "/O=Customer/CN=Customer Classical CA"
+issue "$W/cl" server server; issue "$W/cl" client client; issue "$W/cl" spare client; issue "$W/cl" revoked client
+issue "$W/cl2" client client
+O ca -config "$W/cl/ca.cnf" -cert "$W/cl/ca.crt" -keyfile "$W/cl/ca.key" -revoke "$W/cl/revoked.crt" 2>/dev/null
+gencrl "$W/cl" "$W/cl/crl.pem"
+cp "$W/cl/crl.pem" "$W/mig/crl-bundle.pem"
 cp "$W/cl/server.crt" "$W/mig/classical-server.crt"; cp "$W/cl/server.key" "$W/mig/classical-server.key"
-cat "$PKI_DIR/hybrid-ca-chain.crt" "$W/cl/ca.crt" > "$W/mig/client-ca-bundle.pem"
+cat "$PKI_DIR/hybrid-ca-chain.crt" "$W/cl/ca.crt" "$W/cl2/ca.crt" > "$W/mig/client-ca-bundle.pem"
 CL_FPR=$(O x509 -in "$W/cl/client.crt" -outform DER | sha256sum | cut -d' ' -f1)
 printf '{\n  "default": "observe"\n}\n' > "$W/mig/policy.json"
 head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$W/mig/inventory-hmac.key"
@@ -88,7 +112,8 @@ start(){ # (re)start the throwaway gateway with the current $W/mig
 		--entrypoint sh "$GW_IMAGE" -c 'mkdir -p /var/cache/nginx/client_temp /var/log/nginx /var/cache/pqc-gw/routes; exec nginx -g "daemon off;"' >/dev/null
 	for n in ${NETWORKS#* }; do [ "$n" != "$first" ] && docker network connect "$n" $NAME; done
 	docker start $NAME >/dev/null
-	for i in $(seq 1 30); do echo | timeout 3 env LD_LIBRARY_PATH=$LIBDIR OPENSSL_CONF=/dev/null "$OSSL" s_client -connect 127.0.0.1:$P_MIG -servername $H >/dev/null 2>&1 && return 0; sleep 1; done
+	# up, then 2 s for the CRL poller's first pass
+	for i in $(seq 1 30); do echo | timeout 3 env LD_LIBRARY_PATH=$LIBDIR OPENSSL_CONF=/dev/null "$OSSL" s_client -connect 127.0.0.1:$P_MIG -servername $H >/dev/null 2>&1 && { sleep 2; return 0; }; sleep 1; done
 	docker logs $NAME 2>&1 | tail -5; return 1
 }
 req(){ # req LABEL CLIENT-ARGS... -> prints "<server sig> | <http body>"
@@ -115,6 +140,38 @@ printf '{\n  "default": "observe",\n  "sha256:%s": "pq-required"\n}\n' "$CL_FPR"
 docker exec $NAME nginx -s reload; sleep 2
 r=$(req c7 "${CL[@]}" -cert "$W/cl/client.crt" -key "$W/cl/client.key"); echo "   7: $r"; check "7 the same client under pq-required: 403 pq_required" "echo '$r' | grep -q 'pq_required' && grep -q 'HTTP/1.1 403' '$W/c7.out'"
 r=$(req c7b "${CL[@]}"); echo "   7b: $r"; check "7 a classical client WITHOUT that certificate is still only observed" "echo '$r' | grep -q 'class=classical\$'"
+
+# V: revocation per issuer (lua/migration_crl.lua)
+CL2=(-groups X25519:P-256 -sigalgs ecdsa_secp256r1_sha256 -CAfile "$W/cl/ca.crt")
+r=$(req v1 "${CL2[@]}" -cert "$W/cl/revoked.crt" -key "$W/cl/revoked.key"); echo "   V1: $r"
+check "V1 a client certificate revoked by the customer CA: 403 certificate_revoked" "grep -q 'HTTP/1.1 403' '$W/v1.out' && grep -q 'certificate_revoked' '$W/v1.out'"
+r=$(req v2 "${CL2[@]}" -cert "$W/cl/spare.crt" -key "$W/cl/spare.key"); echo "   V2: $r"
+check "V2 a not-revoked certificate from the same CA: served" "echo '$r' | grep -q 'class=classical\$'"
+r=$(req v3 "${CL2[@]}" -cert "$W/cl2/client.crt" -key "$W/cl2/client.key"); echo "   V3: $r"
+check "V3 a client of a trusted CA with no CRL loaded: 403 no_crl_for_issuer" "grep -q 'HTTP/1.1 403' '$W/v3.out' && grep -q 'no_crl_for_issuer' '$W/v3.out'"
+# a CRL under the customer CA's name, signed by another key, revoking "spare"
+O ca -config "$W/evil/ca.cnf" -cert "$W/evil/ca.crt" -keyfile "$W/evil/ca.key" -revoke "$W/cl/spare.crt" 2>/dev/null
+gencrl "$W/evil" "$W/evil/crl.pem"
+cat "$W/cl/crl.pem" "$W/evil/crl.pem" > "$W/mig/crl-bundle.pem"; sleep 2
+r=$(req v4 "${CL2[@]}" -cert "$W/cl/spare.crt" -key "$W/cl/spare.key"); echo "   V4: $r"
+check "V4 a forged CRL (customer CA's name, other key) revokes nothing: still served" "echo '$r' | grep -q 'class=classical\$' && docker exec $NAME grep -q 'does not verify against' /var/log/nginx/error.log"
+# the second CA's CRL, valid for 4 s
+gencrl "$W/cl2" "$W/cl2/crl.pem" -crlsec 4
+cat "$W/cl/crl.pem" "$W/evil/crl.pem" "$W/cl2/crl.pem" > "$W/mig/crl-bundle.pem"; sleep 2
+r=$(req v5 "${CL2[@]}" -cert "$W/cl2/client.crt" -key "$W/cl2/client.key"); echo "   V5: $r"
+check "V5 once its CRL is in crl-bundle.pem (no reload), the second CA's client is served" "echo '$r' | grep -q 'class=classical\$'"
+sleep 4
+r=$(req v6 "${CL2[@]}" -cert "$W/cl2/client.crt" -key "$W/cl2/client.key"); echo "   V6: $r"
+check "V6 past that CRL's nextUpdate: 403 crl_stale" "grep -q 'HTTP/1.1 403' '$W/v6.out' && grep -q 'crl_stale' '$W/v6.out'"
+
+# a customer certificate whose serial the GATEWAY's CA has revoked: a different
+# issuer, so it is not revoked (the earlier serial-only check refused it)
+GW_REVOKED=$(O crl -in "$PKI_DIR/hybrid-combined-crl.pem" -noout -text 2>/dev/null | grep -m1 -oE 'Serial Number: [0-9A-F]+' | cut -d' ' -f3)
+O req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -keyout "$W/cl/twin.key" -out "$W/cl/twin.csr" -subj "/O=Customer/CN=classical-twin" 2>/dev/null
+O x509 -req -in "$W/cl/twin.csr" -CA "$W/cl/ca.crt" -CAkey "$W/cl/ca.key" -set_serial "0x$GW_REVOKED" -days 2 -out "$W/cl/twin.crt" \
+	-extfile <(printf 'keyUsage=critical,digitalSignature\nextendedKeyUsage=clientAuth\n') 2>/dev/null
+r=$(req v7 "${CL2[@]}" -cert "$W/cl/twin.crt" -key "$W/cl/twin.key"); echo "   V7: serial $GW_REVOKED | $r"
+check "V7 a customer certificate with a serial the gateway's CA revoked is served (revocation is per issuer)" "[ -n '$GW_REVOKED' ] && echo '$r' | grep -q 'class=classical\$'"
 
 # R: resumption is off on the migration listener
 printf 'GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' $H | O s_client -connect 127.0.0.1:$P_MIG -servername $H -ign_eof "${CL[@]}" -sess_out "$W/sess.pem" > "$W/r1.out" 2>&1
@@ -155,9 +212,13 @@ for r in d["records"]:
     seen.update((r.get("classes") or {r["class"]: 1}).keys())
 cl = [r for r in d["records"] if r["identity"] == "sha256:" + fpr]
 print("classes", " ".join(sorted(seen)), "records", len(d["records"]), "classical_client", cl[0]["class"] if cl else "missing", cl[0].get("client_key", "") if cl else "")
+crls = {c["issuer"]: c for c in d.get("crls") or []}
+print("crls", len(crls), "customer_revoked", (crls.get("CN=Customer Classical CA,O=Customer") or {}).get("revoked"),
+      "second_stale", (crls.get("CN=Customer Second CA,O=Customer") or {}).get("stale"),
+      "gateway", any("PQC Intermediate" in i for i in crls))
 PY
-echo "   8: $(cat "$W/inventory-check.txt")"
-check "8 the inventory (HMAC) holds pq, pq-kex and classical, the customer-CA client as classical (EC key); unsigned or routing-key 401" "[ '$code' = 200 ] && [ '$code_unsigned' = 401 ] && [ '$code_cp' = 401 ] && grep -q 'classes classical pq pq-kex' '$W/inventory-check.txt' && grep -q 'classical_client classical EC' '$W/inventory-check.txt'"
+echo "   8: $(tr '\n' ' ' < "$W/inventory-check.txt")"
+check "8 the inventory (HMAC) holds pq, pq-kex and classical, the customer-CA client as classical (EC key), the CRLs per issuer; unsigned or routing-key 401" "[ '$code' = 200 ] && [ '$code_unsigned' = 401 ] && [ '$code_cp' = 401 ] && grep -q 'classes classical pq pq-kex' '$W/inventory-check.txt' && grep -q 'classical_client classical EC' '$W/inventory-check.txt' && grep -q 'customer_revoked 1 second_stale True gateway True' '$W/inventory-check.txt'"
 
 strict(){ printf 'GET / HTTP/1.1\r\nHost: %s\r\nConnection: close\r\n\r\n' $H | timeout 10 env LD_LIBRARY_PATH=$LIBDIR OPENSSL_CONF=/dev/null "$OSSL" s_client \
 	-connect 127.0.0.1:$P_STRICT -servername $H -ign_eof -groups X25519MLKEM768 -CAfile "$PKI_DIR/ca-chain.crt" "$@"; }
