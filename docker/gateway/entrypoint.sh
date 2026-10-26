@@ -88,17 +88,18 @@ RELOAD_STATE=/tmp/.reload-nginx-last-mtime
         if [ -f "$RELOAD_SIGNAL" ]; then
             mtime=$(stat -c %Y "$RELOAD_SIGNAL" 2>/dev/null || echo "$last_mtime")
             if [ "$mtime" != "$last_mtime" ]; then
-                last_mtime="$mtime"
-                echo "$last_mtime" > "$RELOAD_STATE"
-                echo "[reload-watcher] detected updated $RELOAD_SIGNAL, validating config..."
-                if nginx -t 2>&1; then
-                    if nginx -s reload 2>&1; then
-                        echo "[reload-watcher] nginx reloaded successfully"
-                    else
-                        echo "[reload-watcher] ERROR: nginx -s reload failed" >&2
-                    fi
-                else
-                    echo "[reload-watcher] ERROR: nginx -t failed, skipping reload" >&2
+                # The signal counts as handled only once the reload succeeded: a
+                # failed test or reload is retried every poll (reported once), so
+                # a new CRL cannot stay unloaded until the next signal.
+                if nginx -t -q 2>/dev/null && nginx -s reload 2>/dev/null; then
+                    last_mtime="$mtime"
+                    echo "$last_mtime" > "$RELOAD_STATE"
+                    reload_failed_for=
+                    echo "[reload-watcher] $RELOAD_SIGNAL updated: nginx reloaded"
+                elif [ "${reload_failed_for:-}" != "$mtime" ]; then
+                    reload_failed_for="$mtime"
+                    echo "[reload-watcher] ERROR: $RELOAD_SIGNAL updated but nginx did not reload; retrying every ${RELOAD_POLL_INTERVAL}s" >&2
+                    nginx -t 2>&1 | tail -3 >&2 || true
                 fi
             fi
         fi

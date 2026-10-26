@@ -46,6 +46,17 @@ retry_at=0
 # The CRL files the gateway reads (ssl_crl and the Lua pollers).
 CRL_FILES="${CRL_PUBLISHED_FILES:-/etc/pki/pqc-ca/hybrid-combined-crl.pem /etc/pki/pqc-ca/combined-crl.pem}"
 crl_state() { cat $CRL_FILES 2>/dev/null | cksum; }
+signal_pending=0   # a changed CRL whose reload signal could not be written yet
+
+send_reload_signal() {
+  if touch "$RELOAD_SIGNAL" 2>/dev/null; then
+    signal_pending=0
+  else
+    signal_pending=1
+    echo "[crl-renewer] WARN: could not write reload signal $RELOAD_SIGNAL," \
+         "handshake-layer CRL will not refresh until it can; retrying" >&2
+  fi
+}
 
 run_renew() {
   local reason="$1" ok=1 before
@@ -68,11 +79,10 @@ run_renew() {
   # a reload is not free, old workers close what they hold after
   # worker_shutdown_timeout, so a renewer failing every minute would otherwise
   # cut every long-lived session (edge links) every minute.
-  if [ "$(crl_state)" = "$before" ]; then
+  if [ "$(crl_state)" != "$before" ] || [ "$signal_pending" = 1 ]; then
+    send_reload_signal
+  else
     echo "[crl-renewer] published CRLs unchanged, no gateway reload"
-  elif ! touch "$RELOAD_SIGNAL" 2>/dev/null; then
-    echo "[crl-renewer] WARN: could not write reload signal $RELOAD_SIGNAL," \
-         "handshake-layer CRL will not refresh until the next gateway reload" >&2
   fi
   if [ "$ok" = 1 ]; then
     mv -f "$MARKER.next" "$MARKER"
@@ -93,6 +103,7 @@ last_daily=$SECONDS
 
 while true; do
   sleep "$POLL_INTERVAL"
+  [ "$signal_pending" = 1 ] && send_reload_signal
 
   # A failed run is retried (with backoff) whatever triggered it.
   if [ "$retry_wait" -gt 0 ]; then
