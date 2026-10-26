@@ -217,7 +217,11 @@ and a key-algorithm check at issuance. Either alone leaves a path open.
 `bench/check-negative-controls.sh` mints an RSA and an EC leaf that the issuance path refuses to
 produce, signing each out-of-band **with the real intermediate key**. It then routes that
 certificate, so that any refusal is attributable to TLS rather than to policy, and asserts that the
-handshake rejects it.
+handshake rejects it. A compliant client, offered ML-DSA-65 only, withholds its classical
+certificate, so that refusal does not reach the guard itself. `bench/test8b/` does: a test-only
+OpenSSL client, patched to send the classical certificate anyway, must be refused by the gateway,
+and a plain `s_server` with the same certificate and CA must accept it without the guard and
+refuse it with `-client_sigalgs ML-DSA-65`.
 
 ### 3 · Transport: OCSP stapling costs a round trip, not only bytes
 

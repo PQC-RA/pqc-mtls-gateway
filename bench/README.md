@@ -172,7 +172,9 @@ classical-keyed certificate signed by the legitimate ML-DSA intermediate and con
 refuses it. Chain validation *alone* accepts such a certificate; only the explicit
 `ClientSignatureAlgorithms` restriction rejects it, and an `ssl_conf_command` that OpenSSL does not
 recognise is accepted at parse time and simply never applied. **Run it after every OpenSSL or
-nginx upgrade.**
+nginx upgrade.** A compliant client offered ML-DSA-65 only withholds its classical certificate,
+so this test sees the refusal without the guard ever being asked; `test8b/` forces the client
+to send the certificate and checks that the guard is what refuses it.
 
 ### Analysis and diagnostics
 
@@ -237,6 +239,7 @@ order; the rest are run on their own when you have a specific question.
 | `test-crl-renewer.sh` | Hermetic, no running stack: a revocation during a renewal is not lost, a failed renewal is retried with backoff, a burst coalesces, and CRL publication is never seen half-written. `IMAGE=` a crl-renewer image built from this tree |
 | `check-tls-log-evidence.sh` | Every kind of connection on :443 leaves a log entry that names what was negotiated or why it was refused: valid client, no certificate, classical-only and pure ML-KEM key exchange, TLS 1.2. Reads the gateway's log volume |
 | `test-enroll-8443.sh` | The post-quantum-only `:8443`: PQ clients enroll; pre-3.5 OpenSSL, classical-only groups, browser-like signature algorithms and the old classical CA are refused in the handshake with a named reason; the token is consumed only by a success. Issues five certificates on a running gateway, so it needs `ENROLL8443_I_UNDERSTAND=1` |
+| `test8b/test8b-classical-client.sh` | A client that sends a classical (ECDSA P-256, RSA-3072) certificate signed by the ML-DSA-65 intermediate although the CertificateRequest allows ML-DSA-65 only: the gateway must refuse it, and a local `s_server` shows the `ClientSignatureAlgorithms` guard is what refuses. Needs a test-only OpenSSL built with `test8b-force-client-sigalg.patch`, signs two 1-day leaves with the CA on this host, so it needs `TEST8B_I_UNDERSTAND=1`; loopback targets only |
 
 ### Specific questions
 

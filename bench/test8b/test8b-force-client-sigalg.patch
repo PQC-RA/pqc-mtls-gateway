@@ -1,0 +1,36 @@
+--- ssl/t1_lib.c.orig	2026-10-26 08:26:31.467061999 +0000
++++ ssl/t1_lib.c	2026-10-26 08:26:31.472983195 +0000
+@@ -4652,6 +4652,33 @@
+ 
+     if (SSL_CONNECTION_IS_TLS13(s)) {
+         lu = find_sig_alg(s, NULL, NULL);
++        /*
++         * TEST 8b ONLY (pqc gateway, 2026-10-26): with TEST8B_FORCE_CLIENT_SIGALG
++         * set, a CLIENT that holds no certificate the server's
++         * signature_algorithms allow ignores that list and signs with the
++         * first of its own algorithms that fits its certificate, so the
++         * server receives a classical Certificate and CertificateVerify it
++         * never asked for. Never ship this build.
++         */
++        if (lu == NULL && !s->server && getenv("TEST8B_FORCE_CLIENT_SIGALG") != NULL) {
++            const uint16_t *own;
++            size_t ownlen = tls12_get_psigalgs(s, 1, &own), j;
++
++            for (j = 0; j < ownlen; j++) {
++                const SIGALG_LOOKUP *c = tls1_lookup_sigalg(SSL_CONNECTION_GET_CTX(s), own[j]);
++
++                if (c == NULL || c->hash == NID_sha1 || c->sig == EVP_PKEY_RSA
++                    || !tls1_lookup_md(SSL_CONNECTION_GET_CTX(s), c, NULL)
++                    || !ssl_has_cert(s, c->sig_idx))
++                    continue;
++                if (c->sig == EVP_PKEY_EC && c->curve != NID_undef
++                    && ssl_get_EC_curve_nid(s->cert->pkeys[c->sig_idx].privatekey) != c->curve)
++                    continue;
++                lu = c;
++                fprintf(stderr, "TEST8B: forcing client sigalg %s against the server's list\n", c->name);
++                break;
++            }
++        }
+         if (lu == NULL) {
+             if (!fatalerrs)
+                 return 1;
