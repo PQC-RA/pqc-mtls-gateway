@@ -176,7 +176,11 @@ function normalizeFingerprint(raw) {
  */
 function extractCn(dn) {
 	if (typeof dn !== "string") return null;
-	const m = /CN=([^,/]+)/.exec(dn);
+	// Exactly one "CN=" in the whole DN, read only at the start of an attribute:
+	// "emailAddress=xCN=victim" or "ISO-CN=victim" must not be taken for a CN
+	// (the management API refuses such subjects too; this is the second layer).
+	if ((dn.match(/cn\s*=/gi) || []).length !== 1) return null;
+	const m = /(?:^|[,/])\s*CN=([^,/]+)/.exec(dn);
 	// .trim() handles trailing "\n" from `openssl req -noout -subject`'s
 	// stdout, not a DN-parsing concern, just CLI-output hygiene. index.txt
 	// lines have no such trailing whitespace, so this is a no-op there.
@@ -507,7 +511,11 @@ async function handleSign(res, payload) {
 				log("ERROR", `Failed to read CSR: ${err.stderr || err.message}`);
 				return sendError(res, 400, "invalid_csr", "Could not read subject or key from CSR");
 			}
-			if (!cn) return sendError(res, 400, "invalid_csr", "CSR subject has no CN component");
+			if (!cn) return sendError(res, 400, "invalid_csr", "CSR subject must carry exactly one CN");
+			// Same CN alphabet and single-attribute RDNs as the management API.
+			if (!/^[A-Za-z0-9._-]{1,64}$/.test(cn) || /(^|[^\\])\+/.test(subject)) {
+				return sendError(res, 400, "invalid_csr", "CSR subject: CN outside [A-Za-z0-9._-]{1,64} or a multi-valued RDN");
+			}
 
 			const now = Date.now();
 			const idem = readJsonState(IDEMPOTENCY_FILE);

@@ -55,7 +55,13 @@ end
 require("client_cert_expiry").refuse_if_expired("admin_jwt")
 
 local function extract_cn(dn)
-    return dn and dn:match("CN=([^,/]+)") or ""
+    if not dn then return "" end
+    -- Exactly one "CN=" in the DN, read only at the start of an attribute: a
+    -- value such as "emailAddress=xCN=victim" or a type such as "ISO-CN" must
+    -- not be taken for the CN. Anything else yields no CN (refused upstream).
+    local _, n = dn:lower():gsub("cn%s*=", "")
+    if n ~= 1 then return "" end
+    return dn:match("^CN=([^,/]+)") or dn:match(",CN=([^,/]+)") or ""
 end
 
 local function extract_ou(dn)
