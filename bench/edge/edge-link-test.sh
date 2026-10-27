@@ -8,8 +8,7 @@
 # A throwaway ML-DSA-65 PKI is made for the link; nothing touches a running
 # deployment. Needs what migration-listener-test.sh needs for the central
 # gateway (GW_IMAGE, PKI_DIR, SSL_DIR, SECRETS_DIR, ADMIN_CRT/KEY, NETWORKS,
-# OSSL), plus the image pqc-test-modbus:local (FROM python:3.12-slim,
-# pip install pymodbus==3.8.6).
+# OSSL), plus the image pqc-test-modbus:local (bench/images/build.sh).
 #
 # Checks:
 #   E1 the SCADA reads the device's holding registers through the link

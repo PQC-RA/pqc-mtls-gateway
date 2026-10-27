@@ -8,7 +8,7 @@
 #   python:3.11-slim-bookworm  CPython ssl on OpenSSL 3.0
 #   eclipse-temurin:21-jdk     Java 21 JSSE (HttpsURLConnection)
 #   curlimages/curl            curl on OpenSSL 3.5 (post-quantum capable)
-#   pqc-test-chromium:local    Chromium from Alpine (FROM alpine:3, apk add chromium nss-tools)
+#   pqc-test-chromium:local    Chromium from Alpine (bench/images/build.sh)
 #
 # Cases:
 #   10 OpenSSL 1.1.1 client  -> served, class classical
