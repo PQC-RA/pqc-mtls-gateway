@@ -352,7 +352,7 @@ A client then renews its own certificate over mTLS, without an administrator:
   `scripts/generate-gateway-secrets.sh`). The request carries a CSR for a **new** ML-DSA-65
   key and a signature by the **current** key over the CSR, the current serial and a time.
 - **Profiles**, named by the enrollment token: `client-30d` (30-day leaves, renewed at 2/3 of
-  their lifetime, refused before 1/2 with `renewal_too_early`) and `demo-120s` (two-minute
+  their lifetime, refused before 1/2 with `too_early`) and `demo-120s` (two-minute
   leaves for demonstrations, only with `CUSTODIAN_DEMO_PROFILE=1`). Tokens without a profile
   issue the usual 365-day leaves.
 - **One successor per certificate**, and a **365-day lineage cap** from the first enrollment;
