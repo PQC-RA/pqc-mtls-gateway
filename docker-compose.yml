@@ -82,6 +82,11 @@ services:
   build:
    context: docker
    dockerfile: gateway/Dockerfile
+   # From docker/base/versions.env (scripts/build-all.sh exports it); the image
+   # refuses to build if its base images carry other versions.
+   args:
+    OPENRESTY_VERSION: ${OPENRESTY_VERSION:-}
+    OPENSSL_VERSION: ${OPENSSL_VERSION:-}
   image: pqc-gateway:1.0.0
   container_name: pqc-gateway
   depends_on:
@@ -200,7 +205,10 @@ services:
   # readable or group readable to its own gid, so it never needs DAC_OVERRIDE.
   cap_drop:
    - ALL
-  build: docker/ocsp-pq
+  build:
+   context: docker/ocsp-pq
+   args:
+    OPENSSL_VERSION: ${OPENSSL_VERSION:-}
   container_name: pqc-ocsp-pq
   # The responder signs OCSP answers with the delegated OCSP key and touches
   # nothing else, so it has no need of root. uid/gid 1002 is the dedicated
@@ -289,7 +297,10 @@ services:
    - ALL
   cap_add:
    - DAC_OVERRIDE
-  build: docker/crl-renewer
+  build:
+   context: docker/crl-renewer
+   args:
+    OPENSSL_VERSION: ${OPENSSL_VERSION:-}
   container_name: pqc-crl-renewer
   environment:
    # Watch this sentinel (touched by management-api on revoke) for on-demand CRL regen.
@@ -352,6 +363,8 @@ services:
   build:
    context: .
    dockerfile: docker/pqc-ca-custodian/Dockerfile
+   args:
+    OPENSSL_VERSION: ${OPENSSL_VERSION:-}
   container_name: pqc-ca-custodian
   # Same fixed service account as management-api. Host CA ownership from
   # scripts/setup-pki.sh already grants 1001:1001 exactly this access

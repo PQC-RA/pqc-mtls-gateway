@@ -71,6 +71,12 @@ end
 local s_dn = ngx.var.ssl_client_s_dn or ""
 local cn   = extract_cn(s_dn)
 local ou   = extract_ou(s_dn)
+-- A subject without exactly one CN gets no admin token (the API would refuse
+-- one with sub="" anyway; refusing here keeps the decision local).
+if cn == "" then
+    ngx.log(ngx.WARN, "[admin_jwt] client DN without a single CN, refused: ", s_dn)
+    return ngx.exit(ngx.HTTP_FORBIDDEN)
+end
 
 -- Compute SHA-256 fingerprint from the URL-encoded client cert PEM via the
 -- shared helper.  nginx's built-in $ssl_client_fingerprint is SHA-1

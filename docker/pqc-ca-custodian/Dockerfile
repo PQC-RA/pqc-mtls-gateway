@@ -81,6 +81,11 @@ RUN groupadd --system --gid 1001 appuser \
 COPY --chown=root:root docker/pqc-ca-custodian/custodian.js ./custodian.js
 
 ENV HOME=/tmp
+# The OpenSSL this image must carry, passed from docker/base/versions.env by every
+# build path (no default here: one source); a stale base image fails the build.
+ARG OPENSSL_VERSION
+RUN test -n "${OPENSSL_VERSION}" && /opt/openssl/bin/openssl version | grep -qF "OpenSSL ${OPENSSL_VERSION} "
+
 USER 1001:1001
 
 EXPOSE 8091

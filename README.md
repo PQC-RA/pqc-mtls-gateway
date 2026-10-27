@@ -4,12 +4,12 @@
 
 **A production-shaped API gateway where the key exchange *and* both peers' authentication are post-quantum.**
 
-X25519MLKEM768 key agreement · ML-DSA-65 mutual authentication · native OpenSSL 3.6.2 · no OQS
+X25519MLKEM768 key agreement · ML-DSA-65 mutual authentication · native OpenSSL 3.6.5 · no OQS
 
 [![bring-up](https://github.com/PQC-RA/pqc-mtls-gateway/actions/workflows/bring-up.yml/badge.svg)](https://github.com/PQC-RA/pqc-mtls-gateway/actions/workflows/bring-up.yml)
 [![checks](https://github.com/PQC-RA/pqc-mtls-gateway/actions/workflows/checks.yml/badge.svg)](https://github.com/PQC-RA/pqc-mtls-gateway/actions/workflows/checks.yml)
 [![licence](https://img.shields.io/badge/licence-AGPL--3.0--only-A6391A)](LICENSE)
-[![OpenSSL](https://img.shields.io/badge/OpenSSL-3.6.2-37414E)](https://openssl-library.org/)
+[![OpenSSL](https://img.shields.io/badge/OpenSSL-3.6.5-37414E)](https://openssl-library.org/)
 [![FIPS 203/204](https://img.shields.io/badge/FIPS-203%20%C2%B7%20204-37414E)](https://csrc.nist.gov/pubs/fips/204/final)
 
 *Artifact for the IEEE CSCN 2026 paper. Every figure below is reproducible from this repository.*
@@ -23,7 +23,7 @@ poorly characterised is a **complete** deployment: post-quantum key exchange **a
 authentication on **both** peers, with those certificates traversing a production edge.
 
 This is one, measured. It terminates TLS 1.3 at an OpenResty edge linked against an unmodified,
-side-installed OpenSSL 3.6.2, with **no OQS provider and no patched library**. It enforces mTLS
+side-installed OpenSSL 3.6.5, with **no OQS provider and no patched library**. It enforces mTLS
 with CRL revocation, and hands a short-lived attested identity to backends that do not need to be
 post-quantum capable at all.
 
@@ -71,7 +71,7 @@ same system. Durations and round-trip counts survive a change of instrument.
 ```mermaid
 flowchart LR
   C["mTLS client<br/>ML-DSA-65 certificate"]
-  GW["PQC Gateway<br/>OpenResty 1.27 · OpenSSL 3.6.2<br/>TLS termination · Lua policy"]
+  GW["PQC Gateway<br/>OpenResty 1.31 · OpenSSL 3.6.5<br/>TLS termination · Lua policy"]
   BE["Backend service<br/>need not be PQ-capable"]
 
   subgraph CP["control plane"]
@@ -152,7 +152,7 @@ echo | OPENSSL_CONF=/etc/ssl/openssl.cnf /opt/openssl/bin/openssl s_client \
 <details>
 <summary><b>What <code>deploy.sh</code> actually does</b></summary>
 
-1. **Fetches the base images**, PQ OpenSSL 3.6.2 and OpenResty 1.27.1.2, by the digests in
+1. **Fetches the base images**, PQ OpenSSL and OpenResty at the versions in `docker/base/versions.env`, by the digests in
    `base.lock`. Falls back to compiling from source (~30 min) only if the pull is unavailable.
 2. **Installs PQ OpenSSL** to `/opt/openssl-<ver>`, aliased `/opt/openssl`, the path everything else
    resolves.
@@ -621,6 +621,17 @@ The renewer reports the state on every run, in `docker logs pqc-crl-renewer` and
 ---
 
 ## Upgrading to 2026-10
+
+**OpenResty 1.31.8.1 and OpenSSL 3.6.5** (from 1.27.1.2 and 3.6.2). nginx 1.31.7+ fixes
+CVE-2026-97629 (session forgery with TLS session tickets, nginx 1.23.2 to 1.31.6); OpenSSL
+3.6.3 to 3.6.5 fix, among others, CMS, OCSP and CMP issues. `scripts/build-all.sh` replaces
+`pqc-mtls-openssl-base:local` / `pqc-mtls-openresty-base:local` left from the old versions, and
+every image asserts at build time that it carries the versions in `docker/base/versions.env`,
+so a stale base image fails the build instead of shipping. OpenResty 1.31.8.1 bundles
+release-candidate builds of its Lua modules (`ngx_lua` 0.10.32rc7, `ngx_stream_lua`
+0.0.20rc3), as OpenResty ships them; the stand suites pass on them. If you deployed before
+this release and turned TLS session tickets off as the interim mitigation, they can go back
+on.
 
 **Client certificate renewal (off until enabled).** Generate the new secret
 (`scripts/generate-gateway-secrets.sh` writes `secrets/renew-hmac.key`; without it `/renew`

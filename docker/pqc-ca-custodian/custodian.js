@@ -711,7 +711,13 @@ async function handleRevoke(res, payload) {
 	});
 }
 
+let stopping = false; // set by shutdown() below
 const server = http.createServer(async (req, res) => {
+	if (stopping) {
+		// Graceful stop in progress (see shutdown() below): retryable refusal.
+		res.shouldKeepAlive = false;
+		return sendError(res, 503, "stopping", "Custodian is stopping; retry");
+	}
 	try {
 		// Unauthenticated liveness probe only, no CA data, just booleans on
 		// whether the two files this process serves are reachable. Used by the
@@ -800,21 +806,22 @@ server.listen(PORT, () => {
 
 // Graceful stop. As PID 1, node ignores SIGTERM unless it is handled, so every
 // `docker stop` ended in SIGKILL after 10 s, possibly in the middle of a CA
-// mutation. Now: stop accepting requests, let the CA mutations already queued
-// finish (bounded below Docker's 10 s), then exit.
-let stopping = false;
+// mutation. Now: refuse new requests (503, retryable), close idle keep-alive
+// connections, and exit once the requests in progress have answered and the CA
+// mutations already queued have finished, at most 8 s (below Docker's 10 s).
 function shutdown(signal) {
 	if (stopping) return;
 	stopping = true;
-	log("INFO", `${signal}: no new requests; finishing CA work in progress`);
-	server.close();
+	log("INFO", `${signal}: refusing new requests; finishing work in progress`);
 	const bound = setTimeout(() => {
-		log("WARN", "CA work still running after 8 s; exiting");
+		log("WARN", "work still running after 8 s; exiting");
 		process.exit(1);
 	}, 8000);
 	bound.unref();
-	caChain.then(() => {
-		log("INFO", "CA work finished; exiting");
+	const closed = new Promise(resolve => server.close(resolve));
+	server.closeIdleConnections();
+	Promise.all([closed, caChain]).then(() => {
+		log("INFO", "work finished; exiting");
 		process.exit(0);
 	});
 }

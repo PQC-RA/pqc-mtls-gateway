@@ -14,6 +14,11 @@ EXPOSE 9080
 # chain, so bundling the intermediate only bloated the stapled response by
 # ~6 KB. Embedding only the responder (signer) leaf shrinks the stapled OCSP
 # response from ~15.5 KB to ~9.5 KB and still verifies client-side.
+# The OpenSSL this image must carry, passed from docker/base/versions.env by every
+# build path (no default here: one source); a stale base image fails the build.
+ARG OPENSSL_VERSION
+RUN test -n "${OPENSSL_VERSION}" && /opt/openssl/bin/openssl version | grep -qF "OpenSSL ${OPENSSL_VERSION} "
+
 CMD ["/opt/openssl/bin/openssl", "ocsp", "-port", "9080", \
      "-index", "/etc/pki/pqc-ca/intermediate/db/index.txt", \
      "-CA", "/etc/pki/pqc-ca/intermediate/certs/intermediate-ca.crt", \

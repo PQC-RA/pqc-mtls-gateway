@@ -89,6 +89,43 @@ if ! grep -q 'test -n "${OPENSSL_VERSION}"' "$BASE_DF"; then
   bad=1
 fi
 
+# The OpenResty base keeps ARG defaults because the base-images workflow builds it
+# without --build-arg; they must then equal versions.env, or a version bump
+# silently builds the old OpenResty.
+OR_DF="$ROOT_DIR/docker/base/openresty/Dockerfile"
+for v in OPENRESTY_VERSION OPENRESTY_SHA256; do
+  want=$(sed -n "s/^$v=//p" "$ROOT_DIR/docker/base/versions.env")
+  have=$(sed -n "s/^ARG $v=//p" "$OR_DF" | head -1)
+  if [ -n "$have" ] && [ "$have" != "$want" ]; then
+    echo "ERROR: docker/base/openresty/Dockerfile ARG $v=$have, versions.env says $want." >&2
+    bad=1
+  fi
+done
+
+# The images that assert the versions they carry take them as build arguments
+# without a default (one source), and compose passes them from the environment
+# that scripts/build-all.sh exports from versions.env.
+for df in docker/gateway/Dockerfile docker/pqc-ca-custodian/Dockerfile docker/crl-renewer/Dockerfile docker/ocsp-pq/Dockerfile; do
+  if grep -qE '^ARG[[:space:]]+(OPENSSL|OPENRESTY)_VERSION=' "$ROOT_DIR/$df"; then
+    echo "ERROR: $df gives ARG OPENSSL_VERSION/OPENRESTY_VERSION a default; it must come from versions.env." >&2
+    bad=1
+  fi
+  if ! grep -q 'test -n "${OPENSSL_VERSION}"' "$ROOT_DIR/$df"; then
+    echo "ERROR: $df does not assert the OpenSSL version it carries." >&2
+    bad=1
+  fi
+done
+for v in OPENSSL_VERSION OPENRESTY_VERSION; do
+  if ! grep -qF "$v: \${$v:-}" "$ROOT_DIR/docker-compose.yml"; then
+    echo "ERROR: docker-compose.yml does not pass $v to the image builds." >&2
+    bad=1
+  fi
+done
+if ! grep -q 'docker/base/versions.env' "$ROOT_DIR/scripts/build-all.sh"; then
+  echo "ERROR: scripts/build-all.sh does not export docker/base/versions.env for compose." >&2
+  bad=1
+fi
+
 # Every build path must actually pass the value, or versions.env is decorative.
 for caller in scripts/build-all.sh scripts/fetch-base-image.sh; do
   if ! grep -q 'build-arg "OPENSSL_VERSION=' "$ROOT_DIR/$caller"; then

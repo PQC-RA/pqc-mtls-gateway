@@ -104,6 +104,8 @@ EOF
 pinned_api(){ sed -n 's/^  image: \(ghcr.io\/[^ ]*management-api@sha256:[0-9a-f]*\).*/\1/p' "$1/docker-compose.yml" | head -1; }
 build_img(){ # build_img TAG CONTEXT DOCKERFILE LOG
 	docker build -q -t "$1" --label org.opencontainers.image.revision=$COMMIT \
+		--build-arg "OPENSSL_VERSION=$(sed -n 's/^OPENSSL_VERSION=//p' "$SD/tree/docker/base/versions.env")" \
+		--build-arg "OPENRESTY_VERSION=$(sed -n 's/^OPENRESTY_VERSION=//p' "$SD/tree/docker/base/versions.env")" \
 		--build-arg BASE_OPENSSL_IMAGE=pqc-mtls-openssl-base:local --build-arg BASE_OPENRESTY_IMAGE=pqc-mtls-openresty-base:local \
 		-f "$3" "$2" > "$4" 2>&1 || { tail -20 "$4"; die "build of $1 failed (see $4)"; }
 }

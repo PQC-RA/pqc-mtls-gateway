@@ -1,6 +1,6 @@
 -- tls_telemetry.lua
 -- What the TLS handshake actually negotiated, read from the connection's own
--- SSL object (OpenSSL 3.6.2 via FFI), for the access log.
+-- SSL object (the gateway's OpenSSL, via FFI), for the access log.
 --
 -- Why not nginx variables alone: $ssl_curve returns the raw codepoint for the
 -- hybrid group ("0x11ec") because this nginx build has no name for it, and

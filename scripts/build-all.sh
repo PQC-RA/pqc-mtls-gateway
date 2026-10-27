@@ -8,6 +8,26 @@ cd "$ROOT_DIR"
 
 # The base binary artifacts (PQ OpenSSL tarball, nginx, njs modules) are NOT
 # committed to git. Build them from source on first run if they are missing.
+# Versions for every build below (compose passes them as build args; the images
+# assert them). One source: docker/base/versions.env.
+set -a; . docker/base/versions.env; set +a
+
+# A :local base image left from an earlier version is not reused: its tag is
+# dropped so the published image (if base.lock names this version) or a source
+# build replaces it.
+if docker image inspect pqc-mtls-openssl-base:local >/dev/null 2>&1 \
+	&& ! docker run --rm --entrypoint /opt/openssl/bin/openssl pqc-mtls-openssl-base:local version 2>/dev/null | grep -qF "OpenSSL ${OPENSSL_VERSION} "; then
+    echo "0. pqc-mtls-openssl-base:local is not OpenSSL ${OPENSSL_VERSION}; replacing it"
+    docker image rm pqc-mtls-openssl-base:local >/dev/null
+fi
+if docker image inspect pqc-mtls-openresty-base:local >/dev/null 2>&1 \
+	&& ! docker run --rm --entrypoint grep pqc-mtls-openresty-base:local -aqF "openresty/${OPENRESTY_VERSION}" /usr/sbin/nginx; then
+    # (the base image cannot run nginx: its runtime libraries come in the gateway
+    # image, so the version is read from the binary)
+    echo "0. pqc-mtls-openresty-base:local is not OpenResty ${OPENRESTY_VERSION}; replacing it"
+    docker image rm pqc-mtls-openresty-base:local >/dev/null
+fi
+
 if ! docker image inspect pqc-mtls-openssl-base:local >/dev/null 2>&1; then
     # First try the published, signed base: base.lock pins its digest, and the
     # OpenSSL install tree inside it is exactly what the long compile produces.
@@ -67,6 +87,11 @@ else
     fi
     OR_REF=$(printf '%s' "$OR_LOCK" | sed -n 's/.*"openresty_image"[^"]*"\([^"]*\)".*/\1/p')
     OR_DIG=$(printf '%s' "$OR_LOCK" | sed -n 's/.*"openresty_digest"[^"]*"\([^"]*\)".*/\1/p')
+    OR_VER=$(printf '%s' "$OR_LOCK" | sed -n 's/.*"openresty_version"[^"]*"\([^"]*\)".*/\1/p')
+    if [ -n "$OR_REF" ] && [ "$OR_VER" != "$OPENRESTY_VERSION" ]; then
+        echo "1b. base.lock names OpenResty ${OR_VER:-?}, versions.env ${OPENRESTY_VERSION}: not pulling it"
+        OR_REF=""; OR_DIG=""
+    fi
     # PQC_SKIP_OPENRESTY_PULL is the openresty counterpart of PQC_SKIP_BASE_PULL.
     # Without it this block pulled the published image even when the caller had
     # explicitly asked to test the openresty base a change produces.
@@ -79,7 +104,9 @@ else
         echo "1b. Pulled the published pqc-mtls-openresty-base"
     else
         echo "1b. Building pqc-mtls-openresty-base:local from source..."
-        docker build -t pqc-mtls-openresty-base:local docker/base/openresty/
+        docker build -t pqc-mtls-openresty-base:local \
+            --build-arg "OPENRESTY_VERSION=$OPENRESTY_VERSION" --build-arg "OPENRESTY_SHA256=$OPENRESTY_SHA256" \
+            docker/base/openresty/
     fi
 fi
 

@@ -15,7 +15,6 @@
 # below is not a duplicate of anything inside the binary, there is exactly one
 # OpenSSL in this image. The runtime ldd assertion further down proves the loader
 # actually binds it rather than Ubuntu's own libssl.
-ARG OPENRESTY_SHA256=b569c63b420f80a4ac8466f2deffe73ed93ab760026532e039c3658409a997f4
 ARG BASE_OPENSSL_IMAGE=pqc-mtls-openssl-base:local
 ARG BASE_OPENRESTY_IMAGE=pqc-mtls-openresty-base:local
 FROM ${BASE_OPENSSL_IMAGE} AS opensslbase
@@ -86,6 +85,20 @@ RUN set -eux; \
 	grep -q '/opt/openssl/lib64/libssl.so.3'    /tmp/ldd.txt; \
 	grep -q '/opt/openssl/lib64/libcrypto.so.3' /tmp/ldd.txt; \
 	rm -f /tmp/ldd.txt
+
+# The versions this image must carry, passed from docker/base/versions.env by every
+# build path (no default here: one source). A stale base image, pulled by an old
+# base.lock or kept as :local, fails the build here instead of shipping an older
+# nginx or OpenSSL under a new version file.
+ARG OPENRESTY_VERSION
+ARG OPENSSL_VERSION
+RUN set -eux; \
+	test -n "${OPENRESTY_VERSION}"; test -n "${OPENSSL_VERSION}"; \
+	/usr/sbin/nginx -v > /tmp/v.txt 2>&1; \
+	grep -qF "openresty/${OPENRESTY_VERSION}" /tmp/v.txt; \
+	/opt/openssl/bin/openssl version > /tmp/o.txt; \
+	grep -qF "OpenSSL ${OPENSSL_VERSION} " /tmp/o.txt; \
+	rm -f /tmp/v.txt /tmp/o.txt
 
 COPY gateway/entrypoint.sh /usr/local/bin/entrypoint.sh
 RUN chmod +x /usr/local/bin/entrypoint.sh
