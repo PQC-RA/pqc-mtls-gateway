@@ -797,3 +797,26 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
 	log("INFO", `pqc-ca-custodian listening on :${PORT} (CA_DIR=${CA_DIR}, renewal=${RENEWAL_ENABLED ? "on" : "off"}, demo profile=${DEMO_PROFILE_ENABLED ? "on" : "off"})`);
 });
+
+// Graceful stop. As PID 1, node ignores SIGTERM unless it is handled, so every
+// `docker stop` ended in SIGKILL after 10 s, possibly in the middle of a CA
+// mutation. Now: stop accepting requests, let the CA mutations already queued
+// finish (bounded below Docker's 10 s), then exit.
+let stopping = false;
+function shutdown(signal) {
+	if (stopping) return;
+	stopping = true;
+	log("INFO", `${signal}: no new requests; finishing CA work in progress`);
+	server.close();
+	const bound = setTimeout(() => {
+		log("WARN", "CA work still running after 8 s; exiting");
+		process.exit(1);
+	}, 8000);
+	bound.unref();
+	caChain.then(() => {
+		log("INFO", "CA work finished; exiting");
+		process.exit(0);
+	});
+}
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
