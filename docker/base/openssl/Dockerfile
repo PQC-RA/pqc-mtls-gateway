@@ -189,12 +189,16 @@ ENV PATH=/opt/openssl/bin:$PATH
 # Via files, not pipes: hadolint DL4006 wants `SHELL -o pipefail` before any
 # piped RUN, and this file already established the file-based pattern for the
 # PQ assertion in the build stage. Same reason, same shape.
+# The version comes from the build argument (docker/base/versions.env), so this
+# assertion follows a version bump instead of failing on a stale literal.
+ARG OPENSSL_VERSION
 RUN set -eux; \
+    test -n "${OPENSSL_VERSION}"; \
     test "$(command -v openssl)" = /opt/openssl/bin/openssl; \
     openssl version                   > /tmp/v.txt; \
     openssl list -signature-algorithms > /tmp/s.txt; \
     ldd /usr/bin/openssl               > /tmp/l.txt; \
-    grep -q 'OpenSSL 3\.6\.2'          /tmp/v.txt; \
+    grep -qF "OpenSSL ${OPENSSL_VERSION} " /tmp/v.txt; \
     grep -qi 'ml-dsa'                  /tmp/s.txt; \
     grep -q '/opt/openssl/lib64/libcrypto.so.3' /tmp/l.txt; \
     rm -f /tmp/v.txt /tmp/s.txt /tmp/l.txt
