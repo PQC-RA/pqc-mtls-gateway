@@ -115,7 +115,7 @@ import re, sys
 p, cust, api, rb = sys.argv[1:]
 s = open(p).read()
 s = re.sub(r"image: \S*ca-custodian:\S+", "image: " + cust, s)
-s = re.sub(r"image: \S*management-api:\S+", "image: " + api, s)
+s = re.sub(r"image: \S*management-api[:@]\S+", "image: " + api, s)
 s = s.replace("   - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro\n", f"   - {rb}/config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro\n")
 s = s.replace("   - ./config/nginx/lua:/etc/nginx/lua:ro\n", f"   - {rb}/config/nginx/lua:/etc/nginx/lua:ro\n")
 s = s.replace("   - ./docker/gateway/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro\n", f"   - {rb}/docker/gateway/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro\n")

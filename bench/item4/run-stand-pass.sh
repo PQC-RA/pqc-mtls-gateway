@@ -82,7 +82,7 @@ run unit-custodian       custodian_unit
 run unit-management-api  api_unit
 run e2e-renew            bash "$HERE/e2e-renew-stand.sh" "$W/e2e1";                 gap
 run e2e-failures         bash "$HERE/e2e-renew-stand-2.sh" "$W/e2e2";               gap
-run enroll-acceptance   env ENROLL_PORT=$STAND_ENROLL_PORT ADMIN_PORT=$STAND_TLS_PORT CA=$CA OLD_CA=$STAND_DIR/pki/enroll-classical-ca.crt PKI=$STAND_DIR/pki \
+run enroll-acceptance   env ENROLL8443_I_UNDERSTAND=1 ENROLL_PORT=$STAND_ENROLL_PORT ADMIN_PORT=$STAND_TLS_PORT CA=$CA OLD_CA=$STAND_DIR/pki/enroll-classical-ca.crt PKI=$STAND_DIR/pki \
 	ADMIN_CRT=$ADM_C ADMIN_KEY=$ADM_K LOG_DIR=$NGINX_LOGS CUSTODIAN=$CUST CN_PREFIX=pass-enroll- bash "$HERE/../test-enroll-8443.sh"; gap
 run enroll-reserve-on    bash "$HERE/enroll-reserve-commit-stand.sh" "$W/rc-on" demo-120s; gap
 switch off
