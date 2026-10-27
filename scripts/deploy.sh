@@ -112,29 +112,9 @@ echo "==> [1/9] Ensuring the PQ-OpenSSL base image..."
 # into the install branch, and the ln -sfn heals it. Probing the versioned path
 # instead would report "already installed" and leave every script that now says
 # /opt/openssl pointing at nothing.
+echo "==> [2/9] PQ OpenSSL on the host (scripts/install-host-openssl.sh)..."
+./scripts/install-host-openssl.sh
 OSSL="/opt/openssl/bin/openssl"
-if [[ -x "$OSSL" ]] && OPENSSL_CONF=/dev/null "$OSSL" list -signature-algorithms 2>/dev/null | grep -qi "ml-dsa"; then
-    echo "==> [2/9] PQ OpenSSL already at $OSSL (skip install)."
-else
-    # Copied straight out of the base image, with no tarball in between: going
-    # via one would mean copying this tree OUT of the image, gzipping it, and
-    # untarring it back, a round trip that only moves bytes from an image to a
-    # host.
-    echo "==> [2/9] Installing PQ OpenSSL to /opt (from the base image)..."
-    _cid=$(docker create pqc-mtls-openssl-base:local /bin/true)
-    docker cp "$_cid:/opt/openssl-${OPENSSL_VER}" /opt/
-    docker rm -f "$_cid" >/dev/null
-    # `docker cp` of the versioned directory does not carry its sibling symlink,
-    # exactly as `COPY --from` does not. The base image publishes /opt/openssl;
-    # this is the host-side equivalent, and without it every script and bench
-    # harness that addresses /opt/openssl breaks on a real host while passing in
-    # containers.
-    ln -sfn "/opt/openssl-${OPENSSL_VER}" /opt/openssl
-    echo "/opt/openssl/lib64" > /etc/ld.so.conf.d/00-pqc-openssl.conf
-    echo "/opt/openssl/lib"  >> /etc/ld.so.conf.d/00-pqc-openssl.conf
-    ldconfig
-    echo "    $(OPENSSL_CONF=/dev/null $OSSL version)  (/opt/openssl -> openssl-${OPENSSL_VER})"
-fi
 
 # ── Step 3: Bootstrap PKI ────────────────────────────────────────────────────
 # Always invoke setup-pki.sh, it is itself idempotent (root/intermediate CA

@@ -440,7 +440,10 @@ Everything this repository ships can be stood up and tested from a clean clone, 
 running deployment and without touching it:
 
 ```bash
-# root; docker with compose; an OpenSSL 3.5+ (found by scripts/lib/pq-openssl.sh)
+# a clean Ubuntu 24.04 (VM or LXC with nesting) is enough: root, git, docker with compose
+# (curl -fsSL https://get.docker.com | sh). An OpenSSL 3.5+ is installed from the base image
+# when the host has none (scripts/install-host-openssl.sh).
+sudo bench/images/build.sh                                            # test-only images
 sudo scripts/stand-up.sh /srv/pqc-stand mystand 29443 28443 23000
 source /srv/pqc-stand/stand.env
 sudo -E bash bench/item4/run-stand-pass.sh /srv/pqc-stand-pass        # renewal, revocation, rollback

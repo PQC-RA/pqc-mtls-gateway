@@ -39,6 +39,8 @@ SD=${1:?STAND_DIR}; P=${2:?PROJECT}; TP=${3:?TLS_PORT}; EP=${4:?ENROLL_PORT}; AP
 REPO=$(cd "$(dirname "$0")/.." && pwd); COMMIT=$(git -C "$REPO" rev-parse --short "${COMMIT:-HEAD}")
 FIRST_ITEM4=$(git -C "$REPO" log --format=%h --grep='^custodian: renewal profiles' "$COMMIT" | tail -1)
 ROLLBACK_COMMIT=$(git -C "$REPO" rev-parse --short "${ROLLBACK_COMMIT:-${FIRST_ITEM4}^}")
+# An OpenSSL 3.5+ on the host; on a clean host, the one deploy.sh would install.
+( . "$REPO/scripts/lib/pq-openssl.sh" ) >/dev/null 2>&1 || "$REPO/scripts/install-host-openssl.sh"
 . "$REPO/scripts/lib/pq-openssl.sh"
 LIVE_PROJECTS="${LIVE_PROJECTS:-pqc-gw pqc-mtls-gateway} $(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' pqc-gateway 2>/dev/null || true)"
 die(){ echo "stand-up: ABORT: $*" >&2; exit 1; }
