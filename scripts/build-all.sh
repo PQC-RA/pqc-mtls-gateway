@@ -21,7 +21,7 @@ if docker image inspect pqc-mtls-openssl-base:local >/dev/null 2>&1 \
     docker image rm pqc-mtls-openssl-base:local >/dev/null
 fi
 if docker image inspect pqc-mtls-openresty-base:local >/dev/null 2>&1 \
-	&& ! docker run --rm --entrypoint grep pqc-mtls-openresty-base:local -aqF "openresty/${OPENRESTY_VERSION}" /usr/sbin/nginx; then
+	&& ! docker run --rm --entrypoint grep pqc-mtls-openresty-base:local -aoE "openresty/[0-9.]+" /usr/sbin/nginx | grep -qxF "openresty/${OPENRESTY_VERSION}"; then
     # (the base image cannot run nginx: its runtime libraries come in the gateway
     # image, so the version is read from the binary)
     echo "0. pqc-mtls-openresty-base:local is not OpenResty ${OPENRESTY_VERSION}; replacing it"

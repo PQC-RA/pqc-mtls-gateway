@@ -93,9 +93,10 @@ RUN set -eux; \
 ARG OPENRESTY_VERSION
 ARG OPENSSL_VERSION
 RUN set -eux; \
-	test -n "${OPENRESTY_VERSION}"; test -n "${OPENSSL_VERSION}"; \
+	test -n "${OPENRESTY_VERSION}" && test -n "${OPENSSL_VERSION}" \
+		|| { echo "OPENRESTY_VERSION/OPENSSL_VERSION unset: build via scripts/build-all.sh (it passes docker/base/versions.env)" >&2; exit 1; }; \
 	/usr/sbin/nginx -v > /tmp/v.txt 2>&1; \
-	grep -qF "openresty/${OPENRESTY_VERSION}" /tmp/v.txt; \
+	grep -qE "openresty/${OPENRESTY_VERSION}\$" /tmp/v.txt; \
 	/opt/openssl/bin/openssl version > /tmp/o.txt; \
 	grep -qF "OpenSSL ${OPENSSL_VERSION} " /tmp/o.txt; \
 	rm -f /tmp/v.txt /tmp/o.txt

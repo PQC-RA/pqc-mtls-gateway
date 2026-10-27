@@ -17,7 +17,8 @@ EXPOSE 9080
 # The OpenSSL this image must carry, passed from docker/base/versions.env by every
 # build path (no default here: one source); a stale base image fails the build.
 ARG OPENSSL_VERSION
-RUN test -n "${OPENSSL_VERSION}" && /opt/openssl/bin/openssl version | grep -qF "OpenSSL ${OPENSSL_VERSION} "
+RUN test -n "${OPENSSL_VERSION}" || { echo "OPENSSL_VERSION unset: build via scripts/build-all.sh (it passes docker/base/versions.env)" >&2; exit 1; }; \
+	/opt/openssl/bin/openssl version > /tmp/o.txt && grep -qF "OpenSSL ${OPENSSL_VERSION} " /tmp/o.txt && rm -f /tmp/o.txt
 
 CMD ["/opt/openssl/bin/openssl", "ocsp", "-port", "9080", \
      "-index", "/etc/pki/pqc-ca/intermediate/db/index.txt", \

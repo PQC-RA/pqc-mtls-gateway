@@ -36,6 +36,7 @@ build_from_source() {
   # authoritative locally: two sources of truth that agree only by coincidence.
   docker build -t pqc-mtls-openssl-base:local \
     --build-arg "OPENSSL_VERSION=$OPENSSL_VER" \
+    --build-arg "OPENSSL_SHA256=$(sed -n 's/^OPENSSL_SHA256=//p' "$ROOT_DIR/docker/base/versions.env")" \
     "$ROOT_DIR/docker/base/openssl" \
     || skip "from-source build of docker/base failed"
   PULLED=0

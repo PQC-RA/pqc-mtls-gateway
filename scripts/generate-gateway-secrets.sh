@@ -38,7 +38,7 @@
 #
 # After running this script, rebuild the gateway image so the new public key
 # is embedded in the JWKS:
-#   docker compose build gateway
+#   scripts/build-all.sh   (or: set -a; . docker/base/versions.env; set +a; docker compose build gateway)
 #   docker compose up -d
 
 set -euo pipefail
@@ -175,5 +175,5 @@ echo "These files are gitignored.  Store them in your secrets manager or"
 echo "encrypted storage, DO NOT commit them to version control."
 echo ""
 echo "Next steps:"
-echo "  1. docker compose build gateway   # embeds JWKS from new key"
+echo "  1. scripts/build-all.sh   # rebuilds the gateway (embeds JWKS from the new key)"
 echo "  2. docker compose up -d"
