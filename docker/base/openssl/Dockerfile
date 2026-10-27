@@ -41,9 +41,9 @@
 # which turns a bare `docker build` into a loud failure instead of an image
 # that silently fetched "openssl-.tar.gz".
 ARG OPENSSL_VERSION
-ARG OPENSSL_SHA256=aaf51a1fe064384f811daeaeb4ec4dce7340ec8bd893027eee676af31e83a04f
+ARG OPENSSL_SHA256=a2157c2830efdec3788939b00c9b0638306d3f0bbb76dc4832ee503bb397df98
 
-FROM ubuntu:24.04@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90 AS build
+FROM ubuntu:24.04@sha256:24737cef17f4e22b1977df7d9a05e77c4e28b7da5b8911f8d8ccda136bf3573c AS build
 
 ARG OPENSSL_VERSION
 ARG OPENSSL_SHA256
@@ -114,7 +114,7 @@ RUN set -eux; \
     chmod -R 755 "/stage/opt/openssl-${OPENSSL_VERSION}"
 
 
-FROM ubuntu:24.04@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90
+FROM ubuntu:24.04@sha256:24737cef17f4e22b1977df7d9a05e77c4e28b7da5b8911f8d8ccda136bf3573c
 
 # NO `ARG OPENSSL_VERSION` here, deliberately: this stage never names a version.
 # It copies the whole of /stage/opt, which already carries both the versioned

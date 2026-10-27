@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# pqc-mtls-openresty-base, OpenResty 1.27.1.2 built once against the PQ OpenSSL base,
+# pqc-mtls-openresty-base, OpenResty 1.31.8.1 built once against the PQ OpenSSL base,
 # published to ghcr.io/pqc-ra/pqc-mtls-openresty-base.
 #
 # This is the same move already made for OpenSSL:
@@ -14,12 +14,12 @@
 # the gateway does. The configure flags below are lifted verbatim from
 # docker/gateway/Dockerfile so they cannot drift.
 ARG BASE_OPENSSL_IMAGE=pqc-mtls-openssl-base:local
-ARG OPENRESTY_VERSION=1.27.1.2
-ARG OPENRESTY_SHA256=74f076f7e364b2a99a6c5f9bb531c27610c78985abe956b442b192a2295f7548
+ARG OPENRESTY_VERSION=1.31.8.1
+ARG OPENRESTY_SHA256=b569c63b420f80a4ac8466f2deffe73ed93ab760026532e039c3658409a997f4
 
 FROM ${BASE_OPENSSL_IMAGE} AS opensslbase
 
-FROM ubuntu:24.04@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90 AS build
+FROM ubuntu:24.04@sha256:24737cef17f4e22b1977df7d9a05e77c4e28b7da5b8911f8d8ccda136bf3573c AS build
 
 ENV DEBIAN_FRONTEND=noninteractive
 ARG OPENRESTY_VERSION
@@ -101,7 +101,7 @@ RUN set -eux; \
 
 # Carrier stage: OpenResty only. No OpenSSL, no build toolchain, consumers
 # COPY --from this and take OpenSSL from pqc-mtls-openssl-base separately.
-FROM ubuntu:24.04@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90
+FROM ubuntu:24.04@sha256:24737cef17f4e22b1977df7d9a05e77c4e28b7da5b8911f8d8ccda136bf3573c
 
 COPY --from=build /usr/sbin/nginx      /usr/sbin/nginx
 COPY --from=build /usr/local/openresty /usr/local/openresty

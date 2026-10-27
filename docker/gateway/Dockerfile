@@ -2,7 +2,7 @@
 # The gateway now COMPILES NOTHING. Both heavy builds are published images:
 #
 #   pqc-mtls-openssl-base    PQ OpenSSL, compiled from a checksummed source
-#   pqc-mtls-openresty-base  OpenResty 1.27.1.2, linked against that OpenSSL
+#   pqc-mtls-openresty-base  OpenResty 1.31.8.1, linked against that OpenSSL
 #
 # "genuine build-once". Everything before this
 # only amortised the compile via a warm buildx cache.
@@ -15,14 +15,14 @@
 # below is not a duplicate of anything inside the binary, there is exactly one
 # OpenSSL in this image. The runtime ldd assertion further down proves the loader
 # actually binds it rather than Ubuntu's own libssl.
-ARG OPENRESTY_SHA256=74f076f7e364b2a99a6c5f9bb531c27610c78985abe956b442b192a2295f7548
+ARG OPENRESTY_SHA256=b569c63b420f80a4ac8466f2deffe73ed93ab760026532e039c3658409a997f4
 ARG BASE_OPENSSL_IMAGE=pqc-mtls-openssl-base:local
 ARG BASE_OPENRESTY_IMAGE=pqc-mtls-openresty-base:local
 FROM ${BASE_OPENSSL_IMAGE} AS opensslbase
 FROM ${BASE_OPENRESTY_IMAGE} AS openrestybase
 
 # ── Runtime stage ────────────────────────────────────────────────────────────
-FROM ubuntu:24.04@sha256:4fbb8e6a8395de5a7550b33509421a2bafbc0aab6c06ba2cef9ebffbc7092d90 AS runtime
+FROM ubuntu:24.04@sha256:24737cef17f4e22b1977df7d9a05e77c4e28b7da5b8911f8d8ccda136bf3573c AS runtime
 
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
