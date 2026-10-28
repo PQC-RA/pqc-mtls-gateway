@@ -26,23 +26,33 @@
 set -uo pipefail
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts/lib" && pwd)/pq-openssl.sh"; export OPENSSL=$O
 W=${1:?workdir}; HERE=$(cd "$(dirname "$0")" && pwd); TOOL="$HERE/../../scripts/ca-unique-subject.sh"
-LIVE=/etc/pki/pqc-ca/intermediate; STAND=${STAND_DIR:?source STAND_DIR/stand.env first}/pki/intermediate
+LIVE=${PROD_CA_DIR:-/etc/pki/pqc-ca/intermediate}; STAND=${STAND_DIR:?source STAND_DIR/stand.env first}/pki/intermediate
+# The rows to rehearse on: a copy of the production CA's on a host that has one
+# (hashed before and after); on a host built only for the stand, an empty CA
+# database, from which the steps below create every row they check.
+if [ -f "$LIVE/db/index.txt" ]; then SRC=$LIVE; SRCNAME=production; else SRC=""; SRCNAME="empty (no production CA on this host)"; fi
 [ -e "$W" ] && { echo "$W exists"; exit 2; }
 fail=0; step() { printf '\n== %s\n' "$*"; }
 ok() { echo "PASS: $*"; }; bad() { echo "FAIL: $*"; fail=$((fail+1)); }
-livehash() { sha256sum $LIVE/db/index.txt $LIVE/db/index.txt.attr $LIVE/db/serial $LIVE/db/crlnumber $LIVE/openssl-intermediate.cnf | cut -c1-16 | tr '\n' ' '; }
+livehash() { [ -n "$SRC" ] || { echo none; return; }; sha256sum $SRC/db/index.txt $SRC/db/index.txt.attr $SRC/db/serial $SRC/db/crlnumber $SRC/openssl-intermediate.cnf | cut -c1-16 | tr '\n' ' '; }
 L0=$(livehash)
 
 mkca() { # mkca DIR: scratch CA = stand key and certificate + copy of the live db
 	local s=$1; mkdir -p "$s"/{certs,private,db,issued,crl}; chmod 700 "$s/private"
 	cp $STAND/certs/intermediate-ca.crt "$s/certs/"; cp $STAND/private/intermediate-ca.key "$s/private/"
-	cp $LIVE/db/index.txt $LIVE/db/index.txt.attr $LIVE/db/serial $LIVE/db/crlnumber "$s/db/"
+	if [ -n "$SRC" ]; then
+		cp $SRC/db/index.txt $SRC/db/index.txt.attr $SRC/db/serial $SRC/db/crlnumber "$s/db/"
+	else
+		: > "$s/db/index.txt"; echo "unique_subject = yes" > "$s/db/index.txt.attr"
+		echo 2000 > "$s/db/serial"; echo 2000 > "$s/db/crlnumber"
+	fi
 	chown 1001:1001 "$s/db" "$s/db/index.txt" "$s/db/index.txt.attr" "$s/db/serial"; chmod 775 "$s/db"   # as live
 	sed -e "s#^dir[[:space:]]*=.*#dir               = $s#" \
 	    -e 's|^unique_subject[[:space:]]*=.*|unique_subject    = yes               # as live|' \
 	    $STAND/openssl-intermediate.cnf > "$s/openssl-intermediate.cnf"
 }
 S="$W/scratch"; mkca "$S"; C="$S/openssl-intermediate.cnf"
+echo "rows from: $SRCNAME${SRC:+ ($SRC)}"
 echo "scratch CA $S; live index copied: $(wc -l < "$S/db/index.txt") rows, attr: $(cat "$S/db/index.txt.attr")"
 cmp -s $STAND/certs/intermediate-ca.crt "$S/certs/intermediate-ca.crt" && ! cmp -s $LIVE/certs/intermediate-ca.crt "$S/certs/intermediate-ca.crt" \
 	&& ok "scratch signs with the STAND key, not live's" || { bad "key check"; exit 1; }

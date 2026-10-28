@@ -36,7 +36,7 @@ renew_one(){ # renew_one i: wait until past half of the lifetime, then renew onc
 	while [ "$(date +%s)" -lt $(( nb + 60 + 63 )) ]; do sleep 1; done
 	t0=$(date +%s.%N); bash "$HERE/renew-client.sh" --dir "$d" --url $ADMIN --resolve $STAND_HOST:$STAND_TLS_PORT:127.0.0.1 --once > "$d/renew.out" 2>&1; rc=$?; t1=$(date +%s.%N)
 	new=$($O x509 -in "$d/client.crt" -noout -serial | cut -d= -f2)
-	echo "lat-$TS-$1 $old $new $(echo "$t1 - $t0" | bc) $rc" >> "$W/client.tsv"
+	echo "lat-$TS-$1 $old $new $(python3 -c "import sys; print(round(float(sys.argv[2]) - float(sys.argv[1]), 3))" "$t0" "$t1") $rc" >> "$W/client.tsv"
 }
 # The enrollment endpoint allows 5 requests a minute per address (burst 3), so
 # one CN is enrolled every 12 s; each renews about 63 s after it was issued,
