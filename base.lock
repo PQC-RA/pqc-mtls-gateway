@@ -1,0 +1,10 @@
+{
+  "image": "ghcr.io/pqc-ra/pqc-mtls-openssl-base",
+  "digest": "sha256:321c0a2aa38893f3ea0c4652c1428de7873b84279bc166191d021b94967079ed",
+  "openssl_version": "3.6.5",
+  "openresty_image": "ghcr.io/pqc-ra/pqc-mtls-openresty-base",
+  "openresty_digest": "sha256:8f15aa4ccf6b7dfa93a4b30959317d4f97971b4702eb3fe426bdf549e4ca3b92",
+  "openresty_version": "1.31.8.1",
+  "builtFrom_sha": "16f03060a3100ea1fa29487ba4ad73714da761d9",
+  "created": "2026-10-28T08:49:09Z"
+}
