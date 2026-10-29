@@ -172,7 +172,9 @@ generate_internal_tls() {
     # leaf chains to the CA and is valid for 30 more days. A classical (RSA)
     # CA or leaf left by an earlier version is reissued: the old files are kept
     # once as *-rsa.* (rollback only, never a second ssl_certificate) and the
-    # new ones are written IN PLACE (write_in_place above).
+    # new ones are written IN PLACE (write_in_place above). The RSA CA key copy
+    # (internal-tls-ca-rsa.key) belongs in the encrypted keys set (ADR-018) and
+    # off this host once the rollback window is over.
     INT_TLS_DIR="$PKI_DIR/internal-tls"
     local ca_crt="$PKI_DIR/internal-tls-ca.crt" ca_key="$INT_TLS_DIR/internal-tls-ca.key"
     local leaf_crt="$SSL_DIR/internal-tls.crt" leaf_key="$SSL_DIR/internal-tls.key"
@@ -240,6 +242,8 @@ CNF
     local tmp
     tmp=$(mktemp -d "$INT_TLS_DIR/.reissue.XXXXXX")
     chmod 700 "$tmp"
+    # Private keys live in $tmp until installed: removed on any exit.
+    trap 'rm -rf "'"$tmp"'"' EXIT
 
     if [ "$reissue_ca" = 1 ]; then
         echo "==> Internal service-mesh TLS CA (ML-DSA-65)"
@@ -263,6 +267,14 @@ CNF
         -out "$tmp/leaf.crt"
     OPENSSL_CONF=/dev/null "$OPENSSL" verify -CAfile "$tmp/ca.crt" "$tmp/leaf.crt" >/dev/null \
         || { echo "ERROR: new :8081 leaf does not verify against the new internal CA" >&2; exit 1; }
+    # Each key must match its certificate before anything is installed, so a
+    # failure can never leave a mismatched pair for the next reload.
+    local k c
+    for k in ca leaf; do
+        c=$(OPENSSL_CONF=/dev/null "$OPENSSL" x509 -in "$tmp/$k.crt" -noout -pubkey)
+        [ "$c" = "$(OPENSSL_CONF=/dev/null "$OPENSSL" pkey -in "$tmp/$k.key" -pubout)" ] \
+            || { echo "ERROR: $k key and certificate do not match" >&2; exit 1; }
+    done
 
     # Install: keys first (600), then certificates (644), all in place.
     if [ "$reissue_ca" = 1 ]; then
@@ -272,6 +284,7 @@ CNF
     write_in_place "$tmp/leaf.key" "$leaf_key"; chmod 600 "$leaf_key"
     write_in_place "$tmp/leaf.crt" "$leaf_crt"
     rm -rf "$tmp"
+    trap - EXIT
     echo "    internal CA $(cert_key_alg "$ca_crt"), :8081 leaf $(cert_key_alg "$leaf_crt")"
     echo "    Reload the gateway (nginx -s reload) and restart management-api: Node reads"
     echo "    NODE_EXTRA_CA_CERTS only at start."

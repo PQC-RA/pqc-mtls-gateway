@@ -97,8 +97,9 @@ if ! (
     pin=$("$O" pkey -in "$ADMIN_V2_KEY_FILE" -pubout -outform DER | tail -c 1952 | sha256sum | cut -d' ' -f1)
     echo "  admin-v2 public key SHA-256 (management-api ADMIN_V2_PUB_SHA256): $pin"
 ); then
-    echo "WARN: no ML-DSA-65 admin key (admin-v2): no OpenSSL 3.5+ found. The gateway" >&2
-    echo "      runs with admin-v1; install one (scripts/install-host-openssl.sh) and re-run." >&2
+    echo "WARN: no ML-DSA-65 admin key (admin-v2): no OpenSSL 3.5+ found. docker-compose.yml" >&2
+    echo "      names this key as a secret, so the stack will not start without it: install" >&2
+    echo "      one (scripts/install-host-openssl.sh) and re-run this script." >&2
 fi
 
 LOOKUP_KEY_FILE="$SECRETS_DIR/gateway-signing-key-lookup.key"

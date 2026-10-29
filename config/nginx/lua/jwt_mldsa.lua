@@ -33,6 +33,7 @@ local cjson = require("cjson.safe")
 require("jwt_rs256")
 local function cdef(decl) pcall(ffi.cdef, decl) end
 cdef("void OPENSSL_cleanse(void *ptr, size_t len);")
+cdef("void ERR_clear_error(void);")
 cdef("typedef struct bio_st BIO;")
 cdef("BIO *BIO_new_mem_buf(const void *buf, int len);")
 cdef("int BIO_free(BIO *a);")
@@ -60,9 +61,16 @@ local function b64url(s)
     return (ngx.encode_base64(s):gsub("+", "-"):gsub("/", "_"):gsub("=", ""))
 end
 
+-- Failure paths leave entries on OpenSSL's per-thread error queue; clear them
+-- so they do not surface later in an unrelated SSL error line.
+local function fail(msg)
+    crypto.ERR_clear_error()
+    return nil, msg
+end
+
 local function load_key(pem_key)
     if type(pem_key) ~= "string" or #pem_key == 0 then
-        return nil, "pem_key must be a non-empty string"
+        return fail("pem_key must be a non-empty string")
     end
     local pem_len = #pem_key
     local pem_buf = ffi.new("unsigned char[?]", pem_len)
@@ -70,17 +78,17 @@ local function load_key(pem_key)
     local bio = crypto.BIO_new_mem_buf(pem_buf, pem_len)
     if bio == nil then
         crypto.OPENSSL_cleanse(pem_buf, pem_len)
-        return nil, "BIO_new_mem_buf failed"
+        return fail("BIO_new_mem_buf failed")
     end
     local pkey = crypto.PEM_read_bio_PrivateKey(bio, nil, nil, nil)
     crypto.BIO_free(bio)
     crypto.OPENSSL_cleanse(pem_buf, pem_len)
     if pkey == nil then
-        return nil, "PEM_read_bio_PrivateKey failed (invalid PEM?)"
+        return fail("PEM_read_bio_PrivateKey failed (invalid PEM?)")
     end
     if crypto.EVP_PKEY_is_a(pkey, ALG) ~= 1 then
         crypto.EVP_PKEY_free(pkey)
-        return nil, "the key is not an " .. ALG .. " key"
+        return fail("the key is not an " .. ALG .. " key")
     end
     return pkey
 end
@@ -91,19 +99,19 @@ local function raw_sign(pkey, tbs)
     if ctx == nil then return nil, "EVP_MD_CTX_new failed" end
     if crypto.EVP_DigestSignInit(ctx, nil, nil, nil, pkey) ~= 1 then
         crypto.EVP_MD_CTX_free(ctx)
-        return nil, "EVP_DigestSignInit failed"
+        return fail("EVP_DigestSignInit failed")
     end
     local siglen = ffi.new("size_t[1]", 0)
     if crypto.EVP_DigestSign(ctx, nil, siglen, tbs, #tbs) ~= 1 then
         crypto.EVP_MD_CTX_free(ctx)
-        return nil, "EVP_DigestSign (size query) failed"
+        return fail("EVP_DigestSign (size query) failed")
     end
     local sig = ffi.new("unsigned char[?]", siglen[0])
     local rc = crypto.EVP_DigestSign(ctx, sig, siglen, tbs, #tbs)
     crypto.EVP_MD_CTX_free(ctx)
-    if rc ~= 1 then return nil, "EVP_DigestSign failed" end
+    if rc ~= 1 then return fail("EVP_DigestSign failed") end
     if tonumber(siglen[0]) ~= SIG_LEN then
-        return nil, "signature is " .. tostring(siglen[0]) .. " bytes, not " .. SIG_LEN
+        return fail("signature is " .. tostring(siglen[0]) .. " bytes, not " .. SIG_LEN)
     end
     return ffi.string(sig, siglen[0])
 end
@@ -114,6 +122,7 @@ local function raw_verify(pkey, tbs, sig)
     local ok = crypto.EVP_DigestVerifyInit(ctx, nil, nil, nil, pkey) == 1
         and crypto.EVP_DigestVerify(ctx, sig, #sig, tbs, #tbs) == 1
     crypto.EVP_MD_CTX_free(ctx)
+    if not ok then crypto.ERR_clear_error() end
     return ok
 end
 

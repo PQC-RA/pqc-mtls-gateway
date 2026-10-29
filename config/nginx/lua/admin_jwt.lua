@@ -98,13 +98,13 @@ if not fpr then
     return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
 end
 
-local meta = ngx.shared.pqc_route_meta
-local kid  = meta:get("admin_jwt_kid") or "admin-v1"
+local signer = require("admin_signer")
+local kid    = signer.kid
 local pem
 if kid == "admin-v2" then
-    pem = meta:get("jwt_key_admin_v2")
+    pem = signer.v2_pem
 elseif kid == "admin-v1" then
-    pem = meta:get("jwt_key_admin")
+    pem = ngx.shared.pqc_route_meta:get("jwt_key_admin")
 end
 if not pem then
     ngx.log(ngx.ERR, "[admin_jwt] signing key for ", tostring(kid), " absent from shared dict, refusing to proxy")

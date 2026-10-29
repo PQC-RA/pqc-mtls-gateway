@@ -48,8 +48,9 @@ fi
 #   admin-v2  ML-DSA-65, /run/secrets/gateway-signing-key-admin-v2, published as
 #             {"kty":"AKP","alg":"ML-DSA-65","kid":"admin-v2","pub":...}
 # ADMIN_JWKS_KIDS lists the admin kids the JWKS publishes. Unset: admin-v1, plus
-# admin-v2 when its key file exists (an upgrade without the new key changes
-# nothing). The end state is ADMIN_JWKS_KIDS=admin-v2. The kid that signs must
+# admin-v2 when its key file exists (with docker-compose.yml the file must
+# exist, it is a declared secret; signing stays admin-v1 until ADMIN_JWT_KID
+# says otherwise). The end state is ADMIN_JWKS_KIDS=admin-v2. The kid that signs must
 # be published, or management-api could not verify a single admin token.
 KEY_SECRET_ADMIN_V2=/run/secrets/gateway-signing-key-admin-v2
 ADMIN_JWT_KID="${ADMIN_JWT_KID:-admin-v1}"

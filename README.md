@@ -681,9 +681,10 @@ migration inventory) needs OpenSSL 3.5 or later; Node 22 has it. Order, each ste
    plus `GATEWAY_TLS_LEAF_ALG=ML-DSA-65` on management-api. From then on a rollback to RS256 needs
    management-api reconfigured first.
 
-Without these variables nothing changes: the gateway signs `admin-v1` and publishes `admin-v2`
-beside it only if its key exists. The compose file names the new key as a Docker secret, so run
-`scripts/generate-gateway-secrets.sh` once before `docker compose up`.
+Without these variables the admin token stays `admin-v1` (the JWKS gains the `admin-v2` entry,
+which a management-api that does not accept it ignores). The compose file names the new key as a
+Docker secret, so run `scripts/generate-gateway-secrets.sh` once before `docker compose up`, or
+the stack does not start. `/admin/` is now rate-limited per client certificate (20/s, burst 50).
 
 A deployment made before this release needs these steps beyond `deploy.sh`:
 
