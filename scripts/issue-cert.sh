@@ -28,6 +28,10 @@
 #   PQC_ENROLL_URL       Enrollment endpoint           (default: https://<PQC_GATEWAY host>:8443/enroll;
 #                         set it for a gateway published on non-default ports)
 #   ENROLLMENT_TOKEN     Pre-issued enrollment token   (if set, skips admin step)
+#   PROFILE              Profile of the token the admin step creates (default: legacy,
+#                        the CERT_VALIDITY_DAYS certificate). This script installs no
+#                        renewal client, so client-30d only makes sense if the client
+#                        runs bench/item4/renew-client.sh or its own renewal.
 #   PQC_ADMIN_CERT       Admin client cert             (required only without ENROLLMENT_TOKEN)
 #   PQC_ADMIN_KEY        Admin client key              (required only without ENROLLMENT_TOKEN)
 #   PQC_OUT_DIR          Where to save artifacts       (default: ./certs/<cn>)
@@ -372,12 +376,15 @@ else
     echo "    (requires admin cert/key, set ENROLLMENT_TOKEN=<token> to skip this step)"
 
     ENCODED_CN=$(python3 -c "import urllib.parse; print(urllib.parse.quote('$CN'))")
+    PROFILE="${PROFILE:-legacy}"
+    case "$PROFILE" in legacy|client-30d|demo-120s) ;; *) echo "ERROR: PROFILE must be legacy, client-30d or demo-120s"; exit 1;; esac
+    echo "    profile: $PROFILE"
 
     if ! has_pq_curl; then
         TOKEN_RESP=$(_pq_https POST \
-            "$GW/admin/certs/enrollment-tokens?cn=${ENCODED_CN}&ttl=300" "" 1)
+            "$GW/admin/certs/enrollment-tokens?cn=${ENCODED_CN}&ttl=300&profile=${PROFILE}" "" 1)
     elif ! TOKEN_RESP=$($CURL_ADMIN -X POST \
-            "$GW/admin/certs/enrollment-tokens?cn=${ENCODED_CN}&ttl=300" \
+            "$GW/admin/certs/enrollment-tokens?cn=${ENCODED_CN}&ttl=300&profile=${PROFILE}" \
             -w "\n%{http_code}" 2>&1); then
         echo "ERROR: curl failed connecting to $GW"
         echo "$TOKEN_RESP"

@@ -288,8 +288,12 @@ An admin pre-issues a CN-constrained token out-of-band:
 ```bash
 curl -sk --cacert $CA_CHAIN --cert $ADMIN_CERT --key $ADMIN_KEY -H "X-PQC-CSRF: 1" \
   -X POST "https://<server>/admin/certs/enrollment-tokens?cn=<cn>&ttl=86400"
-# → { "token": "enroll_...", "expiresAt": ..., "allowedCn": "<cn>" }
+# → { "token": "enroll_...", "expiresAt": ..., "allowedCn": "<cn>", "profile": "legacy" }
 ```
+
+Without `&profile=` the token follows `DEFAULT_ENROLLMENT_PROFILE`. A client that does not
+renew its own certificate needs `&profile=legacy`; with `client-30d` it stops working after
+30 days unless it renews (see "Renewing client certificates").
 
 The operator then enrolls autonomously against port 8443, with no mTLS client certificate:
 
@@ -344,6 +348,11 @@ gateway.
 ## Renewing client certificates
 
 Off by default; on with `RENEWAL_ENABLED=1` in `.env` (custodian and management-api).
+With `DEFAULT_ENROLLMENT_PROFILE=client-30d` an enrollment token created without
+`?profile=` issues the renewable 30-day certificate; `?profile=legacy` still issues the
+`CERT_VALIDITY_DAYS` certificate (365 days by default) for a client that cannot renew.
+`scripts/issue-cert.sh` and `scripts/request-client-cert.sh` ask for `legacy` unless
+`PROFILE=` says otherwise, because they install no renewal client.
 A client then renews its own certificate over mTLS, without an administrator:
 
 - **`POST /renew`** on the mTLS listener. The gateway checks the client's current

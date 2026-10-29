@@ -9,6 +9,10 @@ API_BASE=${API_BASE:-http://127.0.0.1:3000}
 # /api/admin/; this script talks to the API directly, so it spells it out.
 API_ROOT="${API_BASE}/api"
 TTL_SECONDS=${TTL_SECONDS:-3600}
+# Token profile: legacy (CERT_VALIDITY_DAYS certificate) unless the caller renews on its own
+# (client-30d needs a renewal client such as bench/item4/renew-client.sh).
+PROFILE=${PROFILE:-legacy}
+case "$PROFILE" in legacy|client-30d|demo-120s) ;; *) echo "PROFILE must be legacy, client-30d or demo-120s" >&2; exit 1;; esac
 OUT_DIR=${OUT_DIR:-$PWD/client-cert-artifacts}
 COUNTRY=${COUNTRY:-BG}
 ORG=${ORG:-ACME Corp}
@@ -87,7 +91,7 @@ echo "[2/6] Generating ML-DSA-65 key and CSR for CN=${CN}..."
 
 echo "[3/6] Requesting enrollment token..."
 curl -fsS -X POST \
-  "${API_ROOT}/admin/certs/enrollment-tokens?cn=${CN}&ttl=${TTL_SECONDS}" \
+  "${API_ROOT}/admin/certs/enrollment-tokens?cn=${CN}&ttl=${TTL_SECONDS}&profile=${PROFILE}" \
   > "$TOKEN_RESPONSE_PATH"
 
 # Values are passed via the environment and read with os.environ so the shell
