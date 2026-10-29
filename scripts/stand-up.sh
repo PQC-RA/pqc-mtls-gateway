@@ -168,6 +168,7 @@ services:
    - /etc/pki/pqc-empty:/etc/pki/pqc-ca/intermediate/private:ro
    - /etc/pki/pqc-empty:/etc/pki/pqc-ca/ocsp:ro
    - /etc/pki/pqc-empty:/etc/pki/pqc-ca/root/private:ro
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/internal-tls:ro
    - $SD/ssl:/etc/ssl/pqc:ro
    - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
    - ./config/nginx/security-headers.conf:/etc/nginx/security-headers.conf:ro
@@ -188,6 +189,7 @@ services:
    - $SD/pki:/etc/pki/pqc-ca:ro
    - /etc/pki/pqc-empty:/etc/pki/pqc-ca/root/private:ro
    - /etc/pki/pqc-empty:/etc/pki/pqc-ca/intermediate/private:ro
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/internal-tls:ro
  pki-dist:
   image: $IMG_PKIDIST
   pull_policy: never
@@ -200,6 +202,7 @@ services:
    - $SD/pki:/etc/pki/pqc-ca:rw
    - /etc/pki/pqc-empty:/etc/pki/pqc-ca/ocsp:ro
    - /etc/pki/pqc-empty:/etc/pki/pqc-ca/root/private:ro
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/internal-tls:ro
    - ./scripts/pqc-crl-renew.sh:/usr/local/bin/pqc-crl-renew.sh:ro
    - pqc-www-pki:/var/www/pki:rw
    - pqc-logs-crl:/var/log/pqc-gw:rw
@@ -210,6 +213,9 @@ services:
   container_name: $P-ca-custodian
   volumes: !override
    - $SD/pki:/etc/pki/pqc-ca:rw
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/ocsp:ro
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/root/private:ro
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/internal-tls:ro
    - ./secrets/custodian-hmac.key:/run/secrets/custodian-hmac:ro
  mgmt-volume-init:
   container_name: $P-mgmt-volume-init

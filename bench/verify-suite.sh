@@ -216,6 +216,13 @@ else
     else
       echo "     ==> PASS: root-ca.key not readable"
     fi
+    # The internal TLS CA key (ADR-022): whoever holds it can impersonate the
+    # :8081 control plane to management-api. No container needs it.
+    if docker exec "$c" sh -c "ls /etc/pki/pqc-ca/internal-tls/ 2>/dev/null | grep -q ." 2>/dev/null; then
+      fail "$c sees files under /etc/pki/pqc-ca/internal-tls (internal TLS CA key not masked)"
+    else
+      echo "     ==> PASS: internal-tls/ masked (empty)"
+    fi
   done
 fi
 

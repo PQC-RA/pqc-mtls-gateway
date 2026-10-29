@@ -79,8 +79,12 @@ else
     echo "  Written: $ADMIN_KEY_FILE"
 fi
 
-# ── RSA-2048 lookup JWT signing key (Key C, aud=pqc-cert-lookup) ────
+# ── ML-DSA-65 admin JWT signing key (Key A, kid admin-v2, ADR-022) ───────────
+# docker-compose.yml names it as a Docker secret, so the stack does not start
+# without it, whether or not the gateway signs with it yet. Failing here, with
+# the reason, is clearer than compose's "secret file not found" later.
 ADMIN_V2_KEY_FILE="$SECRETS_DIR/gateway-signing-key-admin-v2.key"
+ADMIN_V2_FAILED=0
 # Run in a subshell: pq-openssl.sh exits when it finds no OpenSSL 3.5+, and that
 # must stop only this key, with a clear message, not the RSA/HMAC secrets.
 if ! (
@@ -97,11 +101,10 @@ if ! (
     pin=$("$O" pkey -in "$ADMIN_V2_KEY_FILE" -pubout -outform DER | tail -c 1952 | sha256sum | cut -d' ' -f1)
     echo "  admin-v2 public key SHA-256 (management-api ADMIN_V2_PUB_SHA256): $pin"
 ); then
-    echo "WARN: no ML-DSA-65 admin key (admin-v2): no OpenSSL 3.5+ found. docker-compose.yml" >&2
-    echo "      names this key as a secret, so the stack will not start without it: install" >&2
-    echo "      one (scripts/install-host-openssl.sh) and re-run this script." >&2
+    ADMIN_V2_FAILED=1
 fi
 
+# ── RSA-2048 lookup JWT signing key (Key C, aud=pqc-cert-lookup) ────
 LOOKUP_KEY_FILE="$SECRETS_DIR/gateway-signing-key-lookup.key"
 if [ -f "$LOOKUP_KEY_FILE" ]; then
     echo "SKIP: $LOOKUP_KEY_FILE already exists (delete it first to regenerate)"
@@ -202,6 +205,19 @@ echo "Secrets ready in $SECRETS_DIR/"
 echo "These files are gitignored.  Store them in your secrets manager or"
 echo "encrypted storage, DO NOT commit them to version control."
 echo ""
+echo "Private keys that belong in the encrypted keys set (ADR-018), never in a"
+echo "state backup: every *.key above, and from scripts/setup-pki.sh the internal"
+echo "TLS CA key(s) under <PKI_DIR>/internal-tls/ and the :8081 keys"
+echo "<SSL_DIR>/internal-tls*.key. A new gateway-signing-key-admin-v2.key and a new"
+echo "ML-DSA-65 internal CA join that set in the same update."
+echo ""
+if [ "$ADMIN_V2_FAILED" = 1 ]; then
+    echo "ERROR: $ADMIN_V2_KEY_FILE was not created: no OpenSSL 3.5+ (ML-DSA-65) found." >&2
+    echo "       docker-compose.yml names it as a Docker secret, so the stack will not start" >&2
+    echo "       without it. Install one (scripts/install-host-openssl.sh, or set OSSL to an" >&2
+    echo "       OpenSSL 3.5+ binary) and run this script again; existing keys are kept." >&2
+    exit 1
+fi
 echo "Next steps:"
-echo "  1. scripts/build-all.sh   # rebuilds the gateway (embeds JWKS from the new key)"
+echo "  1. scripts/check-secrets.sh   # every file docker-compose.yml needs is present"
 echo "  2. docker compose up -d"

@@ -662,29 +662,63 @@ Responses that take longer than 60 seconds in total and straddle a reload are
 cut; change the value in `nginx.conf` if you serve such responses. The
 crl-renewer now signals a reload only when a published CRL actually changed.
 
-**Admin token and `:8081` to ML-DSA-65 (ADR-022, off until switched).** The admin token
-(`/admin/` only) can be signed with ML-DSA-65 (RFC 9964, kid `admin-v2`) instead of RS256
-(`admin-v1`), and carries `jti`, `htm` and `htu`: management-api accepts each token once, for
-the method and path it was minted for. The internal TLS CA and the `:8081` certificate become
-ML-DSA-65 (`setup-pki.sh` reissues them in place; the RSA ones stay on disk as
-`internal-tls-ca-rsa.crt` and `internal-tls-rsa.{crt,key}` for rollback only) and `:8081` takes
+**Admin token and `:8081` to ML-DSA-65 (ADR-022).** The admin token (`/admin/` only) can be
+signed with ML-DSA-65 (RFC 9964, kid `admin-v2`) instead of RS256 (`admin-v1`), and carries
+`jti`, `htm` and `htu`: management-api accepts each token once, for the method and path it was
+minted for. The internal TLS CA and the `:8081` certificate move to ML-DSA-65, and `:8081` takes
 TLS 1.3 with X25519MLKEM768 only, so a client of `:8081` (management-api, `bench/policy.sh`, the
-migration inventory) needs OpenSSL 3.5 or later; Node 22 has it. Order, each step reversible:
+migration inventory) needs OpenSSL 3.5 or later; Node 22 has it.
+
+- **New deployment:** the internal CA and `:8081` are ML-DSA-65 from the start; the admin token
+  stays `admin-v1` until `ADMIN_JWT_KID` says otherwise.
+- **Existing deployment (RSA internal CA):** nothing changes by itself. `setup-pki.sh` and
+  `deploy.sh` leave an RSA internal CA in place and print a warning, because management-api pins
+  that CA (`NODE_EXTRA_CA_CERTS`, read only at start): a CA swapped under a running
+  management-api makes every JWKS fetch fail, so every `/admin/` call answers 401 and route
+  pushes fail. The move is the explicit, ordered steps below.
+- **The trust file is a bundle during the move.** `REISSUE_INTERNAL_CA=1 scripts/setup-pki.sh`
+  creates the ML-DSA-65 CA and leaf next to the RSA ones (`internal-tls-ca-mldsa.crt`,
+  `internal-tls-mldsa.{crt,key}`; the RSA ones are kept as `internal-tls-ca-rsa.crt` and
+  `internal-tls-rsa.{crt,key}`) and writes `internal-tls-ca.crt`, the file management-api pins,
+  in place as a bundle of both CAs. `:8081` keeps serving the RSA leaf. Once management-api has
+  started on the bundle, `scripts/internal-tls-switch.sh mldsa` and `... rsa` switch the served
+  leaf with a gateway reload only, no management-api restart. The switch refuses while
+  management-api still runs on a CA set older than the bundle.
+
+Order (each step has its rollback):
 
 1. `scripts/generate-gateway-secrets.sh` (adds only `gateway-signing-key-admin-v2.key` and prints
-   the SHA-256 of its public key) and `scripts/setup-pki.sh` (reissues the internal CA and leaf);
-   reload the gateway, restart management-api (Node reads `NODE_EXTRA_CA_CERTS` only at start).
-2. management-api first: `JWT_EXPECTED_KID=admin-v1,admin-v2` and `ADMIN_V2_PUB_SHA256=<hash>`.
-3. Gateway: `ADMIN_JWT_KID=admin-v2` (recreate the container: nginx reads it at start).
+   the SHA-256 of its public key; it stops with an error if it cannot, and
+   `scripts/check-secrets.sh` names any secret file compose would miss) and
+   `REISSUE_INTERNAL_CA=1 scripts/setup-pki.sh`. The new key, the ML-DSA-65 internal CA key and
+   the `:8081` keys join the encrypted keys set together. Rollback: none needed, nothing running
+   reads the new files yet.
+2. management-api: `JWT_EXPECTED_KID=admin-v1,admin-v2` and `ADMIN_V2_PUB_SHA256=<hash>`, and
+   recreate it (it now trusts both CAs). Rollback: the previous variables; the bundle stays.
+3. `scripts/internal-tls-switch.sh mldsa` (gateway reload). Rollback:
+   `scripts/internal-tls-switch.sh rsa`.
+4. Gateway: `ADMIN_JWT_KID=admin-v2` (recreate the container: nginx reads it at start).
    Rollback: `ADMIN_JWT_KID=admin-v1`.
-4. After the dual window: `ADMIN_JWKS_KIDS=admin-v2` on the gateway and `JWT_EXPECTED_KID=admin-v2`
-   plus `GATEWAY_TLS_LEAF_ALG=ML-DSA-65` on management-api. From then on a rollback to RS256 needs
+5. After the dual window: `ADMIN_JWKS_KIDS=admin-v2` on the gateway; `JWT_EXPECTED_KID=admin-v2`
+   and `GATEWAY_TLS_LEAF_ALG=ML-DSA-65` on management-api (JWKS fetch, cert lookup and route push
+   then accept only an ML-DSA-65 `:8081` certificate); `scripts/internal-tls-switch.sh drop-rsa`,
+   then recreate management-api. From then on a rollback to RS256 or to the RSA `:8081` needs
    management-api reconfigured first.
 
-Without these variables the admin token stays `admin-v1` (the JWKS gains the `admin-v2` entry,
-which a management-api that does not accept it ignores). The compose file names the new key as a
-Docker secret, so run `scripts/generate-gateway-secrets.sh` once before `docker compose up`, or
-the stack does not start. `/admin/` is now rate-limited per client certificate (20/s, burst 50).
+Two properties to know during the window. The `jti` single-use cache is in management-api's
+memory: a restart empties it, so a token captured on the gateway-to-API hop less than 60 s before
+a restart can be replayed once after it. And management-api accepts `admin-v1` tokens without
+`jti`, `htm` and `htu` (it checks them when present), so a gateway rolled back to code from
+before this release keeps working; with `JWT_EXPECTED_KID=admin-v2` that ends.
+
+The compose file names the new key as a Docker secret, so run
+`scripts/generate-gateway-secrets.sh` once before `docker compose up`, or the stack does not
+start. `/admin/` is now rate-limited per client certificate (20/s, burst 50). The internal TLS CA
+keys (`internal-tls/`) are now masked in every container that mounts the CA tree. The gateway
+logs `[cert-expiry] WARN` within 30 days of the end of a certificate it serves (`:8081` and
+`:443`/`:8443` are issued for 365 days and not renewed automatically);
+`scripts/check-cert-expiry.sh` does the same check on the host, with an exit status. Renew the
+`:8081` leaf with `RENEW_INTERNAL_LEAF=1 scripts/setup-pki.sh` and a gateway reload.
 
 A deployment made before this release needs these steps beyond `deploy.sh`:
 

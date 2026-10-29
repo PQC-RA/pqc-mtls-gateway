@@ -144,6 +144,33 @@ RELOAD_STATE=/tmp/.reload-nginx-last-mtime
     done
 ) &
 
+# ── Certificate expiry warning ────────────────────────────────────────────────
+# Nothing renews the gateway's own server certificates automatically (the :8081
+# internal-tls leaf and the :443/:8443 server certificate are issued for 365
+# days by scripts/setup-pki.sh). So say it, in this container's log, at start
+# and every CERT_EXPIRY_CHECK_S seconds: WARN within CERT_EXPIRY_WARN_DAYS of
+# the end, ERROR once expired. scripts/check-cert-expiry.sh is the same check
+# for the host (exit status for monitoring).
+CERT_EXPIRY_WARN_DAYS="${CERT_EXPIRY_WARN_DAYS:-30}"
+CERT_EXPIRY_CHECK_S="${CERT_EXPIRY_CHECK_S:-21600}"
+(
+    set +e
+    while true; do
+        for crt in $(sed -n 's/^[[:space:]]*ssl_certificate[[:space:]]\+\([^;[:space:]]*\);.*/\1/p' /etc/nginx/nginx.conf | sort -u); do
+            [ -f "$crt" ] || continue
+            end=$(OPENSSL_CONF=/dev/null /opt/openssl/bin/openssl x509 -in "$crt" -noout -enddate 2>/dev/null | sed 's/notAfter=//')
+            [ -n "$end" ] || { echo "[cert-expiry] ERROR: cannot read $crt" >&2; continue; }
+            days=$(( ($(date -d "$end" +%s) - $(date +%s)) / 86400 ))
+            if ! OPENSSL_CONF=/dev/null /opt/openssl/bin/openssl x509 -in "$crt" -noout -checkend 0 >/dev/null 2>&1; then
+                echo "[cert-expiry] ERROR: $crt EXPIRED on $end; renew it (README, certificate renewal)" >&2
+            elif ! OPENSSL_CONF=/dev/null /opt/openssl/bin/openssl x509 -in "$crt" -noout -checkend $((CERT_EXPIRY_WARN_DAYS * 86400)) >/dev/null 2>&1; then
+                echo "[cert-expiry] WARN: $crt ends $end, in $days days; renew it (README, certificate renewal)" >&2
+            fi
+        done
+        sleep "$CERT_EXPIRY_CHECK_S"
+    done
+) &
+
 # ── Log rotation ──────────────────────────────────────────────────────────────
 # /var/log/nginx is a named volume (so logs survive container recreation), which
 # means nothing else bounds its size. No logrotate in the image and no sidecar

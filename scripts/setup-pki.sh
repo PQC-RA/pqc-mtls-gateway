@@ -24,10 +24,14 @@
 # Idempotency: the root/intermediate CA is bootstrapped exactly once, if it
 # already exists at PKI_DIR, this script leaves it untouched rather than
 # regenerating it (that would orphan every issued cert). Newer artifacts added
-# to this script after a given host was first bootstrapped (currently: the
-# internal-tls service-mesh CA) are individually idempotent and ARE still
-# generated on a re-run, so re-running this script against an existing PKI is
-# always safe and is how a deployment picks up new PKI artifacts.
+# to this script after a given host was first bootstrapped are individually
+# idempotent and ARE still generated on a re-run, so re-running this script
+# against an existing PKI is always safe and is how a deployment picks up new
+# PKI artifacts. One exception, by design: an existing RSA internal TLS CA (the
+# :8081 control plane) is NOT replaced by a plain re-run, because management-api
+# pins that CA and reads it only at start. Its move to ML-DSA-65 is explicit:
+#   REISSUE_INTERNAL_CA=1 ./scripts/setup-pki.sh    (see generate_internal_tls)
+# and RENEW_INTERNAL_LEAF=1 renews an ML-DSA-65 :8081 leaf near its end.
 # -----------------------------------------------------------------------------
 set -euo pipefail
 
@@ -97,13 +101,14 @@ OCSP_GID="${OCSP_GID:-1002}"
 # --- Empty dir every CA-tree consumer mounts over key-bearing subdirs -------
 # docker-compose.yml bind-mounts this over the key-bearing subdirectories of
 # every service that mounts the CA tree, so each one holds at most the single
-# private key it actually uses and none of them holds the root CA key:
-#   gateway      -> intermediate/private, ocsp/, root/private masked (no key)
-#   ocsp-pq      -> intermediate/private, root/private masked (keeps ocsp/)
-#   crl-renewer  -> ocsp/, root/private masked (keeps intermediate/private)
-#   pqc-ca-custodian -> ocsp/, root/private masked (keeps intermediate/private)
-# The invariant to re-check whenever a service gains this mount: root/private is
-# masked on ALL of them, and this list matches the mount list. Verify against the
+# private key it actually uses and none of them holds the root CA key or the
+# internal TLS CA key (internal-tls/, ADR-022):
+#   gateway      -> intermediate/private, ocsp/, root/private, internal-tls masked (no key)
+#   ocsp-pq      -> intermediate/private, root/private, internal-tls masked (keeps ocsp/)
+#   crl-renewer  -> ocsp/, root/private, internal-tls masked (keeps intermediate/private)
+#   pqc-ca-custodian -> ocsp/, root/private, internal-tls masked (keeps intermediate/private)
+# The invariant to re-check whenever a service gains this mount: root/private and
+# internal-tls are masked on ALL of them, and this list matches the mount list. Verify against the
 # mount list, never against a comment: a comment like this one can assert a
 # property that a service mounting the tree does not implement, and nothing
 # fails. bench/verify-suite.sh section 6 enumerates the mounters at runtime, so it
@@ -141,87 +146,34 @@ set_ocsp_key_perms() {
     echo "==> OCSP responder key: 640 root:$OCSP_GID (readable by the ocsp-pq container's gid)"
 }
 
-# Algorithm of a certificate's public key, as OpenSSL prints it ("" if unreadable).
-cert_key_alg() {
-    OPENSSL_CONF=/dev/null "$OPENSSL" x509 -in "$1" -noout -text 2>/dev/null \
-        | sed -n 's/^ *Public Key Algorithm: *//p' | head -1
+# Internal TLS CA and :8081 leaf: names and helpers (ITLS_*), shared with
+# scripts/internal-tls-switch.sh.
+# shellcheck source=lib/internal-tls.sh
+. "$ROOT_DIR/scripts/lib/internal-tls.sh"
+
+# Issue an ML-DSA-65 :8081 leaf signed by CA cert $1 / key $2 into $3 (dir):
+# writes $3/leaf.key and $3/leaf.crt, verified and key-matched.
+itls_issue_leaf() {
+    local ca_crt=$1 ca_key=$2 out=$3
+    itls_ossl genpkey -algorithm ML-DSA-65 -out "$out/leaf.key"
+    "$OPENSSL" req -config "$INT_TLS_CNF" -new -key "$out/leaf.key" \
+        -subj "/C=BG/O=${PKI_ORG}/OU=Internal Service Mesh/CN=gateway" \
+        -out "$out/leaf.csr"
+    itls_ossl x509 -req -days 365 -in "$out/leaf.csr" \
+        -CA "$ca_crt" -CAkey "$ca_key" -set_serial "0x$("$OPENSSL" rand -hex 16)" \
+        -extfile "$INT_TLS_CNF" -extensions v3_server \
+        -out "$out/leaf.crt"
+    itls_ossl verify -CAfile "$ca_crt" "$out/leaf.crt" >/dev/null \
+        || { echo "ERROR: new :8081 leaf does not verify against the internal CA" >&2; exit 1; }
+    itls_key_matches "$out/leaf.crt" "$out/leaf.key" \
+        || { echo "ERROR: new :8081 leaf key and certificate do not match" >&2; exit 1; }
+    rm -f "$out/leaf.csr"
 }
 
-# Write $1 over $2 IN PLACE (same inode), then remove $1. Single-file bind
-# mounts (management-api mounts internal-tls-ca.crt as one file) keep pointing
-# at the inode they were started with: a rename or `cp --remove-destination`
-# would leave a running container with the old content for good.
-write_in_place() {
-    if [ -e "$2" ]; then cat "$1" > "$2"; else cp "$1" "$2"; fi
-    rm -f "$1"
-}
-
-generate_internal_tls() {
-    # --- Internal service-mesh TLS CA and :8081 leaf (ML-DSA-65, ADR-022) ----
-    # The management-api reaches the gateway's internal control port for the
-    # JWKS fetch and the route push. Node 22 bundles OpenSSL 3.5, which
-    # validates ML-DSA certificates, so this channel is post-quantum like the
-    # rest: an ML-DSA-65 CA (its own, NOT the client-facing root) and an
-    # ML-DSA-65 leaf with keyUsage digitalSignature only (RFC 9881 permits no
-    # keyEncipherment for ML-DSA). The CA cert is placed at the PKI root so the
-    # API (which mounts only this one file, not the CA tree) pins it through
-    # NODE_EXTRA_CA_CERTS (ADR-009). The CA key is ONLINE, 600/root, in
-    # $PKI_DIR/internal-tls/.
-    #
-    # Idempotent: nothing is written when the CA and the leaf are ML-DSA-65, the
-    # leaf chains to the CA and is valid for 30 more days. A classical (RSA)
-    # CA or leaf left by an earlier version is reissued: the old files are kept
-    # once as *-rsa.* (rollback only, never a second ssl_certificate) and the
-    # new ones are written IN PLACE (write_in_place above). The RSA CA key copy
-    # (internal-tls-ca-rsa.key) belongs in the encrypted keys set (ADR-018) and
-    # off this host once the rollback window is over.
-    INT_TLS_DIR="$PKI_DIR/internal-tls"
-    local ca_crt="$PKI_DIR/internal-tls-ca.crt" ca_key="$INT_TLS_DIR/internal-tls-ca.key"
-    local leaf_crt="$SSL_DIR/internal-tls.crt" leaf_key="$SSL_DIR/internal-tls.key"
-    local reissue_ca=1 reissue_leaf=1 alg
-    mkdir -p "$INT_TLS_DIR" "$SSL_DIR"
-
-    if [ -f "$ca_crt" ] && [ -f "$ca_key" ] && [ "$(cert_key_alg "$ca_crt")" = "ML-DSA-65" ]; then
-        reissue_ca=0
-    fi
-    if [ "$reissue_ca" = 0 ] && [ -f "$leaf_crt" ] && [ -f "$leaf_key" ] \
-       && [ "$(cert_key_alg "$leaf_crt")" = "ML-DSA-65" ] \
-       && OPENSSL_CONF=/dev/null "$OPENSSL" verify -CAfile "$ca_crt" "$leaf_crt" >/dev/null 2>&1 \
-       && OPENSSL_CONF=/dev/null "$OPENSSL" x509 -in "$leaf_crt" -noout -checkend 2592000 >/dev/null 2>&1; then
-        reissue_leaf=0
-    fi
-    if [ "$reissue_ca" = 0 ] && [ "$reissue_leaf" = 0 ]; then
-        echo "==> Internal TLS CA and :8081 leaf are ML-DSA-65 and current (skip)."
-        return
-    fi
-
-    # Keep a classical predecessor once, for rollback (ADR-022 decision 4).
-    if [ -f "$ca_crt" ]; then
-        alg=$(cert_key_alg "$ca_crt")
-        case "$alg" in
-            ML-DSA-*) ;;
-            *)  if [ ! -e "$PKI_DIR/internal-tls-ca-rsa.crt" ]; then
-                    cp -p "$ca_crt" "$PKI_DIR/internal-tls-ca-rsa.crt"
-                    [ -f "$ca_key" ] && cp -p "$ca_key" "$INT_TLS_DIR/internal-tls-ca-rsa.key"
-                    echo "    kept the $alg internal CA as internal-tls-ca-rsa.crt (rollback only)"
-                fi ;;
-        esac
-    fi
-    if [ -f "$leaf_crt" ]; then
-        alg=$(cert_key_alg "$leaf_crt")
-        case "$alg" in
-            ML-DSA-*) ;;
-            *)  if [ ! -e "$SSL_DIR/internal-tls-rsa.crt" ]; then
-                    cp -p "$leaf_crt" "$SSL_DIR/internal-tls-rsa.crt"
-                    [ -f "$leaf_key" ] && cp -p "$leaf_key" "$SSL_DIR/internal-tls-rsa.key"
-                    echo "    kept the $alg :8081 leaf as $SSL_DIR/internal-tls-rsa.crt (rollback only)"
-                fi ;;
-        esac
-    fi
-
+itls_write_cnf() {
     # Self-contained OpenSSL config: the PQC OpenSSL build ships no default
     # openssl.cnf at its compiled-in path, and `req` requires a [req] section.
-    INT_TLS_CNF="$INT_TLS_DIR/internal-tls-openssl.cnf"
+    INT_TLS_CNF="$ITLS_KEY_DIR/internal-tls-openssl.cnf"
     cat > "$INT_TLS_CNF" <<'CNF'
 [req]
 distinguished_name = req_dn
@@ -239,55 +191,175 @@ subjectKeyIdentifier = hash
 authorityKeyIdentifier = keyid
 subjectAltName = DNS:gateway, DNS:pqc-gateway, DNS:localhost, IP:127.0.0.1
 CNF
+}
+
+generate_internal_tls() {
+    # --- Internal service-mesh TLS CA and :8081 leaf (ML-DSA-65, ADR-022) ----
+    # management-api reaches the gateway's internal control port for the JWKS
+    # fetch and the route push. Node 22 bundles OpenSSL 3.5, which validates
+    # ML-DSA certificates, so this channel is post-quantum like the rest: an
+    # ML-DSA-65 CA (its own, NOT the client-facing root) and an ML-DSA-65 leaf
+    # with keyUsage digitalSignature only (RFC 9881 permits no keyEncipherment
+    # for ML-DSA). The file names are in scripts/lib/internal-tls.sh.
+    #
+    # Three cases:
+    #   fresh host        ML-DSA-65 CA and leaf are created; the trust file
+    #                     holds the ML-DSA-65 CA; :8081 serves the ML-DSA leaf.
+    #   ML-DSA-65 present nothing is written. A leaf within 30 days of its end
+    #                     is reported (WARNING), and renewed in place only with
+    #                     RENEW_INTERNAL_LEAF=1.
+    #   RSA (pre-ADR-022) nothing is written unless REISSUE_INTERNAL_CA=1. A
+    #                     deploy must never change the CA management-api pins
+    #                     behind its back: Node reads NODE_EXTRA_CA_CERTS only at
+    #                     start. With REISSUE_INTERNAL_CA=1 the ML-DSA-65 CA and
+    #                     leaf are created NEXT TO the RSA ones, the trust file
+    #                     becomes a bundle of both CAs (written in place), and
+    #                     :8081 keeps serving the RSA leaf. The served leaf is
+    #                     switched only by scripts/internal-tls-switch.sh, after
+    #                     management-api has been restarted on the bundle.
+    mkdir -p "$ITLS_KEY_DIR" "$SSL_DIR"
+    chmod 700 "$ITLS_KEY_DIR"
+
+    # A draft of this change (never released) kept the ML-DSA-65 CA only in
+    # the trust file; adopt that layout.
+    if [ ! -e "$ITLS_CA_MLDSA" ] && [ -f "$ITLS_BUNDLE" ] && [ "$(itls_alg "$ITLS_BUNDLE")" = "ML-DSA-65" ] \
+       && [ -f "$ITLS_CA_KEY" ] && itls_key_matches "$ITLS_BUNDLE" "$ITLS_CA_KEY"; then
+        itls_ossl x509 -in "$ITLS_BUNDLE" -out "$ITLS_CA_MLDSA"; chmod 644 "$ITLS_CA_MLDSA"
+        if [ ! -e "$ITLS_ML_CRT" ] && [ -f "$ITLS_LEAF_CRT" ] && [ "$(itls_alg "$ITLS_LEAF_CRT")" = "ML-DSA-65" ] \
+           && itls_key_matches "$ITLS_LEAF_CRT" "$ITLS_LEAF_KEY"; then
+            ( umask 077; cp "$ITLS_LEAF_KEY" "$ITLS_ML_KEY" ); cp "$ITLS_LEAF_CRT" "$ITLS_ML_CRT"
+        fi
+        echo "    adopted the ML-DSA-65 internal CA as internal-tls-ca-mldsa.crt"
+    fi
+
+    local have_mldsa=0
+    if [ -f "$ITLS_CA_MLDSA" ] && [ "$(itls_alg "$ITLS_CA_MLDSA")" = "ML-DSA-65" ] \
+       && [ -f "$ITLS_CA_KEY" ] && itls_key_matches "$ITLS_CA_MLDSA" "$ITLS_CA_KEY"; then
+        have_mldsa=1
+    fi
     local tmp
-    tmp=$(mktemp -d "$INT_TLS_DIR/.reissue.XXXXXX")
+    tmp=$(mktemp -d "$ITLS_KEY_DIR/.work.XXXXXX")
     chmod 700 "$tmp"
     # Private keys live in $tmp until installed: removed on any exit.
     trap 'rm -rf "'"$tmp"'"' EXIT
 
-    if [ "$reissue_ca" = 1 ]; then
-        echo "==> Internal service-mesh TLS CA (ML-DSA-65)"
-        OPENSSL_CONF=/dev/null "$OPENSSL" genpkey -algorithm ML-DSA-65 -out "$tmp/ca.key"
-        "$OPENSSL" req -config "$INT_TLS_CNF" -new -x509 -days 3650 -extensions v3_ca \
-            -key "$tmp/ca.key" \
-            -subj "/C=BG/O=${PKI_ORG}/OU=Internal Service Mesh/CN=PQC-GW Internal TLS CA ML-DSA-65" \
-            -out "$tmp/ca.crt"
+    if [ "$have_mldsa" = 1 ]; then
+        itls_write_cnf
+        local status=current
+        if ! [ -f "$ITLS_ML_CRT" ] || ! [ -f "$ITLS_ML_KEY" ] \
+           || ! itls_ossl verify -CAfile "$ITLS_CA_MLDSA" "$ITLS_ML_CRT" >/dev/null 2>&1 \
+           || ! itls_key_matches "$ITLS_ML_CRT" "$ITLS_ML_KEY"; then
+            status=missing
+        elif ! itls_not_expiring "$ITLS_ML_CRT"; then
+            status=expiring
+        fi
+        if ! itls_bundle_has "$ITLS_BUNDLE" "$ITLS_CA_MLDSA"; then
+            echo "WARNING: $ITLS_BUNDLE (the CA file management-api pins) does not hold the" >&2
+            echo "  ML-DSA-65 internal CA. A :8081 serving the ML-DSA-65 leaf is then refused by" >&2
+            echo "  management-api. See scripts/internal-tls-switch.sh status." >&2
+        fi
+        if [ "$status" = current ]; then
+            echo "==> Internal TLS CA and :8081 leaf are ML-DSA-65 and current (skip)."
+            echo "    ML-DSA-65 leaf valid until $(itls_expiry "$ITLS_ML_CRT"); :8081 serves $(itls_alg "$ITLS_LEAF_CRT")"
+            rm -rf "$tmp"; trap - EXIT
+            return
+        fi
+        if [ "$status" = expiring ] && [ "${RENEW_INTERNAL_LEAF:-0}" != 1 ]; then
+            echo "WARNING: the ML-DSA-65 :8081 certificate $ITLS_ML_CRT ends $(itls_expiry "$ITLS_ML_CRT")." >&2
+            echo "  Renew it: RENEW_INTERNAL_LEAF=1 scripts/setup-pki.sh, then reload the gateway" >&2
+            echo "  (same CA, so management-api needs no restart)." >&2
+            rm -rf "$tmp"; trap - EXIT
+            return
+        fi
+        echo "==> :8081 ML-DSA-65 leaf ($status): issuing a new one from the ML-DSA-65 internal CA"
+        local was_served=0
+        if [ -f "$ITLS_ML_CRT" ] && [ -f "$ITLS_LEAF_CRT" ] && [ "$(itls_fpr "$ITLS_ML_CRT")" = "$(itls_fpr "$ITLS_LEAF_CRT")" ]; then
+            was_served=1
+        fi
+        [ -e "$ITLS_LEAF_CRT" ] || was_served=1
+        itls_issue_leaf "$ITLS_CA_MLDSA" "$ITLS_CA_KEY" "$tmp"
+        ( umask 077; cp "$tmp/leaf.key" "$tmp/served.key" ); cp "$tmp/leaf.crt" "$tmp/served.crt"
+        itls_write_in_place "$tmp/leaf.key" "$ITLS_ML_KEY"; chmod 600 "$ITLS_ML_KEY"
+        itls_write_in_place "$tmp/leaf.crt" "$ITLS_ML_CRT"; chmod 644 "$ITLS_ML_CRT"
+        if [ "$was_served" = 1 ]; then
+            itls_write_in_place "$tmp/served.key" "$ITLS_LEAF_KEY"; chmod 600 "$ITLS_LEAF_KEY"
+            itls_write_in_place "$tmp/served.crt" "$ITLS_LEAF_CRT"; chmod 644 "$ITLS_LEAF_CRT"
+            echo "    :8081 serves the new leaf after a gateway reload (docker exec pqc-gateway nginx -s reload)."
+        fi
+        rm -rf "$tmp"; trap - EXIT
+        return
+    fi
+
+    if [ -f "$ITLS_BUNDLE" ]; then
+        # An internal CA exists and it is not (yet) ML-DSA-65: a pre-ADR-022 host.
+        local alg
+        alg=$(itls_alg "$ITLS_BUNDLE")
+        if [ "${REISSUE_INTERNAL_CA:-0}" != 1 ]; then
+            echo "WARNING: the internal TLS CA ($ITLS_BUNDLE) is $alg, not ML-DSA-65." >&2
+            echo "  Left unchanged: moving :8081 to ML-DSA-65 is an explicit, ordered step" >&2
+            echo "  (README, \"Admin token and :8081 to ML-DSA-65\"):" >&2
+            echo "    REISSUE_INTERNAL_CA=1 scripts/setup-pki.sh   (adds the ML-DSA-65 CA; :8081 unchanged)" >&2
+            echo "    restart management-api                         (it reads the CA bundle at start)" >&2
+            echo "    scripts/internal-tls-switch.sh mldsa           (switches :8081, reversible)" >&2
+            rm -rf "$tmp"; trap - EXIT
+            return
+        fi
+        echo "==> Internal TLS: adding an ML-DSA-65 CA and leaf next to the $alg ones (REISSUE_INTERNAL_CA=1)"
+        # Keep the classical CA and leaf, once (rollback; never a second ssl_certificate).
+        if [ ! -e "$ITLS_CA_RSA" ]; then
+            itls_ossl x509 -in "$ITLS_BUNDLE" -out "$ITLS_CA_RSA"; chmod 644 "$ITLS_CA_RSA"
+            if [ -f "$ITLS_CA_KEY" ] && itls_key_matches "$ITLS_CA_RSA" "$ITLS_CA_KEY"; then
+                ( umask 077; cp "$ITLS_CA_KEY" "$ITLS_CA_RSA_KEY" ); chmod 600 "$ITLS_CA_RSA_KEY"
+            fi
+            echo "    kept the $alg internal CA as internal-tls-ca-rsa.crt"
+        fi
+        if [ ! -e "$ITLS_RSA_CRT" ] && [ -f "$ITLS_LEAF_CRT" ] && [ "$(itls_alg "$ITLS_LEAF_CRT")" != "ML-DSA-65" ]; then
+            ( umask 077; cp "$ITLS_LEAF_KEY" "$ITLS_RSA_KEY" ); chmod 600 "$ITLS_RSA_KEY"
+            cp "$ITLS_LEAF_CRT" "$ITLS_RSA_CRT"; chmod 644 "$ITLS_RSA_CRT"
+            echo "    kept the $(itls_alg "$ITLS_LEAF_CRT") :8081 leaf as internal-tls-rsa.crt"
+        fi
     else
-        cp "$ca_key" "$tmp/ca.key"; cp "$ca_crt" "$tmp/ca.crt"
+        echo "==> Internal service-mesh TLS CA and :8081 leaf (ML-DSA-65)"
     fi
 
-    echo "==> Gateway :8081 server certificate (ML-DSA-65, digitalSignature only; SAN: gateway)"
-    OPENSSL_CONF=/dev/null "$OPENSSL" genpkey -algorithm ML-DSA-65 -out "$tmp/leaf.key"
-    "$OPENSSL" req -config "$INT_TLS_CNF" -new -key "$tmp/leaf.key" \
-        -subj "/C=BG/O=${PKI_ORG}/OU=Internal Service Mesh/CN=gateway" \
-        -out "$tmp/leaf.csr"
-    OPENSSL_CONF=/dev/null "$OPENSSL" x509 -req -days 365 -in "$tmp/leaf.csr" \
-        -CA "$tmp/ca.crt" -CAkey "$tmp/ca.key" -set_serial "0x$("$OPENSSL" rand -hex 16)" \
-        -extfile "$INT_TLS_CNF" -extensions v3_server \
-        -out "$tmp/leaf.crt"
-    OPENSSL_CONF=/dev/null "$OPENSSL" verify -CAfile "$tmp/ca.crt" "$tmp/leaf.crt" >/dev/null \
-        || { echo "ERROR: new :8081 leaf does not verify against the new internal CA" >&2; exit 1; }
-    # Each key must match its certificate before anything is installed, so a
-    # failure can never leave a mismatched pair for the next reload.
-    local k c
-    for k in ca leaf; do
-        c=$(OPENSSL_CONF=/dev/null "$OPENSSL" x509 -in "$tmp/$k.crt" -noout -pubkey)
-        [ "$c" = "$(OPENSSL_CONF=/dev/null "$OPENSSL" pkey -in "$tmp/$k.key" -pubout)" ] \
-            || { echo "ERROR: $k key and certificate do not match" >&2; exit 1; }
-    done
+    itls_write_cnf
+    itls_ossl genpkey -algorithm ML-DSA-65 -out "$tmp/ca.key"
+    "$OPENSSL" req -config "$INT_TLS_CNF" -new -x509 -days 3650 -extensions v3_ca \
+        -key "$tmp/ca.key" \
+        -subj "/C=BG/O=${PKI_ORG}/OU=Internal Service Mesh/CN=PQC-GW Internal TLS CA ML-DSA-65" \
+        -out "$tmp/ca.crt"
+    itls_key_matches "$tmp/ca.crt" "$tmp/ca.key" \
+        || { echo "ERROR: internal CA key and certificate do not match" >&2; exit 1; }
+    itls_issue_leaf "$tmp/ca.crt" "$tmp/ca.key" "$tmp"
+    # The trust file: the ML-DSA-65 CA, plus the RSA CA while :8081 can still
+    # be switched back to the RSA leaf.
+    cp "$tmp/ca.crt" "$tmp/bundle.crt"
+    [ -f "$ITLS_CA_RSA" ] && cat "$ITLS_CA_RSA" >> "$tmp/bundle.crt"
 
-    # Install: keys first (600), then certificates (644), all in place.
-    if [ "$reissue_ca" = 1 ]; then
-        write_in_place "$tmp/ca.key" "$ca_key"; chmod 600 "$ca_key"
-        write_in_place "$tmp/ca.crt" "$ca_crt"; chmod 644 "$ca_crt"
+    # Install: keys first (600), then certificates (644), all in place. The
+    # served leaf is written only on a fresh host; on an RSA host it is
+    # switched by scripts/internal-tls-switch.sh.
+    local fresh=1
+    [ -f "$ITLS_LEAF_CRT" ] && fresh=0
+    if [ "$fresh" = 1 ]; then
+        ( umask 077; cp "$tmp/leaf.key" "$tmp/served.key" ); cp "$tmp/leaf.crt" "$tmp/served.crt"
     fi
-    write_in_place "$tmp/leaf.key" "$leaf_key"; chmod 600 "$leaf_key"
-    write_in_place "$tmp/leaf.crt" "$leaf_crt"
+    itls_write_in_place "$tmp/ca.key" "$ITLS_CA_KEY"; chmod 600 "$ITLS_CA_KEY"
+    itls_write_in_place "$tmp/leaf.key" "$ITLS_ML_KEY"; chmod 600 "$ITLS_ML_KEY"
+    itls_write_in_place "$tmp/ca.crt" "$ITLS_CA_MLDSA"; chmod 644 "$ITLS_CA_MLDSA"
+    itls_write_in_place "$tmp/leaf.crt" "$ITLS_ML_CRT"; chmod 644 "$ITLS_ML_CRT"
+    if [ "$fresh" = 1 ]; then
+        itls_write_in_place "$tmp/served.key" "$ITLS_LEAF_KEY"; chmod 600 "$ITLS_LEAF_KEY"
+        itls_write_in_place "$tmp/served.crt" "$ITLS_LEAF_CRT"; chmod 644 "$ITLS_LEAF_CRT"
+    fi
+    itls_write_in_place "$tmp/bundle.crt" "$ITLS_BUNDLE"; chmod 644 "$ITLS_BUNDLE"
     rm -rf "$tmp"
     trap - EXIT
-    echo "    internal CA $(cert_key_alg "$ca_crt"), :8081 leaf $(cert_key_alg "$leaf_crt")"
-    echo "    Reload the gateway (nginx -s reload) and restart management-api: Node reads"
-    echo "    NODE_EXTRA_CA_CERTS only at start."
+    echo "    trust file $ITLS_BUNDLE: $(itls_bundle_fprs "$ITLS_BUNDLE" | wc -l) CA(s); :8081 serves $(itls_alg "$ITLS_LEAF_CRT")"
+    if [ "$fresh" = 0 ]; then
+        echo "    NEXT: restart management-api (Node reads the CA bundle only at start), then"
+        echo "          scripts/internal-tls-switch.sh mldsa. :8081 is unchanged until then."
+    fi
 }
 
 # The rendered intermediate config is written once, at bootstrap, so a template

@@ -125,6 +125,10 @@ OSSL="/opt/openssl/bin/openssl"
 # first bootstrapped before some artifact existed must still pick it up on
 # every re-run instead of staying behind. A host bootstrapped before an artifact
 # existed would otherwise come up without it, and the gateway would not start.
+# The one thing it never does here is replace an existing RSA internal TLS CA
+# (:8081, ADR-022): management-api pins that CA and reads it only at start, so
+# that move is a separate, ordered step (REISSUE_INTERNAL_CA=1 setup-pki.sh,
+# restart management-api, scripts/internal-tls-switch.sh mldsa; see README).
 echo "==> [3/9] Bootstrapping / catching up PQC PKI (ML-DSA-65)..."
 PKI_DIR=/etc/pki/pqc-ca
 OPENSSL_BIN="$OSSL" SERVER_IP="$SERVER_IP" ./scripts/setup-pki.sh
@@ -204,6 +208,7 @@ echo "==> [8/9] Building Docker images..."
 # ── Step 9: Init volumes + start services ───────────────────────────────────
 echo "==> [9/9] Starting services..."
 ./scripts/init-volumes.sh
+./scripts/check-secrets.sh
 docker compose up -d
 
 # ── Wait for gateway health ───────────────────────────────────────────────────

@@ -104,15 +104,18 @@ services:
    - "8081"
   volumes:
    - /etc/pki/pqc-ca:/etc/pki/pqc-ca:ro
-   # Edge data plane needs only the public CA chain + CRL (top-level files); it
-   # uses no CA private key. Mask EVERY key-bearing subdir with an empty dir so
-   # no CA private key is ever exposed at the edge (the most internet-facing
-   # component in the stack): the intermediate CA key, the OCSP delegated key,
-   # AND the root CA key. All three directories are masked below, so the gateway
-   # holds no CA private key of any kind.
+   # Edge data plane needs only top-level public files of the CA tree: the
+   # client CA chain, the combined CRL and internal-tls-ca.crt (the healthcheck
+   # verifies :8081 with it). It uses no CA private key. Every key-bearing subdir
+   # is masked with an empty dir so no CA private key is exposed at the edge
+   # (the most internet-facing component in the stack): the intermediate CA key,
+   # the OCSP delegated key, the root CA key AND the internal TLS CA keys
+   # (internal-tls/, ADR-022). Its own :8081 key comes from /etc/ssl/pqc below.
+   # bench/verify-suite.sh section 6 checks this at runtime.
    - /etc/pki/pqc-empty:/etc/pki/pqc-ca/intermediate/private:ro
    - /etc/pki/pqc-empty:/etc/pki/pqc-ca/ocsp:ro
    - /etc/pki/pqc-empty:/etc/pki/pqc-ca/root/private:ro
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/internal-tls:ro
    - /etc/ssl/pqc:/etc/ssl/pqc:ro
    - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
    - ./config/nginx/security-headers.conf:/etc/nginx/security-headers.conf:ro
@@ -238,9 +241,11 @@ services:
    # intermediate/certs/intermediate-ca.crt and ocsp/ocsp-pq.{crt,key} (see
    # docker/ocsp-pq/Dockerfile). The delegated OCSP key is the ONLY private key
    # it has any business holding, so mask the other two key-bearing subdirs
-   # with an empty dir, exactly as the gateway does above.
+   # with an empty dir, exactly as the gateway does above, and the internal TLS
+   # CA keys (internal-tls/).
    - /etc/pki/pqc-empty:/etc/pki/pqc-ca/intermediate/private:ro
    - /etc/pki/pqc-empty:/etc/pki/pqc-ca/root/private:ro
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/internal-tls:ro
   security_opt:
    - no-new-privileges:true
   read_only: true
@@ -335,9 +340,12 @@ services:
    # OCSP key nor the root CA key, so both are masked with an empty dir.
    # Masking root/private makes root-CRL regeneration an offline operation:
    # pqc-crl-renew.sh Step 2 detects the absent key, says so loudly, and keeps
-   # the intermediate path working rather than failing the whole run.
+   # the intermediate path working rather than failing the whole run. The
+   # internal TLS CA keys (internal-tls/) are masked too: this mount is rw, and
+   # nothing here signs for :8081.
    - /etc/pki/pqc-empty:/etc/pki/pqc-ca/ocsp:ro
    - /etc/pki/pqc-empty:/etc/pki/pqc-ca/root/private:ro
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/internal-tls:ro
    - /usr/local/bin/pqc-crl-renew.sh:/usr/local/bin/pqc-crl-renew.sh:ro
    - pqc-www-pki:/var/www/pki:rw
    - pqc-logs-crl:/var/log/pqc-gw:rw
@@ -398,8 +406,10 @@ services:
    # to root would silently reopen it, because this was the one service with no
    # mask. Mask both key-bearing subdirs so the property holds by mount list as
    # well as by uid, as it does for every other service that mounts this tree.
+   # Same for the internal TLS CA keys (internal-tls/, 0700 root).
    - /etc/pki/pqc-empty:/etc/pki/pqc-ca/ocsp:ro
    - /etc/pki/pqc-empty:/etc/pki/pqc-ca/root/private:ro
+   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/internal-tls:ro
    # Docker standalone always mounts secrets as 0600/root, uid 1001 can't read
    # them. Mount as a regular bind so host file permissions (0644) apply instead
    # (same workaround already used for control-plane-hmac below).
@@ -598,7 +608,10 @@ services:
    # Reach the gateway control plane over TLS (JWKS fetch + route push). The
    # gateway presents an ML-DSA-65 certificate from the ML-DSA-65 internal CA
    # there (ADR-022; Node 22 bundles OpenSSL 3.5); NODE_EXTRA_CA_CERTS pins that
-   # CA so a spoofed JWKS is rejected. Node reads it only at start.
+   # CA so a spoofed JWKS is rejected. Node reads it only at start. While an
+   # existing deployment moves from the RSA internal CA, the file is a bundle of
+   # both CAs (scripts/setup-pki.sh REISSUE_INTERNAL_CA=1), so the :8081 leaf can
+   # be switched either way (scripts/internal-tls-switch.sh) without a restart.
    - GATEWAY_JWKS_URI=https://gateway:8081/.well-known/jwks.json
    - GATEWAY_CONTROL_URL=https://gateway:8081/update-routes
    - NODE_EXTRA_CA_CERTS=/etc/pki/internal-tls-ca.crt
