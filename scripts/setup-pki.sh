@@ -141,36 +141,84 @@ set_ocsp_key_perms() {
     echo "==> OCSP responder key: 640 root:$OCSP_GID (readable by the ocsp-pq container's gid)"
 }
 
+# Algorithm of a certificate's public key, as OpenSSL prints it ("" if unreadable).
+cert_key_alg() {
+    OPENSSL_CONF=/dev/null "$OPENSSL" x509 -in "$1" -noout -text 2>/dev/null \
+        | sed -n 's/^ *Public Key Algorithm: *//p' | head -1
+}
+
+# Write $1 over $2 IN PLACE (same inode), then remove $1. Single-file bind
+# mounts (management-api mounts internal-tls-ca.crt as one file) keep pointing
+# at the inode they were started with: a rename or `cp --remove-destination`
+# would leave a running container with the old content for good.
+write_in_place() {
+    if [ -e "$2" ]; then cat "$1" > "$2"; else cp "$1" "$2"; fi
+    rm -f "$1"
+}
+
 generate_internal_tls() {
-    # --- Internal service-mesh TLS CA (classical RSA-2048) -------------------
-    # The management-api (Node.js) reaches the gateway's internal control port
-    # for the JWKS fetch and the route push. Node's bundled OpenSSL (3.0.x)
-    # CANNOT validate ML-DSA certificates, so this ONE internal, private-network
-    # channel uses a classical RSA CA. It authenticates gateway<->management-api
-    # traffic ONLY; it is NOT part of the public PQC trust chain and never
-    # touches the client-facing mTLS (443) or enrollment (8443) listeners. The
-    # CA cert is placed at the PKI root so the API (which mounts only this one
-    # file, not the CA tree, see docker-compose.yml) can load it via
-    # NODE_EXTRA_CA_CERTS; the CA private key stays 600/root and is never
-    # readable by the unprivileged API even though it sits inside the mounted
-    # tree.
+    # --- Internal service-mesh TLS CA and :8081 leaf (ML-DSA-65, ADR-022) ----
+    # The management-api reaches the gateway's internal control port for the
+    # JWKS fetch and the route push. Node 22 bundles OpenSSL 3.5, which
+    # validates ML-DSA certificates, so this channel is post-quantum like the
+    # rest: an ML-DSA-65 CA (its own, NOT the client-facing root) and an
+    # ML-DSA-65 leaf with keyUsage digitalSignature only (RFC 9881 permits no
+    # keyEncipherment for ML-DSA). The CA cert is placed at the PKI root so the
+    # API (which mounts only this one file, not the CA tree) pins it through
+    # NODE_EXTRA_CA_CERTS (ADR-009). The CA key is ONLINE, 600/root, in
+    # $PKI_DIR/internal-tls/.
     #
-    # Idempotent (skip if already generated), unlike the root/intermediate CA,
-    # this is safe to catch up on an EXISTING PKI: a host whose CA predates the
-    # internal-TLS leaf must be able to pick it up on a re-run, instead of the
-    # whole script hard-failing on the root-CA guard below.
-    if [ -f "$PKI_DIR/internal-tls-ca.crt" ]; then
-        echo "==> Internal service-mesh TLS CA already exists (skip)."
+    # Idempotent: nothing is written when the CA and the leaf are ML-DSA-65, the
+    # leaf chains to the CA and is valid for 30 more days. A classical (RSA)
+    # CA or leaf left by an earlier version is reissued: the old files are kept
+    # once as *-rsa.* (rollback only, never a second ssl_certificate) and the
+    # new ones are written IN PLACE (write_in_place above).
+    INT_TLS_DIR="$PKI_DIR/internal-tls"
+    local ca_crt="$PKI_DIR/internal-tls-ca.crt" ca_key="$INT_TLS_DIR/internal-tls-ca.key"
+    local leaf_crt="$SSL_DIR/internal-tls.crt" leaf_key="$SSL_DIR/internal-tls.key"
+    local reissue_ca=1 reissue_leaf=1 alg
+    mkdir -p "$INT_TLS_DIR" "$SSL_DIR"
+
+    if [ -f "$ca_crt" ] && [ -f "$ca_key" ] && [ "$(cert_key_alg "$ca_crt")" = "ML-DSA-65" ]; then
+        reissue_ca=0
+    fi
+    if [ "$reissue_ca" = 0 ] && [ -f "$leaf_crt" ] && [ -f "$leaf_key" ] \
+       && [ "$(cert_key_alg "$leaf_crt")" = "ML-DSA-65" ] \
+       && OPENSSL_CONF=/dev/null "$OPENSSL" verify -CAfile "$ca_crt" "$leaf_crt" >/dev/null 2>&1 \
+       && OPENSSL_CONF=/dev/null "$OPENSSL" x509 -in "$leaf_crt" -noout -checkend 2592000 >/dev/null 2>&1; then
+        reissue_leaf=0
+    fi
+    if [ "$reissue_ca" = 0 ] && [ "$reissue_leaf" = 0 ]; then
+        echo "==> Internal TLS CA and :8081 leaf are ML-DSA-65 and current (skip)."
         return
     fi
 
-    echo "==> Internal service-mesh TLS CA (RSA-2048)"
-    INT_TLS_DIR="$PKI_DIR/internal-tls"
-    mkdir -p "$INT_TLS_DIR"
+    # Keep a classical predecessor once, for rollback (ADR-022 decision 4).
+    if [ -f "$ca_crt" ]; then
+        alg=$(cert_key_alg "$ca_crt")
+        case "$alg" in
+            ML-DSA-*) ;;
+            *)  if [ ! -e "$PKI_DIR/internal-tls-ca-rsa.crt" ]; then
+                    cp -p "$ca_crt" "$PKI_DIR/internal-tls-ca-rsa.crt"
+                    [ -f "$ca_key" ] && cp -p "$ca_key" "$INT_TLS_DIR/internal-tls-ca-rsa.key"
+                    echo "    kept the $alg internal CA as internal-tls-ca-rsa.crt (rollback only)"
+                fi ;;
+        esac
+    fi
+    if [ -f "$leaf_crt" ]; then
+        alg=$(cert_key_alg "$leaf_crt")
+        case "$alg" in
+            ML-DSA-*) ;;
+            *)  if [ ! -e "$SSL_DIR/internal-tls-rsa.crt" ]; then
+                    cp -p "$leaf_crt" "$SSL_DIR/internal-tls-rsa.crt"
+                    [ -f "$leaf_key" ] && cp -p "$leaf_key" "$SSL_DIR/internal-tls-rsa.key"
+                    echo "    kept the $alg :8081 leaf as $SSL_DIR/internal-tls-rsa.crt (rollback only)"
+                fi ;;
+        esac
+    fi
+
     # Self-contained OpenSSL config: the PQC OpenSSL build ships no default
-    # openssl.cnf at its compiled-in path, and `req` requires a [req] section,
-    # so we provide one inline rather than depend on a system openssl.cnf
-    # being present.
+    # openssl.cnf at its compiled-in path, and `req` requires a [req] section.
     INT_TLS_CNF="$INT_TLS_DIR/internal-tls-openssl.cnf"
     cat > "$INT_TLS_CNF" <<'CNF'
 [req]
@@ -180,33 +228,53 @@ prompt = no
 [v3_ca]
 basicConstraints = critical, CA:TRUE, pathlen:0
 keyUsage = critical, keyCertSign, cRLSign
+subjectKeyIdentifier = hash
 [v3_server]
 basicConstraints = critical, CA:FALSE
-keyUsage = critical, digitalSignature, keyEncipherment
+keyUsage = critical, digitalSignature
 extendedKeyUsage = serverAuth
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid
 subjectAltName = DNS:gateway, DNS:pqc-gateway, DNS:localhost, IP:127.0.0.1
 CNF
-    "$OPENSSL" genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
-        -out "$INT_TLS_DIR/internal-tls-ca.key"
-    chmod 600 "$INT_TLS_DIR/internal-tls-ca.key"
-    "$OPENSSL" req -config "$INT_TLS_CNF" -new -x509 -days 3650 -extensions v3_ca \
-        -key "$INT_TLS_DIR/internal-tls-ca.key" \
-        -subj "/C=BG/O=${PKI_ORG}/OU=Internal Service Mesh/CN=PQC-GW Internal TLS CA" \
-        -out "$PKI_DIR/internal-tls-ca.crt"
-    chmod 644 "$PKI_DIR/internal-tls-ca.crt"
+    local tmp
+    tmp=$(mktemp -d "$INT_TLS_DIR/.reissue.XXXXXX")
+    chmod 700 "$tmp"
 
-    echo "==> Gateway internal-TLS server certificate (SAN: gateway)"
-    "$OPENSSL" genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \
-        -out "$SSL_DIR/internal-tls.key"
-    chmod 600 "$SSL_DIR/internal-tls.key"
-    "$OPENSSL" req -config "$INT_TLS_CNF" -new -key "$SSL_DIR/internal-tls.key" \
+    if [ "$reissue_ca" = 1 ]; then
+        echo "==> Internal service-mesh TLS CA (ML-DSA-65)"
+        OPENSSL_CONF=/dev/null "$OPENSSL" genpkey -algorithm ML-DSA-65 -out "$tmp/ca.key"
+        "$OPENSSL" req -config "$INT_TLS_CNF" -new -x509 -days 3650 -extensions v3_ca \
+            -key "$tmp/ca.key" \
+            -subj "/C=BG/O=${PKI_ORG}/OU=Internal Service Mesh/CN=PQC-GW Internal TLS CA ML-DSA-65" \
+            -out "$tmp/ca.crt"
+    else
+        cp "$ca_key" "$tmp/ca.key"; cp "$ca_crt" "$tmp/ca.crt"
+    fi
+
+    echo "==> Gateway :8081 server certificate (ML-DSA-65, digitalSignature only; SAN: gateway)"
+    OPENSSL_CONF=/dev/null "$OPENSSL" genpkey -algorithm ML-DSA-65 -out "$tmp/leaf.key"
+    "$OPENSSL" req -config "$INT_TLS_CNF" -new -key "$tmp/leaf.key" \
         -subj "/C=BG/O=${PKI_ORG}/OU=Internal Service Mesh/CN=gateway" \
-        -out "$INT_TLS_DIR/internal-tls.csr"
-    "$OPENSSL" x509 -req -days 825 -in "$INT_TLS_DIR/internal-tls.csr" \
-        -CA "$PKI_DIR/internal-tls-ca.crt" -CAkey "$INT_TLS_DIR/internal-tls-ca.key" \
-        -CAcreateserial -extfile "$INT_TLS_CNF" -extensions v3_server \
-        -out "$SSL_DIR/internal-tls.crt"
-    rm -f "$INT_TLS_DIR/internal-tls.csr"
+        -out "$tmp/leaf.csr"
+    OPENSSL_CONF=/dev/null "$OPENSSL" x509 -req -days 365 -in "$tmp/leaf.csr" \
+        -CA "$tmp/ca.crt" -CAkey "$tmp/ca.key" -set_serial "0x$("$OPENSSL" rand -hex 16)" \
+        -extfile "$INT_TLS_CNF" -extensions v3_server \
+        -out "$tmp/leaf.crt"
+    OPENSSL_CONF=/dev/null "$OPENSSL" verify -CAfile "$tmp/ca.crt" "$tmp/leaf.crt" >/dev/null \
+        || { echo "ERROR: new :8081 leaf does not verify against the new internal CA" >&2; exit 1; }
+
+    # Install: keys first (600), then certificates (644), all in place.
+    if [ "$reissue_ca" = 1 ]; then
+        write_in_place "$tmp/ca.key" "$ca_key"; chmod 600 "$ca_key"
+        write_in_place "$tmp/ca.crt" "$ca_crt"; chmod 644 "$ca_crt"
+    fi
+    write_in_place "$tmp/leaf.key" "$leaf_key"; chmod 600 "$leaf_key"
+    write_in_place "$tmp/leaf.crt" "$leaf_crt"
+    rm -rf "$tmp"
+    echo "    internal CA $(cert_key_alg "$ca_crt"), :8081 leaf $(cert_key_alg "$leaf_crt")"
+    echo "    Reload the gateway (nginx -s reload) and restart management-api: Node reads"
+    echo "    NODE_EXTRA_CA_CERTS only at start."
 }
 
 # The rendered intermediate config is written once, at bootstrap, so a template

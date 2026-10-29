@@ -38,17 +38,54 @@ if [ ! -f "$HMAC_SECRET" ]; then
 fi
 
 # ── Runtime JWKS generation ──────────────────────────────────────────────────
-# Build the JWKS document from the three injected private keys and write it
-# to /tmp/jwks.json (served by the nginx alias directive), one kid-distinguished
+# Build the JWKS document from the injected private keys and write it to
+# /tmp/jwks.json (served by the nginx alias directive), one kid-distinguished
 # entry per key so a verifier resolves the right public key by kid.
 # /tmp is a tmpfs mount so this write does not touch the read-only rootfs.
-if ! python3 /usr/local/bin/gen_jwks.py /tmp/jwks.json \
-    "backend-v1:$KEY_SECRET_BACKEND" \
-    "admin-v1:$KEY_SECRET_ADMIN" \
-    "lookup-v1:$KEY_SECRET_LOOKUP"; then
+#
+# Admin keys (ADR-022). ADMIN_JWT_KID picks the signer (nginx.conf reads it):
+#   admin-v1  RS256, /run/secrets/gateway-signing-key-admin (default)
+#   admin-v2  ML-DSA-65, /run/secrets/gateway-signing-key-admin-v2, published as
+#             {"kty":"AKP","alg":"ML-DSA-65","kid":"admin-v2","pub":...}
+# ADMIN_JWKS_KIDS lists the admin kids the JWKS publishes. Unset: admin-v1, plus
+# admin-v2 when its key file exists (an upgrade without the new key changes
+# nothing). The end state is ADMIN_JWKS_KIDS=admin-v2. The kid that signs must
+# be published, or management-api could not verify a single admin token.
+KEY_SECRET_ADMIN_V2=/run/secrets/gateway-signing-key-admin-v2
+ADMIN_JWT_KID="${ADMIN_JWT_KID:-admin-v1}"
+case "$ADMIN_JWT_KID" in
+    admin-v1|admin-v2) ;;
+    *) echo "FATAL: ADMIN_JWT_KID must be admin-v1 or admin-v2, got '$ADMIN_JWT_KID'" >&2; exit 1 ;;
+esac
+if [ -n "${ADMIN_JWKS_KIDS:-}" ]; then
+    admin_kids=$(echo "$ADMIN_JWKS_KIDS" | tr ',' ' ')
+else
+    admin_kids="admin-v1"
+    [ -f "$KEY_SECRET_ADMIN_V2" ] && admin_kids="admin-v1 admin-v2"
+fi
+case " $admin_kids " in
+    *" $ADMIN_JWT_KID "*) ;;
+    *) echo "FATAL: ADMIN_JWT_KID=$ADMIN_JWT_KID is not in the published admin kids ($admin_kids)" >&2; exit 1 ;;
+esac
+jwks_args=("backend-v1:$KEY_SECRET_BACKEND" "lookup-v1:$KEY_SECRET_LOOKUP")
+for k in $admin_kids; do
+    case "$k" in
+        admin-v1) jwks_args+=("admin-v1:$KEY_SECRET_ADMIN") ;;
+        admin-v2)
+            if [ ! -f "$KEY_SECRET_ADMIN_V2" ]; then
+                echo "FATAL: admin-v2 is to be published but $KEY_SECRET_ADMIN_V2 is missing" >&2
+                echo "       Create it with scripts/generate-gateway-secrets.sh (secrets.gateway-signing-key-admin-v2)" >&2
+                exit 1
+            fi
+            jwks_args+=("admin-v2:ML-DSA-65:$KEY_SECRET_ADMIN_V2") ;;
+        *) echo "FATAL: ADMIN_JWKS_KIDS holds '$k'; only admin-v1 and admin-v2 exist" >&2; exit 1 ;;
+    esac
+done
+if ! python3 /usr/local/bin/gen_jwks.py /tmp/jwks.json "${jwks_args[@]}"; then
     echo "FATAL: JWKS generation failed" >&2
     exit 1
 fi
+echo "Admin token signer: $ADMIN_JWT_KID; admin kids in the JWKS: $admin_kids"
 echo "JWKS generated at /tmp/jwks.json"
 
 # ── Route persistence directory ──────────────────────────────────────────────

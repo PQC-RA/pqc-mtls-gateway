@@ -188,8 +188,19 @@ services:
   secrets:
    - gateway-signing-key
    - gateway-signing-key-admin
+   # ML-DSA-65 admin key, kid admin-v2 (ADR-022), from
+   # scripts/generate-gateway-secrets.sh. Published in the JWKS when present;
+   # signs only with ADMIN_JWT_KID=admin-v2 below.
+   - gateway-signing-key-admin-v2
    - gateway-signing-key-lookup
    - control-plane-hmac
+  environment:
+   # Admin token signer (ADR-022): admin-v1 (RS256, default) or admin-v2
+   # (ML-DSA-65). management-api must accept the kid first (JWT_EXPECTED_KID).
+   - ADMIN_JWT_KID=${ADMIN_JWT_KID:-admin-v1}
+   # Admin kids the JWKS publishes, comma-separated. Empty: admin-v1, plus
+   # admin-v2 if its key exists. End state after the 7-day window: admin-v2.
+   - ADMIN_JWKS_KIDS=${ADMIN_JWKS_KIDS:-}
   deploy:
    resources:
     limits:
@@ -558,6 +569,18 @@ services:
    - AUDITOR_CERT_FINGERPRINTS=${AUDITOR_CERT_FINGERPRINTS}
    - JWT_EXPECTED_ISSUER=pqc-gateway
    - JWT_EXPECTED_AUDIENCE=pqc-mtls-management-api
+   # Admin token kids accepted (ADR-022): admin-v1 = RS256, admin-v2 = ML-DSA-65
+   # (fixed table in the API). Ship "admin-v1,admin-v2" BEFORE the gateway
+   # switches ADMIN_JWT_KID; "admin-v2" alone is the end state.
+   - JWT_EXPECTED_KID=${JWT_EXPECTED_KID:-admin-v1}
+   # SHA-256 (hex) of the admin-v2 raw ML-DSA-65 public key, printed by
+   # scripts/generate-gateway-secrets.sh. The API refuses an admin-v2 JWKS entry
+   # with any other key, so whoever can serve a JWKS cannot substitute it.
+   - ADMIN_V2_PUB_SHA256=${ADMIN_V2_PUB_SHA256:-}
+   # ML-DSA-65: the JWKS is fetched only from a :8081 presenting an ML-DSA-65
+   # certificate (chain validation alone would accept an RSA leaf from the
+   # pinned CA). Set it once :8081 runs the ML-DSA-65 leaf (ADR-022 end state).
+   - GATEWAY_TLS_LEAF_ALG=${GATEWAY_TLS_LEAF_ALG:-}
    - OPENSSL_CONF=/etc/ssl/openssl.cnf
    # pqc-logs-audit is mounted read-only here; redirect CRL renewal logs to /tmp
    - CRL_LOG_FILE=/tmp/crl-renewal.log
@@ -573,8 +596,9 @@ services:
    - AUDIT_LOG_PATH=/var/log/pqc-gw/enroll-audit.log
    - ADMIN_AUDIT_LOG=/var/lib/pqc-mgmt/admin-actions.log
    # Reach the gateway control plane over TLS (JWKS fetch + route push). The
-   # gateway presents a classical RSA cert there (Node cannot validate ML-DSA);
-   # NODE_EXTRA_CA_CERTS pins the internal CA so a spoofed JWKS is rejected.
+   # gateway presents an ML-DSA-65 certificate from the ML-DSA-65 internal CA
+   # there (ADR-022; Node 22 bundles OpenSSL 3.5); NODE_EXTRA_CA_CERTS pins that
+   # CA so a spoofed JWKS is rejected. Node reads it only at start.
    - GATEWAY_JWKS_URI=https://gateway:8081/.well-known/jwks.json
    - GATEWAY_CONTROL_URL=https://gateway:8081/update-routes
    - NODE_EXTRA_CA_CERTS=/etc/pki/internal-tls-ca.crt
@@ -628,6 +652,8 @@ secrets:
   file: ./secrets/gateway-signing.key
  gateway-signing-key-admin:
   file: ./secrets/gateway-signing-key-admin.key
+ gateway-signing-key-admin-v2:
+  file: ./secrets/gateway-signing-key-admin-v2.key
  gateway-signing-key-lookup:
   file: ./secrets/gateway-signing-key-lookup.key
  control-plane-hmac:

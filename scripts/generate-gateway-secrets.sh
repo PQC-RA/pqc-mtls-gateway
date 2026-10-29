@@ -15,6 +15,12 @@
 #                                   key across purposes), a leaked
 #                                   key here should not let an attacker forge
 #                                   backend-attestation tokens too.
+#   gateway-signing-key-admin-v2.key  ML-DSA-65 private key for the /admin/
+#                                   JWT under kid=admin-v2 (ADR-022), used when
+#                                   the gateway runs with ADMIN_JWT_KID=admin-v2.
+#                                   Needs OpenSSL 3.5+ (scripts/lib/pq-openssl.sh).
+#                                   Prints the SHA-256 of its raw public key: that
+#                                   value is management-api's ADMIN_V2_PUB_SHA256.
 #   gateway-signing-key-lookup.key  RSA-2048 private key for Token 2
 #                                   (cert-lookup JWT, aud=pqc-cert-lookup,
 #                                   kid=lookup-v1). Closer in sensitivity to
@@ -74,6 +80,27 @@ else
 fi
 
 # ── RSA-2048 lookup JWT signing key (Key C, aud=pqc-cert-lookup) ────
+ADMIN_V2_KEY_FILE="$SECRETS_DIR/gateway-signing-key-admin-v2.key"
+# Run in a subshell: pq-openssl.sh exits when it finds no OpenSSL 3.5+, and that
+# must stop only this key, with a clear message, not the RSA/HMAC secrets.
+if ! (
+    # shellcheck source=lib/pq-openssl.sh
+    . "$SCRIPT_DIR/lib/pq-openssl.sh"
+    if [ -f "$ADMIN_V2_KEY_FILE" ]; then
+        echo "SKIP: $ADMIN_V2_KEY_FILE already exists (delete it first to regenerate)"
+    else
+        echo "Generating ML-DSA-65 admin JWT signing key (kid admin-v2)..."
+        ( umask 077; "$O" genpkey -algorithm ML-DSA-65 -out "$ADMIN_V2_KEY_FILE" ) || exit 1
+        chmod 600 "$ADMIN_V2_KEY_FILE"
+        echo "  Written: $ADMIN_V2_KEY_FILE"
+    fi
+    pin=$("$O" pkey -in "$ADMIN_V2_KEY_FILE" -pubout -outform DER | tail -c 1952 | sha256sum | cut -d' ' -f1)
+    echo "  admin-v2 public key SHA-256 (management-api ADMIN_V2_PUB_SHA256): $pin"
+); then
+    echo "WARN: no ML-DSA-65 admin key (admin-v2): no OpenSSL 3.5+ found. The gateway" >&2
+    echo "      runs with admin-v1; install one (scripts/install-host-openssl.sh) and re-run." >&2
+fi
+
 LOOKUP_KEY_FILE="$SECRETS_DIR/gateway-signing-key-lookup.key"
 if [ -f "$LOOKUP_KEY_FILE" ]; then
     echo "SKIP: $LOOKUP_KEY_FILE already exists (delete it first to regenerate)"

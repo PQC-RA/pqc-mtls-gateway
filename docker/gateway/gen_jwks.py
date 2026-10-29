@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 """
 gen_jwks.py: Build a standards-compliant JWKS (RFC 7517) from one or more PEM
-RSA keys.
+private keys: RSA (RS256) and ML-DSA-65 (RFC 9964, key type AKP).
 
-Usage: python3 gen_jwks.py <output_jwks.json> <kid1>:<private_key1.pem> [<kid2>:<private_key2.pem> ...]
+Usage: python3 gen_jwks.py <output_jwks.json> <kid>:<rsa_key.pem> [<kid>:ML-DSA-65:<mldsa_key.pem> ...]
+
+An ML-DSA-65 key is named as such on the command line and checked against its
+own SubjectPublicKeyInfo (OID 2.16.840.1.101.3.4.3.18, 1,974 bytes), so an
+entry's type never depends on guessing. Its entry is
+{"kty":"AKP","alg":"ML-DSA-65","kid":...,"pub":<base64url of the raw 1,952-byte
+public key>} (RFC 9964 sections 3 and 8.1.4.2); "use":"sig" as for RSA.
 
 For each <kid>:<path> pair, parses the RSA public key from the
 SubjectPublicKeyInfo DER structure, extracts the modulus (n) and public
@@ -13,7 +19,7 @@ way, each of the gateway's three signing purposes (admin/backend/lookup)
 gets its own kid-distinguished entry so a verifier resolves the right public
 key by the kid in the token header.
 """
-import base64, glob, json, os, shutil, subprocess, sys
+import base64, glob, hashlib, json, os, shutil, subprocess, sys
 
 def find_openssl() -> str:
     """Locate the OpenSSL binary: env var > /opt/openssl > /opt/openssl-* scan > PATH."""
@@ -95,6 +101,19 @@ def extract_rsa_params(pem_key_path: str):
     e_bytes, idx = read_der_int(der, idx)
     return n_bytes, e_bytes
 
+# DER prefix of an ML-DSA-65 SubjectPublicKeyInfo (RFC 9881: no parameters).
+MLDSA65_SPKI_PREFIX = bytes.fromhex("308207b2300b0609608648016503040312038207a100")
+MLDSA65_PUB_LEN = 1952
+
+def extract_mldsa65_pub(pem_key_path: str) -> bytes:
+    """Raw 1,952-byte ML-DSA-65 public key from a PEM private key, or exit."""
+    der = subprocess.check_output([
+        find_openssl(), "pkey", "-in", pem_key_path, "-pubout", "-outform", "DER",
+    ])
+    if len(der) != len(MLDSA65_SPKI_PREFIX) + MLDSA65_PUB_LEN or not der.startswith(MLDSA65_SPKI_PREFIX):
+        sys.exit(f"{pem_key_path}: not an ML-DSA-65 key (SPKI {len(der)} bytes)")
+    return der[len(MLDSA65_SPKI_PREFIX):]
+
 def main():
     if len(sys.argv) < 3:
         sys.exit(f"Usage: {sys.argv[0]} <output_jwks.json> <kid1>:<private_key1.pem> [<kid2>:<private_key2.pem> ...]")
@@ -103,10 +122,33 @@ def main():
     pairs    = sys.argv[2:]
 
     keys = []
+    seen = set()
     for pair in pairs:
-        kid, _, key_path = pair.partition(":")
+        parts = pair.split(":", 2)
+        if len(parts) == 3 and parts[1] == "ML-DSA-65":
+            kid, alg, key_path = parts
+        elif len(parts) == 2:
+            kid, key_path = parts
+            alg = "RS256"
+        else:
+            sys.exit(f"Invalid <kid>:[ML-DSA-65:]<path> pair: {pair!r}")
         if not kid or not key_path:
             sys.exit(f"Invalid <kid>:<path> pair: {pair!r}")
+        if kid in seen:
+            sys.exit(f"Duplicate kid {kid!r}")
+        seen.add(kid)
+
+        if alg == "ML-DSA-65":
+            pub = extract_mldsa65_pub(key_path)
+            keys.append({
+                "kty": "AKP",
+                "use": "sig",
+                "alg": "ML-DSA-65",
+                "kid": kid,
+                "pub": b64url(pub),
+            })
+            print(f"  {kid}: ML-DSA-65, pub {len(pub)} bytes, sha256 {hashlib.sha256(pub).hexdigest()}")
+            continue
 
         n_bytes, e_bytes = extract_rsa_params(key_path)
         keys.append({

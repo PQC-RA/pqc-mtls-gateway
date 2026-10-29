@@ -1,8 +1,14 @@
 -- admin_jwt.lua
--- Runs in access_by_lua for the /admin/ location. Mints a short-lived RS256
--- JWT attesting the verified mTLS client identity and injects it as the
+-- Runs in access_by_lua for the /admin/ location. Mints a short-lived JWT
+-- attesting the verified mTLS client identity and injects it as the
 -- Authorization header for the management-api, which authorizes the caller
 -- against an explicit certificate-fingerprint allowlist.
+--
+-- Signer and kid come from configuration (ADR-022): ADMIN_JWT_KID=admin-v1
+-- (default, RS256, jwt_rs256.lua) or admin-v2 (ML-DSA-65, jwt_mldsa.lua),
+-- read once by init_by_lua into the shared dict. Both carry jti (single use at
+-- the API) and htm/htu, binding the token to this request's method and to the
+-- path the API receives after the proxy_pass rewrite below.
 --
 -- Key handling:
 --   * The signing key is read from the shared dict (populated by
@@ -17,6 +23,8 @@
 --   * Uses SHA-256 (not nginx's built-in $ssl_client_fingerprint which is SHA-1).
 
 local jwt_rs256        = require("jwt_rs256")
+local jwt_mldsa        = require("jwt_mldsa")
+local resty_random     = require("resty.random")
 local cert_fingerprint = require("cert_fingerprint")
 local header_allowlist = require("header_allowlist")
 
@@ -90,11 +98,38 @@ if not fpr then
     return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
 end
 
-local pem = ngx.shared.pqc_route_meta:get("jwt_key_admin")
+local meta = ngx.shared.pqc_route_meta
+local kid  = meta:get("admin_jwt_kid") or "admin-v1"
+local pem
+if kid == "admin-v2" then
+    pem = meta:get("jwt_key_admin_v2")
+elseif kid == "admin-v1" then
+    pem = meta:get("jwt_key_admin")
+end
 if not pem then
-    ngx.log(ngx.ERR, "[admin_jwt] signing key absent from shared dict, refusing to proxy")
+    ngx.log(ngx.ERR, "[admin_jwt] signing key for ", tostring(kid), " absent from shared dict, refusing to proxy")
     return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
 end
+
+-- htu: the path management-api receives. nginx.conf proxies location /admin/
+-- to http://management-api:3000/api/admin/, which replaces the "/admin/" prefix
+-- of the NORMALIZED uri ($uri) and sends the result re-escaped. A path made only
+-- of characters nginx never escapes is sent byte for byte, so the API can
+-- compare htu with what it received; anything else is refused here rather than
+-- minted with a binding that would not match. The query string is not bound.
+local uri = ngx.var.uri or ""
+if uri:sub(1, 7) ~= "/admin/" or uri:find("[^%w%._~!%$&%(%)%*%+,;=:@/%-]") then
+    ngx.log(ngx.WARN, "[admin_jwt] admin path with characters outside the bound set, refused")
+    return ngx.exit(ngx.HTTP_BAD_REQUEST)
+end
+local htu = "/api/admin/" .. uri:sub(8)
+
+local rnd = resty_random.bytes(16, true)
+if not rnd then
+    ngx.log(ngx.ERR, "[admin_jwt] no strong random bytes for jti, refusing to proxy")
+    return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)
+end
+local jti = (ngx.encode_base64(rnd):gsub("+", "-"):gsub("/", "_"):gsub("=", ""))
 
 -- CSRF / Origin: a gateway-side Origin check on mutating /admin/ methods is
 -- deliberately NOT done here. Primary anti-CSRF enforcement lives in the
@@ -114,9 +149,17 @@ local payload = {
     fpr  = fpr,
     iat  = math.floor(now),
     exp  = math.floor(now) + 60,
+    jti  = jti,
+    htm  = ngx.req.get_method(),
+    htu  = htu,
 }
 
-local token, sign_err = jwt_rs256.sign(pem, payload, "admin-v1")
+local token, sign_err
+if kid == "admin-v2" then
+    token, sign_err = jwt_mldsa.sign(pem, payload, "admin-v2")
+else
+    token, sign_err = jwt_rs256.sign(pem, payload, "admin-v1")
+end
 if not token then
     ngx.log(ngx.ERR, "[admin_jwt] signing failed: ", tostring(sign_err))
     return ngx.exit(ngx.HTTP_INTERNAL_SERVER_ERROR)

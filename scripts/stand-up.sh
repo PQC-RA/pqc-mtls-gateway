@@ -24,6 +24,9 @@
 #   API_SRC          build management-api from this source checkout instead
 #   IMG_CUSTODIAN, IMG_API, IMG_GATEWAY, IMG_RENEWER, IMG_OCSP, IMG_PKIDIST
 #                    use these images instead of building or pulling them
+#   ADMIN_JWT_KID, ADMIN_JWKS_KIDS, JWT_EXPECTED_KID
+#                    admin token kids (ADR-022), written to STAND_DIR/env;
+#                    the admin-v2 pin (ADMIN_V2_PUB_SHA256) is always written
 #   LIVE_PROJECTS    compose projects never to touch (default pqc-gw pqc-mtls-gateway,
 #                    plus the project of a running pqc-gateway container)
 #
@@ -99,6 +102,18 @@ CORS_ALLOWED_ORIGINS=https://127.0.0.1
 CONSOLE_ORIGIN=https://127.0.0.1
 RENEWAL_ENABLED=1
 CUSTODIAN_DEMO_PROFILE=1
+EOF
+# Admin token (ADR-022). The pin is the SHA-256 of the admin-v2 raw public key;
+# the kids come from the caller (defaults: the upgrade-safe admin-v1). The ADR's
+# stand end state is ADMIN_JWT_KID=admin-v2 ADMIN_JWKS_KIDS=admin-v2 JWT_EXPECTED_KID=admin-v2.
+ADMIN_V2_KEY="$SD/tree/secrets/gateway-signing-key-admin-v2.key"
+[ -s "$ADMIN_V2_KEY" ] || die "no admin-v2 key in the stand's secrets (see $SD/secrets.log)"
+ADMIN_V2_PIN=$($O pkey -in "$ADMIN_V2_KEY" -pubout -outform DER | tail -c 1952 | sha256sum | cut -d' ' -f1)
+cat >> "$SD/env" <<EOF
+ADMIN_V2_PUB_SHA256=$ADMIN_V2_PIN
+ADMIN_JWT_KID=${ADMIN_JWT_KID:-admin-v1}
+ADMIN_JWKS_KIDS=${ADMIN_JWKS_KIDS:-}
+JWT_EXPECTED_KID=${JWT_EXPECTED_KID:-admin-v1}
 EOF
 # ── images ────────────────────────────────────────────────────────────────────
 pinned_api(){ sed -n 's/^  image: \(ghcr.io\/[^ ]*management-api@sha256:[0-9a-f]*\).*/\1/p' "$1/docker-compose.yml" | head -1; }

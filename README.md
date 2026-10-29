@@ -160,7 +160,8 @@ echo | OPENSSL_CONF=/etc/ssl/openssl.cnf /opt/openssl/bin/openssl s_client \
    server IP is auto-detected into the certificate SAN. Skipped if a PKI already exists.
 4. **Issues a bootstrap admin certificate** to `./admin-cert/` and writes its SHA-256 fingerprint
    into `ADMIN_CERT_FINGERPRINTS` in `.env`. No manual fingerprint step.
-5. **Generates gateway secrets**, the RSA-2048 JWT signing keys and the control-plane HMAC.
+5. **Generates gateway secrets**, the RSA-2048 JWT signing keys, the ML-DSA-65 admin key
+   (`admin-v2`) and the control-plane HMAC.
 6. **Builds the images and starts the stack.**
 
 Useful flags: `--server-ip IP` overrides SAN auto-detection; `--rebuild-artifacts` ignores the
@@ -573,9 +574,13 @@ actionlint and an OpenSSL version-consistency gate.
   HMAC-authenticated internal API. The gateway mounts the CA tree with the private-key
   subdirectories masked, so the internet-facing component never sees a CA private key.
 - **Classical elements remain only on internal hops, and naming them is part of the result:** the
-  RS256/RSA-2048 JWT used for backend identity hand-off and the RSA-2048 internal-TLS chain that
-  carries the JWKS fetch. The JWT is a deliberate trade: an ML-DSA-65 signature on a token that rides
-  every proxied request would recreate the header-size problem this project exists to document.
+  RS256/RSA-2048 JWTs that ride every proxied request (Token 1, backend identity, and Token 2,
+  cert lookup). That is a deliberate trade: an ML-DSA-65 signature adds 4,412 characters to a
+  header, on every request, against backends that often cap headers at 8 KB, which would recreate
+  the header-size problem this project exists to document. The admin token (`/admin/` only) and
+  the internal `:8081` channel that carries the JWKS move to ML-DSA-65 (ADR-022, below); until a
+  deployment switches `ADMIN_JWT_KID` to `admin-v2` and drops `admin-v1`, its admin token is RS256
+  too.
   Until 2026-10 the `:8443` enrollment listener also presented a classical ECDSA P-256 certificate
   and accepted a classical fallback group; it is now post-quantum-only, like `:443`.
 
@@ -656,6 +661,29 @@ long-lived session (an edge link, a slow download) survived any revocation.
 Responses that take longer than 60 seconds in total and straddle a reload are
 cut; change the value in `nginx.conf` if you serve such responses. The
 crl-renewer now signals a reload only when a published CRL actually changed.
+
+**Admin token and `:8081` to ML-DSA-65 (ADR-022, off until switched).** The admin token
+(`/admin/` only) can be signed with ML-DSA-65 (RFC 9964, kid `admin-v2`) instead of RS256
+(`admin-v1`), and carries `jti`, `htm` and `htu`: management-api accepts each token once, for
+the method and path it was minted for. The internal TLS CA and the `:8081` certificate become
+ML-DSA-65 (`setup-pki.sh` reissues them in place; the RSA ones stay on disk as
+`internal-tls-ca-rsa.crt` and `internal-tls-rsa.{crt,key}` for rollback only) and `:8081` takes
+TLS 1.3 with X25519MLKEM768 only, so a client of `:8081` (management-api, `bench/policy.sh`, the
+migration inventory) needs OpenSSL 3.5 or later; Node 22 has it. Order, each step reversible:
+
+1. `scripts/generate-gateway-secrets.sh` (adds only `gateway-signing-key-admin-v2.key` and prints
+   the SHA-256 of its public key) and `scripts/setup-pki.sh` (reissues the internal CA and leaf);
+   reload the gateway, restart management-api (Node reads `NODE_EXTRA_CA_CERTS` only at start).
+2. management-api first: `JWT_EXPECTED_KID=admin-v1,admin-v2` and `ADMIN_V2_PUB_SHA256=<hash>`.
+3. Gateway: `ADMIN_JWT_KID=admin-v2` (recreate the container: nginx reads it at start).
+   Rollback: `ADMIN_JWT_KID=admin-v1`.
+4. After the dual window: `ADMIN_JWKS_KIDS=admin-v2` on the gateway and `JWT_EXPECTED_KID=admin-v2`
+   plus `GATEWAY_TLS_LEAF_ALG=ML-DSA-65` on management-api. From then on a rollback to RS256 needs
+   management-api reconfigured first.
+
+Without these variables nothing changes: the gateway signs `admin-v1` and publishes `admin-v2`
+beside it only if its key exists. The compose file names the new key as a Docker secret, so run
+`scripts/generate-gateway-secrets.sh` once before `docker compose up`.
 
 A deployment made before this release needs these steps beyond `deploy.sh`:
 
@@ -775,6 +803,9 @@ The value-less template is `.env.example`; `deploy.sh` copies it for you.
 | `.env` | `CORS_ALLOWED_ORIGINS` | Web origins allowed to call the management API. Empty means no cross-origin access |
 | compose | `JWT_EXPECTED_ISSUER` / `JWT_EXPECTED_AUDIENCE` | JWT validation pinning |
 | `secrets/` | `gateway-signing.key` | RSA-2048 JWT signing key (generated, gitignored) |
+| `secrets/` | `gateway-signing-key-admin-v2.key` | ML-DSA-65 admin JWT key, kid `admin-v2` (generated, gitignored); its public key's SHA-256 is `ADMIN_V2_PUB_SHA256` |
+| `.env` | `ADMIN_JWT_KID` / `ADMIN_JWKS_KIDS` | admin token signer and the admin kids in the JWKS (gateway, ADR-022) |
+| `.env` | `JWT_EXPECTED_KID` / `ADMIN_V2_PUB_SHA256` / `GATEWAY_TLS_LEAF_ALG` | admin kids accepted, admin-v2 key pin, `:8081` leaf type (management-api, ADR-022) |
 | `secrets/` | `control-plane-hmac.key` | Control-channel HMAC secret (generated, gitignored) |
 
 </details>
