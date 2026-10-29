@@ -135,7 +135,9 @@ T=$SD/tree
 if [ -z "${IMG_API:-}" ]; then
 	if [ -n "${API_SRC:-}" ]; then
 		IMG_API=$P-management-api:$(git -C "$API_SRC" rev-parse --short HEAD); log "building $IMG_API from $API_SRC"
-		docker build -q -t "$IMG_API" "$API_SRC" > "$SD/build-api.log" 2>&1 || { tail "$SD/build-api.log"; die "management-api build"; }
+		# On the OpenSSL base its own base.lock pins (not the gateway's local base).
+		API_BASE=$(python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); print(d["image"]+"@"+d["digest"])' "$API_SRC/base.lock" 2>/dev/null || true)
+		docker build -q -t "$IMG_API" ${API_BASE:+--build-arg "BASE_OPENSSL_IMAGE=$API_BASE"} "$API_SRC" > "$SD/build-api.log" 2>&1 || { tail "$SD/build-api.log"; die "management-api build"; }
 	else
 		IMG_API=$(pinned_api "$T"); [ -n "$IMG_API" ] || die "no pinned management-api image in docker-compose.yml"
 		log "pulling $IMG_API"; docker pull -q "$IMG_API" > "$SD/pull-api.log" 2>&1 || { cat "$SD/pull-api.log"; die "pull of $IMG_API"; }
