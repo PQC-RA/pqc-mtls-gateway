@@ -253,6 +253,14 @@ generate_internal_tls() {
         elif ! itls_not_expiring "$ITLS_ML_CRT"; then
             status=expiring
         fi
+        if ! itls_bundle_has "$ITLS_BUNDLE" "$ITLS_CA_MLDSA" && [ "${REISSUE_INTERNAL_CA:-}" = 1 ]; then
+            # A reissue interrupted after the ML-DSA-65 CA was written but before
+            # the trust file: finish it (ML-DSA-65 CA, plus the classical one if kept).
+            cp "$ITLS_CA_MLDSA" "$tmp/bundle.crt"
+            [ -f "$ITLS_CA_RSA" ] && cat "$ITLS_CA_RSA" >> "$tmp/bundle.crt"
+            itls_write_in_place "$tmp/bundle.crt" "$ITLS_BUNDLE"; chmod 644 "$ITLS_BUNDLE"
+            echo "==> Trust file completed: $(itls_bundle_fprs "$ITLS_BUNDLE" | wc -l) CA(s). Restart management-api next."
+        fi
         if ! itls_bundle_has "$ITLS_BUNDLE" "$ITLS_CA_MLDSA"; then
             echo "WARNING: $ITLS_BUNDLE (the CA file management-api pins) does not hold the" >&2
             echo "  ML-DSA-65 internal CA. A :8081 serving the ML-DSA-65 leaf is then refused by" >&2
@@ -308,10 +316,17 @@ generate_internal_tls() {
         # Keep the classical CA and leaf, once (rollback; never a second ssl_certificate).
         if [ ! -e "$ITLS_CA_RSA" ]; then
             itls_ossl x509 -in "$ITLS_BUNDLE" -out "$ITLS_CA_RSA"; chmod 644 "$ITLS_CA_RSA"
-            if [ -f "$ITLS_CA_KEY" ] && itls_key_matches "$ITLS_CA_RSA" "$ITLS_CA_KEY"; then
-                ( umask 077; cp "$ITLS_CA_KEY" "$ITLS_CA_RSA_KEY" ); chmod 600 "$ITLS_CA_RSA_KEY"
-            fi
             echo "    kept the $alg internal CA as internal-tls-ca-rsa.crt"
+        fi
+        # The key copy is decided by the KEY file, not the certificate, so a run
+        # interrupted between the two still keeps the classical CA key.
+        if [ ! -e "$ITLS_CA_RSA_KEY" ] && [ -f "$ITLS_CA_KEY" ] && itls_key_matches "$ITLS_CA_RSA" "$ITLS_CA_KEY"; then
+            ( umask 077; cp "$ITLS_CA_KEY" "$ITLS_CA_RSA_KEY.tmp" ); chmod 600 "$ITLS_CA_RSA_KEY.tmp"
+            mv "$ITLS_CA_RSA_KEY.tmp" "$ITLS_CA_RSA_KEY"
+            echo "    kept the $alg internal CA key as internal-tls-ca-rsa.key"
+        fi
+        if [ -f "$ITLS_CA_KEY" ] && itls_key_matches "$ITLS_CA_RSA" "$ITLS_CA_KEY" && [ ! -s "$ITLS_CA_RSA_KEY" ]; then
+            echo "ERROR: the classical internal CA key could not be kept; refusing to overwrite it" >&2; exit 1
         fi
         if [ ! -e "$ITLS_RSA_CRT" ] && [ -f "$ITLS_LEAF_CRT" ] && [ "$(itls_alg "$ITLS_LEAF_CRT")" != "ML-DSA-65" ]; then
             ( umask 077; cp "$ITLS_LEAF_KEY" "$ITLS_RSA_KEY" ); chmod 600 "$ITLS_RSA_KEY"
