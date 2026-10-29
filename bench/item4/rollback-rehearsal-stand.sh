@@ -123,6 +123,10 @@ s = s.replace("   - ./scripts/pqc-crl-renew.sh:/usr/local/bin/pqc-crl-renew.sh:r
 open(p, "w").write(s)
 PY
 grep -c "$RB" $FIX/compose.override.yml | sed 's/^/      rollback mounts: /'
+# ADR-022: the old code signs and accepts admin-v1 (RS256) only. A stand in the
+# ADR-022 end state accepts admin-v2 only, so going back to pre-ADR-022 code
+# includes accepting admin-v1 again (restored with env.item4 at roll forward).
+sed -i 's/^JWT_EXPECTED_KID=.*/JWT_EXPECTED_KID=admin-v1/' $FIX/env
 $FIXC up -d --no-deps pqc-ca-custodian management-api gateway crl-renewer > "$W/s0-up.out" 2>&1; waitup || die "stack not healthy on the old code"
 docker ps --filter label=com.docker.compose.project=$STAND_PROJECT --format '      {{.Names}} {{.Image}} {{.Status}}'
 guard
