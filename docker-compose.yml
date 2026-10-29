@@ -199,7 +199,7 @@ services:
    # (ML-DSA-65). management-api must accept the kid first (JWT_EXPECTED_KID).
    - ADMIN_JWT_KID=${ADMIN_JWT_KID:-admin-v1}
    # Admin kids the JWKS publishes, comma-separated. Empty: admin-v1, plus
-   # admin-v2 if its key exists. End state after the 7-day window: admin-v2.
+   # admin-v2 if its key exists. End state after the dual window (48 h on live): admin-v2.
    - ADMIN_JWKS_KIDS=${ADMIN_JWKS_KIDS:-}
   deploy:
    resources:
