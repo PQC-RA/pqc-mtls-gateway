@@ -116,10 +116,10 @@ echo "  CA index SHA-256 after : ${IDXA:0:24}"
 # ADMITS such a certificate, because it checks that the leaf is signed by a
 # trusted CA and never constrains the leaf's own subject key, so only the
 # explicit ssl_conf_command ClientSignatureAlgorithms restriction can reject it.
-# An ssl_conf_command OpenSSL does not recognise is accepted at parse time and
-# never applied, and an omitted one passes `nginx -t` in silence, so this is the
-# only check that proves the restriction is live. That is why it belongs in CI
-# rather than in a benchmark script run by hand.
+# An omitted ssl_conf_command passes `nginx -t` in silence (an unrecognised one
+# fails it), so only a test against the running server proves the restriction
+# is live: this one, and the requested-sigalgs assertion above. That is why it
+# belongs in CI rather than in a benchmark script run by hand.
 echo "  -- handshake guard: classical cert SIGNED BY THE LEGITIMATE intermediate must be refused"
 INT_CRT=$PKI/intermediate/certs/intermediate-ca.crt
 INT_KEY=$PKI/intermediate/private/intermediate-ca.key
