@@ -76,6 +76,9 @@ echo "=============== 3. PQC-ONLY CLIENT AUTH ==============="
 echo "  -- handshake guard: which sigalgs does the server request?"
 echo | timeout 25 $OSSL s_client -connect 127.0.0.1:443 -CAfile $CA 2>/dev/null \
   | grep -E "Requested Signature Algorithms" | tee $EV/sigalgs.txt | sed 's/^/     /'
+# Exactly ML-DSA-65: without the ClientSignatureAlgorithms line the list is long.
+grep -qxE "Requested Signature Algorithms: (id-ml-dsa-65|mldsa65|ML-DSA-65)" $EV/sigalgs.txt \
+  || fail "the server requests client signatures other than ML-DSA-65 (or none was read)"
 echo "  -- issuance guard: RSA / EC / ML-DSA-44 CSRs must be refused"
 IDXB=$($OSSL dgst -sha256 $PKI/intermediate/db/index.txt | awk '{print $2}')
 TD=$(mktemp -d)
