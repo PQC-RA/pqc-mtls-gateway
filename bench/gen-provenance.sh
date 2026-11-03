@@ -28,9 +28,9 @@ HEAD=$(cd $REPO && git log -1 --pretty=%H)
 BR=$(cd $REPO && git branch --show-current)
 TREE=$(cd $REPO && [ -z "$(git status --porcelain)" ] && echo clean || echo DIRTY)
 CTRS=$(docker ps --format '{{.Names}}' | sort | tr '\n' ' ')
-CAFP=$($OSSL x509 -in /etc/pki/pqc-ca/ca-chain.crt -noout -fingerprint -sha256 | sed 's/.*=//')
+CAFP=$($OSSL x509 -in /var/lib/pqc-ca-public/ca-chain.crt -noout -fingerprint -sha256 | sed 's/.*=//')
 SER=$($OSSL x509 -in $EXPORT_DIR/client.crt -noout -serial | sed 's/.*=//')
-IDX=/etc/pki/pqc-ca/intermediate/db/index.txt
+IDX=/var/lib/pqc-ca/state/db/index.txt
 NR=$(grep -c '^R' $IDX 2>/dev/null || echo 0)
 NV=$(grep -c '^V' $IDX 2>/dev/null || echo 0)
 

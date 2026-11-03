@@ -1,16 +1,10 @@
 #!/usr/bin/env bash
-# Offline unit test of custodian.js: a throwaway copy of a test CA, no network
-# (docker --network none), the custodian and the client in one container.
-# Usage: run-custodian-unit.sh <throwaway-pki-dir> <custodian-image>
-# The pki directory is modified (unique_subject = no); never point it at a real CA.
+# Offline unit test of custodian.js (item 4). Since ADR-024 the custodian runs on
+# its own layout, so bench/item4/custodian-unit.js is run by
+# bench/adr024/run-custodian-crl-unit.sh, which builds that layout with
+# setup-pki.sh and checks the CRL issuer as well. This wrapper is kept so the
+# old entry point still works.
+# Usage: run-custodian-unit.sh [ignored-pki-dir] <custodian-image>
 set -euo pipefail
-P=$1; IMG=$2; T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
-cp "$(dirname "$0")/custodian-unit.js" "$T/client.js"
-head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n' > "$T/hmac"; chmod -R a+rX "$T"
-sed -i 's/^unique_subject *=.*/unique_subject = no/' "$P/intermediate/openssl-intermediate.cnf"
-echo 'unique_subject = no' > "$P/intermediate/db/index.txt.attr"
-docker run --rm --network none -v "$P:/etc/pki/pqc-ca" -v "$T:/t" \
-  -v "$(cd "$(dirname "$0")/../.." && pwd)/docker/pqc-ca-custodian/custodian.js:/c.js:ro" \
-  -e CUSTODIAN_HMAC_SECRET_FILE=/t/hmac -e RENEWAL_ENABLED=1 -e CUSTODIAN_DEMO_PROFILE=1 \
-  -e CRL_FILE=/etc/pki/pqc-ca/hybrid-combined-crl.pem --entrypoint sh "$IMG" \
-  -c 'node /c.js > /tmp/cust.log 2>&1 & sleep 1.5; node /t/client.js; rc=$?; [ $rc = 0 ] || tail -20 /tmp/cust.log; exit $rc'
+IMG=${2:-${1:?usage: run-custodian-unit.sh [pki-dir] <custodian-image>}}
+exec "$(dirname "$0")/../adr024/run-custodian-crl-unit.sh" "$IMG"

@@ -105,7 +105,7 @@ done
 # The images that assert the versions they carry take them as build arguments
 # without a default (one source), and compose passes them from the environment
 # that scripts/build-all.sh exports from versions.env.
-for df in docker/gateway/Dockerfile docker/pqc-ca-custodian/Dockerfile docker/crl-renewer/Dockerfile docker/ocsp-pq/Dockerfile; do
+for df in docker/gateway/Dockerfile docker/pqc-ca-custodian/Dockerfile docker/ocsp-pq/Dockerfile; do
   if grep -qE '^ARG[[:space:]]+(OPENSSL|OPENRESTY)_VERSION=' "$ROOT_DIR/$df"; then
     echo "ERROR: $df gives ARG OPENSSL_VERSION/OPENRESTY_VERSION a default; it must come from versions.env." >&2
     bad=1

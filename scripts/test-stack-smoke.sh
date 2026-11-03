@@ -10,7 +10,7 @@ required_services=(
   "management-api"
   "ocsp-pq"
   "pki-dist"
-  "crl-renewer"
+  "pqc-ca-custodian"
   "shadow-mock"
 )
 

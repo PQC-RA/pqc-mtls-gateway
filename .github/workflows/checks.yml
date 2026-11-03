@@ -106,6 +106,29 @@ jobs:
       - name: OpenSSL version consistency
         run: ./scripts/check-version-consistency.sh
 
+      # ADR-024: no container but the custodian mounts CA key or state, no CA
+      # tree, mask or /signals mount, no test-only fault hook, and the CA path
+      # runs non-root, read-only, with no capability added back. Other
+      # services may differ only as named exceptions with an exit criterion.
+      - name: Compose policy (ADR-024)
+        run: ./scripts/check-compose-policy.sh
+
+      # The policy check itself: each CA-tree and trust-directory violation,
+      # added on top of the compose file by an override, is refused and named.
+      - name: Compose policy check refuses what it must (ADR-024)
+        run: ./bench/adr024/compose-policy-unit.sh
+
+      # One writer of CA state: a script that runs openssl ca on the live CA
+      # takes the custodian's writer lock, or is a named exception.
+      - name: CA state has one writer (ADR-024)
+        run: ./scripts/check-ca-writers.sh
+
+      # ADR-024: the gateway entrypoint fails when the custodian's CA files do
+      # not come, and its reload watcher reports nginx's own errors. The real
+      # functions, sourced, with a fake nginx: no images needed.
+      - name: Gateway entrypoint CA wait and reload watcher (ADR-024)
+        run: ./bench/gateway/entrypoint-ca-unit.sh
+
       - name: Dockerfile BuildKit checks (catches what hadolint cannot)
         run: |
           set -euo pipefail

@@ -23,7 +23,7 @@
 #   PQC_GATEWAY          Gateway base URL              (default: https://127.0.0.1)
 #   PQC_CA_CHAIN         Path to CA chain cert         (default: ./ca-chain.crt)
 #   PQC_ENROLL_CA        CA chain that verifies the :8443 enrollment cert
-#                        (default: /etc/pki/pqc-ca/ca-chain.crt, the PQ chain;
+#                        (default: /var/lib/pqc-ca-public/ca-chain.crt, the PQ chain;
 #                         falls back to PQC_CA_CHAIN when that file is absent)
 #   PQC_ENROLL_URL       Enrollment endpoint           (default: https://<PQC_GATEWAY host>:8443/enroll;
 #                         set it for a gateway published on non-default ports)
@@ -66,11 +66,11 @@ if [[ -n "${PQC_ENROLL_CA:-}" ]]; then
     if [[ ! -f "$ENROLL_CA" ]]; then
         echo "ERROR: PQC_ENROLL_CA is set to '$ENROLL_CA', which does not exist." >&2
         echo "  Point it at the PQ CA chain (ca-chain.crt), or unset it to use" >&2
-        echo "  /etc/pki/pqc-ca/ca-chain.crt or PQC_CA_CHAIN." >&2
+        echo "  /var/lib/pqc-ca-public/ca-chain.crt or PQC_CA_CHAIN." >&2
         exit 1
     fi
 else
-    ENROLL_CA="/etc/pki/pqc-ca/ca-chain.crt"
+    ENROLL_CA="/var/lib/pqc-ca-public/ca-chain.crt"
     [[ -f "$ENROLL_CA" ]] || ENROLL_CA="$CA_CHAIN"
 fi
 
@@ -101,7 +101,7 @@ if [[ -z "$CN" ]]; then
     echo "  $0 <cn>"
     echo ""
     echo "Required files (place alongside script or set env vars):"
-    echo "  ca-chain.crt   scp root@<server>:/etc/pki/pqc-ca/hybrid-ca-chain.crt ."
+    echo "  ca-chain.crt   scp root@<server>:/var/lib/pqc-ca-public/hybrid-ca-chain.crt ."
     echo "  Admin-direct only:"
     echo "  admin.crt      scp root@<server>:<repo>/admin-cert/gateway-admin.crt ./admin.crt"
     echo "  admin.key      scp root@<server>:<repo>/admin-cert/gateway-admin.key ./admin.key && chmod 600 admin.key"

@@ -12,7 +12,7 @@
 #
 # Images: every image this repository builds is built from COMMIT with tags of
 # the stand's own ($PROJECT-<service>:<commit>), so no shared tag such as
-# pqc-gateway:1.0.0 is ever overwritten; the base images come from base.lock
+# pqc-gateway:adr024-4b is ever overwritten; the base images come from base.lock
 # (scripts/build-all.sh BASES_ONLY=1). management-api is the image pinned in
 # docker-compose.yml, pulled from GHCR. The rollback rehearsal's "old code" is
 # ROLLBACK_COMMIT (default: the commit before item 4): its custodian is built
@@ -38,6 +38,18 @@
 #   config of ROLLBACK_COMMIT, for the rollback rehearsal)
 #   stand.env  `source` it, then run bench/item4/*.sh against this stand
 set -euo pipefail
+# A stand built here has the pre-ADR-024 design: the shared CA tree, the CRL
+# renewer, /signals and the masks. setup-pki.sh now moves the intermediate into
+# the custodian's layout under /var/lib/pqc-ca, which on a host with a running
+# deployment is that deployment's own. Rather than build a stand that
+# half-works or touches it, this refuses.
+# TEMPORARY: the stand tooling is not ported to the custodian layout yet.
+# Exit: stand tooling ported (each stand its own CA_ROOT, CA_PUBLIC_DIR,
+# CA_STATUS_DIR and OCSP_KEY_DIR, and the matching mounts), in its own PR, before
+# the stand rehearsal ADR-024 requires ahead of the first production deployment.
+# Owner: Rumen.
+echo "stand-up.sh: not ported to the ADR-024 CA layout yet; see the comment at the top of $0" >&2
+exit 2
 SD=${1:?STAND_DIR}; P=${2:?PROJECT}; TP=${3:?TLS_PORT}; EP=${4:?ENROLL_PORT}; AP=${5:?API_PORT}
 REPO=$(cd "$(dirname "$0")/.." && pwd); COMMIT=$(git -C "$REPO" rev-parse --short "${COMMIT:-HEAD}")
 FIRST_ITEM4=$(git -C "$REPO" log --format=%h --grep='^custodian: renewal profiles' "$COMMIT" | tail -1)

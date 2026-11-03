@@ -22,8 +22,7 @@ export OPENSSL_CONF=/etc/ssl/openssl.cnf
 OSSL=${OSSL:-$([ -x /opt/openssl/bin/openssl ] && echo /opt/openssl/bin/openssl || echo /opt/openssl-3.6.2/bin/openssl)}
 # The repository this harness lives in: admin-cert/, scripts/ and secrets/.
 REPO=${REPO:-$(cd "$BENCH_HOME/.." && pwd)}
-PKI=/etc/pki/pqc-ca
-CA=$PKI/ca-chain.crt
+CA=/var/lib/pqc-ca-public/ca-chain.crt
 C=$REPO/admin-cert/gateway-admin.crt
 K=$REPO/admin-cert/gateway-admin.key
 W="$WORKDIR/negative-controls-work"
@@ -89,7 +88,7 @@ say "  revoke -> $(echo "$R" | head -c 200)"
 say "  waiting for the CRL to carry serial $SER ..."
 found=0
 for i in $(seq 1 30); do
-  if $OSSL crl -in $PKI/hybrid-combined-crl.pem -noout -text 2>/dev/null | grep -qi "Serial Number: *$SER"; then
+  if $OSSL crl -in /var/lib/pqc-ca-public/hybrid-combined-crl.pem -noout -text 2>/dev/null | grep -qi "Serial Number: *$SER"; then
     say "    serial appears in the CRL after ~$((i*2)) s"; found=1; break
   fi
   sleep 2
@@ -97,7 +96,7 @@ done
 [ "$found" = "1" ] || say "    *** serial never appeared in the CRL within 60 s ***"
 
 say "  -- offline path validation (the paper's X509 error 23):"
-V=$($OSSL verify -crl_check -CAfile "$CA" -CRLfile $PKI/hybrid-combined-crl.pem "$CRT" 2>&1)
+V=$($OSSL verify -crl_check -CAfile "$CA" -CRLfile /var/lib/pqc-ca-public/hybrid-combined-crl.pem "$CRT" 2>&1)
 echo "$V" | sed 's/^/     /' | tee -a "$OUT"
 echo "$V" | grep -q "error 23" && say "  ==> PASS: error 23 (certificate revoked)" || say "  ==> *** no error 23 ***"
 
@@ -111,5 +110,5 @@ docker exec pqc-gateway sh -c "grep -ihE 'revoked' /var/log/nginx/error.log 2>/d
 
 "${ADM[@]}" -X DELETE "https://127.0.0.1/admin/policy/routes/$CN" >/dev/null 2>&1
 say
-say "  revoked in CA index now: $(grep -c '^R' $PKI/intermediate/db/index.txt)"
+say "  revoked in CA index now: $(grep -c '^R' /var/lib/pqc-ca/state/db/index.txt)"
 say "raw -> $OUT"

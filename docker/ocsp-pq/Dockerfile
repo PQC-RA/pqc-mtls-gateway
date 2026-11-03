@@ -20,9 +20,15 @@ ARG OPENSSL_VERSION
 RUN test -n "${OPENSSL_VERSION}" || { echo "OPENSSL_VERSION unset: build via scripts/build-all.sh (it passes docker/base/versions.env)" >&2; exit 1; }; \
 	/opt/openssl/bin/openssl version > /tmp/o.txt && grep -qF "OpenSSL ${OPENSSL_VERSION} " /tmp/o.txt && rm -f /tmp/o.txt
 
+# ADR-024: the index is the custodian's snapshot (with index.txt.attr beside
+# it), the key and certificate come from the responder's own directory. Each is
+# a read-only mount of its own. -CA is the intermediate's certificate ALONE (the
+# DER the custodian publishes for AIA): the index is the intermediate's, so a
+# request about a certificate the root issued must get "unknown", never an
+# answer from this index (with the whole chain here it got one).
 CMD ["/opt/openssl/bin/openssl", "ocsp", "-port", "9080", \
-     "-index", "/etc/pki/pqc-ca/intermediate/db/index.txt", \
-     "-CA", "/etc/pki/pqc-ca/intermediate/certs/intermediate-ca.crt", \
-     "-rsigner", "/etc/pki/pqc-ca/ocsp/ocsp-pq.crt", \
-     "-rkey", "/etc/pki/pqc-ca/ocsp/ocsp-pq.key", \
+     "-index", "/var/lib/pqc-ca-status/index.txt", \
+     "-CA", "/var/lib/pqc-ca-public/intermediate-ca.crt", \
+     "-rsigner", "/var/lib/pqc-ocsp/ocsp-pq.crt", \
+     "-rkey", "/var/lib/pqc-ocsp/ocsp-pq.key", \
      "-ndays", "7", "-nmin", "60", "-ignore_err"]

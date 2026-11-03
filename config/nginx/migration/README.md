@@ -87,7 +87,7 @@ clients (logged once a minute) rather than dropping old ones.
   loaded, is never dropped until the gateway restarts. OCSP for client
   certificates is not consulted. What is loaded, per issuer, is listed under
   `crls` in the inventory. The same holds for the gateway's own CRL: if the
-  crl-renewer stops, its clients are refused here once that CRL passes
+  CA custodian stops issuing CRLs, its clients are refused here once that CRL passes
   nextUpdate, as on the strict listeners.
 - **What counts as a usable CRL.** A full CRL (a delta CRL alone is read as
   complete), signed by the CA itself, whose certificate is in

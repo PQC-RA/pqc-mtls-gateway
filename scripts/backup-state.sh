@@ -8,13 +8,17 @@
 # hit aborts the run with nothing archived.
 #
 # What it saves (state, not secrets):
-#   pki/        the CA tree without private/ and *.key: index, serial, crlnumber,
-#               index.txt.attr, lineage.json, idempotency.json, fingerprint index,
-#               issued certificates, CRLs, chains, CA configs
+#   pki/        the host-only CAs (root, internal TLS, classical enrollment)
+#               without private/ and *.key
+#   ca/         live: the custodian's layout (ADR-024) without its key directory:
+#               index, serial, crlnumber, index.txt.attr, lineage.json,
+#               idempotency.json, fingerprint index, issued certificates, CRLs,
+#               the CA configuration, the root-CRL inbox
+#   ca-public/  live: what the custodian publishes (chains, CRLs)
 #   ssl/        public certificates only
 #   redis.rdb   a consistent snapshot over the protocol (it holds bootstrap
 #               tokens, so the backup directory is 0700)
-#   volumes     routes, admin audit, signals, audit/CRL logs, pki-dist
+#   volumes     routes, admin audit, audit logs, nginx logs
 #   compose     the resolved compose config and its sha256, image IDs, git heads
 #
 # Test restore (into a scratch directory, never over the stack):
@@ -40,6 +44,9 @@ live)
 	LIVE_DIR=${LIVE_DIR:-$(cd "$(dirname "$0")/.." && pwd)}
 	LIVE_PROJECT=${LIVE_PROJECT:-$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' pqc-gateway)}
 	PKI=/etc/pki/pqc-ca; SSL=/etc/ssl/pqc; PREFIX=pqc; VOLP=$LIVE_PROJECT
+	# shellcheck source=scripts/lib/ca-layout.sh
+	. "$(cd "$(dirname "$0")/lib" && pwd)/ca-layout.sh"
+	CA="$CA_ROOT"; CAPUB="$CA_PUBLIC_DIR"; TRUST="$TRUST_DIR"
 	COMPOSE=(docker compose -p "$LIVE_PROJECT" --project-directory "$LIVE_DIR") ;;
 *) echo "target must be live or stand" >&2; exit 2 ;;
 esac
@@ -66,12 +73,24 @@ scan() { # scan DIR...: abort if any file outside the exclusions holds a private
 scan "$PKI" "$SSL"
 tar -C "$(dirname "$PKI")" --numeric-owner "${EXCL[@]}" -czpf "$B/pki.tgz" "$(basename "$PKI")"
 tar -C "$(dirname "$SSL")" --numeric-owner "${EXCL[@]}" -czpf "$B/ssl.tgz" "$(basename "$SSL")"
+# The custodian's layout (ADR-024): its key directory is never archived.
+if [ -n "${CA:-}" ] && [ -d "$CA" ]; then
+	scan "$CA/state" "$CA/inbox" "$CAPUB"
+	tar -C "$(dirname "$CA")" --numeric-owner "${EXCL[@]}" --exclude="$(basename "$CA")/key" \
+		-czpf "$B/ca.tgz" "$(basename "$CA")"
+	tar -C "$(dirname "$CAPUB")" --numeric-owner "${EXCL[@]}" -czpf "$B/ca-public.tgz" "$(basename "$CAPUB")"
+fi
+# The public trust anchors (ADR-024 §3): which internal CAs management-api pins.
+if [ -n "${TRUST:-}" ] && [ -d "$TRUST" ]; then
+	scan "$TRUST"
+	tar -C "$(dirname "$TRUST")" --numeric-owner "${EXCL[@]}" -czpf "$B/trust.tgz" "$(basename "$TRUST")"
+fi
 
 # 2. Redis, consistent snapshot over the protocol
 docker exec "$PREFIX-redis" redis-cli --rdb - > "$B/redis.rdb" 2>/dev/null
 
 # 3. Small named volumes (logs and state, no keys); nginx logs included
-for v in pqc-mgmt-data pqc-routes-cache pqc-signals pqc-logs-audit pqc-logs-crl pqc-www-pki pqc-logs-nginx; do
+for v in pqc-mgmt-data pqc-routes-cache pqc-logs-audit pqc-logs-nginx; do
 	d="/var/lib/docker/volumes/${VOLP}_$v"
 	[ -d "$d" ] || continue
 	scan "$d/_data"
@@ -102,17 +121,25 @@ done
 # 6. Test restore into a scratch directory
 R=$(mktemp -d "$OUT/restore-test-XXXX"); fail=0
 for t in "$B"/*.tgz; do mkdir -p "$R/$(basename "$t" .tgz)"; tar -C "$R/$(basename "$t" .tgz)" -xzf "$t" || { echo "EXTRACT FAILED: $t"; fail=1; }; done
-IDX="$R/pki/$(basename "$PKI")/intermediate/db/index.txt"
+# The intermediate's state: the custodian's layout if it was archived, else
+# the CA tree (a stand, or a host not yet migrated).
+if [ -f "$B/ca.tgz" ]; then
+	IDB="$R/ca/$(basename "$CA")/state/db"; ICRL="$R/ca/$(basename "$CA")/state/crl"
+	CHAIN="$R/ca-public/$(basename "$CAPUB")/ca-chain.crt"
+else
+	IDB="$R/pki/$(basename "$PKI")/intermediate/db"; ICRL="$R/pki/$(basename "$PKI")/intermediate/crl"
+	CHAIN="$R/pki/$(basename "$PKI")/ca-chain.crt"
+fi
+IDX="$IDB/index.txt"
 if awk -F'\t' 'NF != 6 || $1 !~ /^[VRE]$/ { bad++ } END { exit bad > 0 }' "$IDX"; then
 	echo "index parses: $(wc -l < "$IDX") rows ($(awk -F'\t' '$1=="V"' "$IDX" | wc -l) V, $(awk -F'\t' '$1=="R"' "$IDX" | wc -l) R, $(awk -F'\t' '$1=="E"' "$IDX" | wc -l) E)"
 else echo "INDEX DOES NOT PARSE"; fail=1; fi
-CHAIN="$R/pki/$(basename "$PKI")/ca-chain.crt"
-for crl in "$R/pki/$(basename "$PKI")/intermediate/crl/intermediate-ca.crl" "$R/pki/$(basename "$PKI")/root/crl/root-ca.crl"; do
+for crl in "$ICRL/intermediate-ca.crl" "$R/pki/$(basename "$PKI")/root/crl/root-ca.crl"; do
 	[ -f "$crl" ] || continue
 	if "$O" crl -in "$crl" -noout -CAfile "$CHAIN" 2>&1 | grep -q "verify OK"; then echo "CRL verifies: ${crl#$R/pki/}"; else echo "CRL DOES NOT VERIFY: $crl"; fail=1; fi
 done
 for j in lineage.json idempotency.json fingerprint-index.json; do
-	f="$R/pki/$(basename "$PKI")/intermediate/db/$j"; [ -f "$f" ] || continue
+	f="$IDB/$j"; [ -f "$f" ] || continue
 	python3 -I -c 'import json,sys; json.load(open(sys.argv[1]))' "$f" && echo "$j parses" || { echo "$j DOES NOT PARSE"; fail=1; }
 done
 docker run --rm --network none -v "$B/redis.rdb:/b/redis.rdb:ro" redis:7.4-alpine redis-check-rdb /b/redis.rdb > "$B/redis-check.txt" 2>&1 || true

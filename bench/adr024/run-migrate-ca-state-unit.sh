@@ -25,10 +25,14 @@ export OPENSSL_CONF=/dev/null
 O=/opt/openssl/bin/openssl; M=/tmp/r/scripts/migrate-ca-state.sh
 P=/etc/pki/pqc-ca; INT=$P/intermediate
 PASS=0; FAIL=0
+# This container runs no containers and has no docker client: say so, as
+# migrate-ca-state.sh asks (it fails closed otherwise).
+export MIGRATE_NO_DOCKER=1
 ok()   { echo "PASS  $1"; PASS=$((PASS+1)); }
 bad()  { echo "FAIL  $1"; FAIL=$((FAIL+1)); }
 check(){ if eval "$2"; then ok "$1"; else bad "$1"; fi; }
 crlno(){ $O crl -in "$1" -noout -crlnumber | sed "s/crlNumber=0x//"; }
+second_crlno(){ awk "/BEGIN X509 CRL/{n++} n==2" "$1" | $O crl -noout -crlnumber | sed "s/crlNumber=0x//"; }
 serials(){ $O crl -in "$1" -noout -text | sed -n "s/^ *Serial Number: *//p" | sort -u; }
 treehash(){ (cd "$1" && find . -type f ! -name "*.lock" -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -c1-16); }
 as_ca(){ setpriv --reuid=1003 --regid=1003 --clear-groups "$@"; }
@@ -114,9 +118,21 @@ cp -p /tmp/keep $F
 chown 0:0 $CA_WRITER_LOCK; chmod 644 $CA_WRITER_LOCK
 $M verify > /dev/null 2>&1
 check "8-4: a writer lock left root-owned 0644 is given back to the custodian (1003, 0600)" "[ \"$(stat -c %u:%a $CA_WRITER_LOCK)\" = 1003:600 ]"
+chown 0:0 $CA_WRITER_LOCK; chmod 644 $CA_WRITER_LOCK
+( flock -x 9; sleep 4 ) 9>>$CA_WRITER_LOCK & sleep 0.5
+$M verify > /tmp/vheld.log 2>&1; rc=$?
+check "L1: while the custodian holds the writer lock, a host tool refuses and leaves the lock file as it is" "[ $rc != 0 ] && grep -q holds /tmp/vheld.log && [ \"$(stat -c %u:%a $CA_WRITER_LOCK)\" = 0:644 ]"
+wait
+$M verify > /dev/null 2>&1
 mv $CA_WRITER_LOCK /tmp/lock.keep; ln -s /tmp/lock-target $CA_WRITER_LOCK
 $M verify > /tmp/lsym.log 2>&1; rc=$?
 check "8-1: a symbolic link as the writer lock is refused, and what it points at is not created" "[ $rc != 0 ] && grep -q \"not a regular file\" /tmp/lsym.log && [ ! -e /tmp/lock-target ]"
+rm $CA_WRITER_LOCK; mv /tmp/lock.keep $CA_WRITER_LOCK
+# L1: a hard link to another file passes a "not a symlink" check; its owner
+# and mode must not change through the lock.
+mv $CA_WRITER_LOCK /tmp/lock.keep; echo victim > /tmp/victim; chmod 644 /tmp/victim; ln /tmp/victim $CA_WRITER_LOCK
+$M verify > /tmp/lhard.log 2>&1; rc=$?
+check "L1: a writer lock that is a hard link to another file is refused, and that file keeps its owner and mode" "[ $rc != 0 ] && grep -q \"other hard links\" /tmp/lhard.log && [ \"$(stat -c %u:%a /tmp/victim)\" = 0:644 ]" || tail -2 /tmp/lhard.log
 rm $CA_WRITER_LOCK; mv /tmp/lock.keep $CA_WRITER_LOCK
 
 # --- the custodian at work on the new layout, as uid 1003 -----------------------
@@ -195,11 +211,16 @@ check "8-2: reverse refuses a state index that lost a row of the old one ($S3, v
 cp $TRUST/internal-tls-ca-mldsa.crt /tmp/trust-new.crt
 cat /tmp/trust-new.crt /tmp/trust-new.crt > $TRUST/internal-tls-ca.crt
 TRUST_NOW=$(sha256sum < $TRUST/internal-tls-ca.crt)
+# B3: the operator renews the root CRL in the old tree during the rollback window
+# (README root-CRL procedure). That is not the old system running on.
+$O ca -config $P/root/openssl-root.cnf -gencrl -out $P/root/crl/root-ca.crl > /tmp/rootrenew.log 2>&1 || cat /tmp/rootrenew.log
+RN=$(crlno $P/root/crl/root-ca.crl); cp $P/root/crl/root-ca.crl /tmp/root-renewed.crl
 # Counters lower than the old tree in the custodian state: reverse takes the larger.
 OS=$(cat "$(ls -d $INT.migrated-* | tail -1)/db/serial")
 echo 01 > $CA_STATE_DIR/db/serial; echo 01 > $CA_STATE_DIR/db/crlnumber
 $M reverse > /tmp/rev.log 2>&1; rc=$?
 check "reverse succeeds" "[ $rc = 0 ]" || tail -8 /tmp/rev.log
+check "B3: a root CRL renewed in the old tree after forward does not block reverse; it is kept and the combined CRL carries it second (0x$RN)" "[ $rc = 0 ] && cmp -s $P/root/crl/root-ca.crl /tmp/root-renewed.crl && [ \"$(second_crlno $P/hybrid-combined-crl.pem)\" = \"$RN\" ]"
 check "the old tree is back in place" "[ -d $INT ] && [ -f $P/hybrid-combined-crl.pem ] && [ -d $P/ocsp ]"
 check "the revocation made in the new layout is in the old index" "grep -q \"^R.*	$S2	\" $INT/db/index.txt"
 check "the old combined CRL is the latest one: $S1 and $S2 revoked, intermediate first" "serials $P/hybrid-combined-crl.pem | grep -qx $S1 && serials $P/hybrid-combined-crl.pem | grep -qx $S2 && $O crl -in $P/hybrid-combined-crl.pem -noout -issuer | grep -q Intermediate"
@@ -230,6 +251,19 @@ printf "V\t301231000000Z\t\tFFFF01\tunknown\t/CN=unit-new\n" >> $CA_STATE_DIR/db
 $M abort > /tmp/abort1.log 2>&1; rc=$?
 cp -p /tmp/keepidx2 $CA_STATE_DIR/db/index.txt
 check "8-2: abort refuses once the custodian issued in the new layout (that row exists nowhere else)" "[ $rc != 0 ] && grep -q \"has issued or revoked\" /tmp/abort1.log"
+# L2: once the custodian has published beyond its first CRL the readers may
+# have read it: abort refuses (the old system would reissue that number).
+NOLD=$(crlno $INT/crl/intermediate-ca.crl)
+for _ in 1 2 3 4 5; do
+    [ $((16#$(crlno $CA_STATE_DIR/crl/intermediate-ca.crl))) -gt $((16#$NOLD + 1)) ] && break
+    as_ca $O ca -config $CA_CNF_FILE -gencrl -out $CA_STATE_DIR/crl/intermediate-ca.crl 2>/dev/null
+done
+cat $CA_STATE_DIR/crl/intermediate-ca.crl $CA_STATE_DIR/crl/root-ca.crl > $CA_PUBLIC_DIR/hybrid-combined-crl.pem
+$M abort > /tmp/abortL2.log 2>&1; rc=$?
+rm $CA_PUBLIC_DIR/hybrid-combined-crl.pem
+check "L2: abort refuses once the custodian has published beyond its first CRL (the readers may have read it)" "[ $rc != 0 ] && grep -q \"beyond its first\" /tmp/abortL2.log" || tail -3 /tmp/abortL2.log
+env -u MIGRATE_NO_DOCKER $M abort > /tmp/abortnd.log 2>&1; rc=$?
+check "with no docker client, and MIGRATE_NO_DOCKER not set, abort refuses (it cannot tell where the readers are)" "[ $rc != 0 ] && grep -q \"no docker client\" /tmp/abortnd.log"
 PA=$(treehash $P)
 $M abort > /tmp/abort2.log 2>&1; rc=$?
 check "8-2: abort sets the unused layout aside and leaves the old tree as the old system left it" "[ $rc = 0 ] && [ ! -d $CA_ROOT ] && [ \"$(treehash $P)\" = \"$PA\" ]" || tail -5 /tmp/abort2.log

@@ -98,6 +98,24 @@ container_running() {
         die "cannot ask docker whether $1 is running ($out); refusing"
     fi
 }
+# True when a container (running or not) other than the custodian mounts the
+# public directory: this release's readers exist, so they may have read it.
+# Fails closed like container_running.
+readers_on_public() {
+    local c out line name
+    if ! command -v docker >/dev/null 2>&1; then
+        [ "${MIGRATE_NO_DOCKER:-0}" = 1 ] && return 1
+        die "no docker client to ask which containers mount $CA_PUBLIC_DIR; refusing (MIGRATE_NO_DOCKER=1 on a host that runs no containers)"
+    fi
+    out=$(docker ps -aq 2>&1) || die "cannot ask docker for its containers ($out); refusing"
+    for c in $out; do
+        line=$(docker inspect -f '{{.Name}} {{range .Mounts}}{{.Source}} {{end}}' "$c" 2>&1) || die "cannot inspect container $c ($line); refusing"
+        name=${line%% *}
+        [ "${name#/}" = "$CUSTODIAN_CONTAINER" ] && continue
+        case " ${line#* } " in *" $CA_PUBLIC_DIR "*) return 0 ;; esac
+    done
+    return 1
+}
 refuse_if_writers_run() {
     local c
     for c in "$CUSTODIAN_CONTAINER" "$RENEWER_CONTAINER"; do
@@ -333,10 +351,16 @@ hex_max() {
 hex_inc() { printf '%X' $(( 16#$1 + 1 )); }
 # sources_unchanged [RETIRED]: every file forward copied is, in the old tree,
 # still the file it copied (looked for where retire renamed it, if it did).
+# Only what the OLD SYSTEM writes counts (its CA state under intermediate/,
+# its OCSP files): those change only if it ran on. The root CRL is renewed by
+# the operator's offline procedure in the rollback window (README, at least
+# every 90 days) and the higher-numbered one is kept below; the trust files
+# are the operator's too.
 sources_unchanged() {
     local want dst src f bad=0
     while read -r want dst src; do
         case "$src" in *"(paths rewritten)"*) continue ;; esac
+        case "$src" in "$INT"/*|"$FROM"/ocsp/*) ;; *) continue ;; esac
         f=$src
         if [ ! -e "$f" ]; then
             case "$f" in
@@ -400,6 +424,14 @@ reverse() {
     # inbox); keep whichever has the higher number.
     if hex_gt "$(crl_number "$CA_STATE_DIR/crl/root-ca.crl")" "$(crl_number "$FROM/root/crl/root-ca.crl")"; then
         install -m 0644 -o 0 -g 0 "$CA_STATE_DIR/crl/root-ca.crl" "$STAGE/root-ca.crl"
+    elif hex_gt "$(crl_number "$FROM/root/crl/root-ca.crl")" "$(crl_number "$CA_STATE_DIR/crl/root-ca.crl")"; then
+        # The operator renewed the root CRL in the old tree after forward: the
+        # combined CRL the old gateway reads must carry THAT root CRL, not the
+        # older one the custodian published. Intermediate first.
+        for f in hybrid-combined-crl.pem combined-crl.pem; do
+            cat "$S/crl/intermediate-ca.crl" "$FROM/root/crl/root-ca.crl" > "$STAGE/public/$f"
+            chmod 0644 "$STAGE/public/$f"
+        done
     fi
     # The trust anchors as they are now (an ADR-022 switch may have changed
     # them since forward), back where the previous release reads them.
@@ -483,7 +515,9 @@ reverse() {
         if [ -d "$f" ]; then mv "$f" "$f.reversed-$TS"; fi
     done
     echo "    $CA_ROOT.reversed-$TS holds a copy of the intermediate key: destroy it when no longer needed, and record that."
-    say "reverse done. Recreate the old containers (they mount the trust file by inode); the renewer's next CRL is number $next."
+    say "reverse done. Check out the previous release and recreate ALL its containers: docker compose up -d --force-recreate"
+    echo "    (a plain up -d would restart the stopped crl-renewer on a network this release's compose down removed; and the old"
+    echo "    containers mount the trust file by inode). The renewer's next CRL is number $next."
 }
 
 # --- abort --------------------------------------------------------------------
@@ -504,6 +538,19 @@ abort() {
         [ "$(sha256sum < "$CA_STATE_DIR/db/$f" | cut -d' ' -f1)" = "$want" ] \
             || die "the custodian has issued or revoked in the new layout ($CA_STATE_DIR/db/$f changed since forward): abort would lose that; roll back with reverse"
     done
+    # The readers must not have moved (switch step 5): after that the custodian's
+    # CRLs were served, and the old system would reissue numbers already seen
+    # (RFC 5280 5.2.3). The first CRL of the custodian is N+1, published before
+    # step 4 and read by nobody; anything beyond it, or a reader container
+    # mounting the public directory, means the readers moved.
+    local n pub
+    n=$(crl_number "$INT/crl/intermediate-ca.crl")
+    if [ -f "$CA_PUBLIC_DIR/hybrid-combined-crl.pem" ]; then
+        pub=$(crl_number "$CA_PUBLIC_DIR/hybrid-combined-crl.pem")
+        [ $((16#$pub)) -le $((16#$n + 1)) ] \
+            || die "the custodian has published CRL 0x$pub, beyond its first (0x$n + 1): the readers may have read it, so the old system must not reissue that number. Roll back with reverse, not abort"
+    fi
+    readers_on_public && die "a container other than the custodian mounts $CA_PUBLIC_DIR (the readers moved): roll back with reverse, not abort"
     say "setting the unused new layout aside (renamed, not deleted); nothing in $FROM changes"
     if [ -f "$CA_STATE_DIR/crl/intermediate-ca.crl" ]; then
         echo "    its last intermediate CRL, number $(crl_number "$CA_STATE_DIR/crl/intermediate-ca.crl"), was never read by the gateway (it reads $FROM until the switch)"
@@ -517,7 +564,8 @@ abort() {
         mv "$TRUST_DIR" "$TRUST_DIR.aborted-$TS"
     fi
     echo "    $CA_ROOT.aborted-$TS holds a copy of the intermediate key: destroy it when no longer needed, and record that."
-    say "abort done. Start the old containers; the old system goes on from where it is."
+    say "abort done. Check out the previous release and recreate ALL its containers: docker compose up -d --force-recreate"
+    echo "    (this release's compose replaced the custodian's container). The old system goes on from where it is."
 }
 
 case "$cmd" in

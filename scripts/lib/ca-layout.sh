@@ -116,10 +116,35 @@ ca_take_writer_lock() {
         exit 1
     fi
     [ -e "$CA_WRITER_LOCK" ] || install -m 0600 -o "$CA_UID" -g "$CA_GID" /dev/null "$CA_WRITER_LOCK"
-    chown "$CA_UID:$CA_GID" "$CA_WRITER_LOCK"
-    chmod 0600 "$CA_WRITER_LOCK"
     exec 9>>"$CA_WRITER_LOCK"
-    flock -n 9
+    # Locked first: while the custodian (or another host tool) holds it, this
+    # touches nothing. Once held, nothing else writes the state directory, and
+    # the owner and mode are set on the file this opened, through its
+    # descriptor (in chown and chmod, /proc/self/fd/9 is the inherited fd 9),
+    # never through the name a link could have redirected meanwhile.
+    flock -n 9 || return 1
+    # The open above follows a link, and the check before it can race: a
+    # writer with the custodian's uid could plant a link, then put a regular
+    # file back. So the descriptor itself must be the file at the name, before
+    # anything is changed through it: the same device and inode as the name
+    # (stat without -L: the name itself, never a link target), a regular file,
+    # and one link only (a hard link to /etc/shadow has the same inode as it).
+    local fd_id name_id links ftype
+    if ! { fd_id=$(stat -L -c '%d:%i' /proc/self/fd/9) && links=$(stat -L -c '%h' /proc/self/fd/9) \
+           && name_id=$(stat -c '%d:%i' "$CA_WRITER_LOCK") && ftype=$(stat -c '%F' "$CA_WRITER_LOCK"); }; then
+        echo "ERROR: cannot stat $CA_WRITER_LOCK and the descriptor opened on it; refusing to use it" >&2
+        exit 1
+    fi
+    case "$ftype" in
+        "regular file"|"regular empty file") ;;
+        *) echo "ERROR: $CA_WRITER_LOCK is a $ftype, not a regular file; refusing to use it" >&2; exit 1 ;;
+    esac
+    if [ "$fd_id" != "$name_id" ] || [ "$links" != 1 ]; then
+        echo "ERROR: $CA_WRITER_LOCK is not the file that was opened, or has other hard links ($links); refusing to use it" >&2
+        exit 1
+    fi
+    chown "$CA_UID:$CA_GID" /proc/self/fd/9
+    chmod 0600 /proc/self/fd/9
 }
 
 # ca_regular_tree PATH...: every entry under each PATH (and PATH itself) is a
@@ -154,4 +179,22 @@ ca_refuse_unmigrated() {
         echo "  cut-over runbook (README, \"The CA custodian becomes the only holder of the CA key\")." >&2
         return 1
     fi
+}
+
+# ca_run_as_root_writer CMD...: run CMD, an `openssl ca` call that writes the
+# custodian's state as root (the caller holds the writer lock), and give the
+# files back to the custodian however it ends: success, failure, or a signal
+# (INT, TERM and HUP end the script, so the EXIT trap runs). A root-owned
+# index.txt or crlnumber.new left behind would make every later CRL pass of
+# the custodian (uid 1003) fail with EACCES. Call it in the main shell, not
+# inside $(...), so a signal to the script reaches these traps. Returns CMD's
+# status; the caller's EXIT, INT, TERM and HUP traps are cleared afterwards.
+ca_run_as_root_writer() {
+    local rc=0
+    trap 'ca_layout_file_perms' EXIT
+    trap 'exit 130' INT TERM HUP
+    "$@" || rc=$?
+    ca_layout_file_perms
+    trap - EXIT INT TERM HUP
+    return "$rc"
 }

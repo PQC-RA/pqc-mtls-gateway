@@ -22,8 +22,7 @@ export OPENSSL_CONF=/etc/ssl/openssl.cnf
 OSSL=${OSSL:-$([ -x /opt/openssl/bin/openssl ] && echo /opt/openssl/bin/openssl || echo /opt/openssl-3.6.2/bin/openssl)}
 # The repository this harness lives in: admin-cert/, scripts/ and secrets/.
 REPO=${REPO:-$(cd "$BENCH_HOME/.." && pwd)}
-PKI=/etc/pki/pqc-ca
-CA=$PKI/ca-chain.crt
+CA=/var/lib/pqc-ca-public/ca-chain.crt
 C=$REPO/admin-cert/gateway-admin.crt
 K=$REPO/admin-cert/gateway-admin.key
 E="$EXPORT_DIR"
@@ -36,16 +35,16 @@ say "=============== OCSP response size, -rother vs responder-leaf =============
 say "  (paper §VI-B: full signer chain ~15.5 KB / +46%; responder leaf ~9.5 KB / +28%)"
 say "  Two throwaway responders on :19080 / :19081. The live responder is untouched."
 pkill -f "ocsp -port 1908" 2>/dev/null || true; sleep 1
-COMMON=(-index $PKI/intermediate/db/index.txt -CA $PKI/intermediate/certs/intermediate-ca.crt
-        -rsigner $PKI/ocsp/ocsp-pq.crt -rkey $PKI/ocsp/ocsp-pq.key -ndays 7 -nmin 60 -ignore_err)
+COMMON=(-index /var/lib/pqc-ca/state/db/index.txt -CA /var/lib/pqc-ca/state/certs/intermediate-ca.crt
+        -rsigner /var/lib/pqc-ocsp/ocsp-pq.crt -rkey /var/lib/pqc-ocsp/ocsp-pq.key -ndays 7 -nmin 60 -ignore_err)
 nohup $OSSL ocsp -port 19080 "${COMMON[@]}"                                             >/tmp/ocsp_leaf.log 2>&1 &
-nohup $OSSL ocsp -port 19081 "${COMMON[@]}" -rother $PKI/intermediate/certs/intermediate-ca.crt >/tmp/ocsp_rother.log 2>&1 &
+nohup $OSSL ocsp -port 19081 "${COMMON[@]}" -rother /var/lib/pqc-ca/state/certs/intermediate-ca.crt >/tmp/ocsp_rother.log 2>&1 &
 sleep 2
 ss -ltn 2>/dev/null | grep -qE ":19080" || { say "  FATAL: :19080 not listening"; tail -3 /tmp/ocsp_leaf.log | tee -a "$OUT"; }
 ss -ltn 2>/dev/null | grep -qE ":19081" || { say "  FATAL: :19081 not listening"; tail -3 /tmp/ocsp_rother.log | tee -a "$OUT"; }
 
 ask(){ # ask <port> <outfile>
-  timeout 25 $OSSL ocsp -issuer $PKI/intermediate/certs/intermediate-ca.crt \
+  timeout 25 $OSSL ocsp -issuer /var/lib/pqc-ca/state/certs/intermediate-ca.crt \
     -cert $E/client.crt -url http://127.0.0.1:$1 -respout "$2" -noverify >/dev/null 2>&1
   wc -c < "$2" 2>/dev/null || echo 0
 }

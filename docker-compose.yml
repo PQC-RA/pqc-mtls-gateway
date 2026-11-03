@@ -11,10 +11,7 @@ networks:
   driver: bridge
 
 volumes:
- pqc-www-pki:
  pqc-logs-audit:
- pqc-logs-crl:
- pqc-signals:
  pqc-routes-cache:
  pqc-mgmt-data:    # management-api route-persistence state (off the read-only CA tree)
  pqc-redis-data:   # durable routing-policy + enrollment-token store
@@ -87,7 +84,13 @@ services:
    args:
     OPENRESTY_VERSION: ${OPENRESTY_VERSION:-}
     OPENSSL_VERSION: ${OPENSSL_VERSION:-}
-  image: pqc-gateway:1.0.0
+  # Every image built here carries this release's tag, never a name another
+  # release builds too: a rollback ("check out the previous release, docker
+  # compose up -d") then finds the previous release's own images unchanged,
+  # instead of rerunning these (pre-merge review 9-2). A release that changes
+  # an image bumps its tag; check-compose-policy.sh refuses a built service
+  # without an explicit, non-latest tag.
+  image: pqc-gateway:adr024-4b
   container_name: pqc-gateway
   depends_on:
    gateway-volume-init:
@@ -103,19 +106,16 @@ services:
   expose:
    - "8081"
   volumes:
-   - /etc/pki/pqc-ca:/etc/pki/pqc-ca:ro
-   # Edge data plane needs only top-level public files of the CA tree: the
-   # client CA chain, the combined CRL and internal-tls-ca.crt (the healthcheck
-   # verifies :8081 with it). It uses no CA private key. Every key-bearing subdir
-   # is masked with an empty dir so no CA private key is exposed at the edge
-   # (the most internet-facing component in the stack): the intermediate CA key,
-   # the OCSP delegated key, the root CA key AND the internal TLS CA keys
-   # (internal-tls/, ADR-022). Its own :8081 key comes from /etc/ssl/pqc below.
-   # bench/verify-suite.sh section 6 checks this at runtime.
-   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/intermediate/private:ro
-   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/ocsp:ro
-   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/root/private:ro
-   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/internal-tls:ro
+   # ADR-024: the public CA files the custodian publishes (chains and CRLs),
+   # and nothing else: no CA private key is in that directory, so nothing is
+   # masked. Mounted at the path nginx.conf and the Lua code already use.
+   # A directory, never single files (a bind-mounted file pins its inode and
+   # would never see the custodian's rename).
+   - /var/lib/pqc-ca-public:/etc/pki/pqc-ca:ro
+   # The public trust anchors (ADR-024 §3): the internal TLS CA (ADR-022) the
+   # healthcheck verifies :8081 with. Public certificates only, a directory
+   # mount (files are replaced by rename), nothing from the CA tree.
+   - /etc/pki/pqc-trust:/etc/pki/pqc-trust:ro
    - /etc/ssl/pqc:/etc/ssl/pqc:ro
    - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
    - ./config/nginx/security-headers.conf:/etc/nginx/security-headers.conf:ro
@@ -141,10 +141,6 @@ services:
    - ./secrets/renew-hmac.key:/run/secrets/renew-hmac:ro
    - pqc-logs-audit:/var/log/pqc-gw:rw
    - pqc-routes-cache:/var/cache/pqc-gw/routes:rw
-   # Consume the crl-renewer's reload-nginx sentinel to refresh the static
-   # ssl_crl at the TLS-handshake layer without a full restart. Gateway only
-   # ever reads this signal, never writes it.
-   - pqc-signals:/signals:ro
    # nginx logs on a named volume (was tmpfs: every recreate erased the access
    # log, including every refusal and CRITICAL PROTECTION line). Size is bounded
    # by the rotation loop in docker/gateway/entrypoint.sh (LOG_ROTATE_*).
@@ -175,7 +171,7 @@ services:
    # was intact, never that nginx had loaded its config or bound a port.
    # /healthz is the control-plane listener on :8081 (nginx.conf), and the
    # container has no curl or wget, so s_client is the transport.
-   test: ["CMD-SHELL", "printf 'GET /healthz HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' | /opt/openssl/bin/openssl s_client -connect 127.0.0.1:8081 -CAfile /etc/pki/pqc-ca/internal-tls-ca.crt -verify_return_error -quiet 2>/dev/null | grep -q '200 OK'"]
+   test: ["CMD-SHELL", "printf 'GET /healthz HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' | /opt/openssl/bin/openssl s_client -connect 127.0.0.1:8081 -CAfile /etc/pki/pqc-trust/internal-tls-ca.crt -verify_return_error -quiet 2>/dev/null | grep -q '200 OK'"]
    interval: 30s
    timeout: 5s
    retries: 3
@@ -223,29 +219,19 @@ services:
    context: docker/ocsp-pq
    args:
     OPENSSL_VERSION: ${OPENSSL_VERSION:-}
+  image: pqc-gw-ocsp-pq:adr024-4b   # release-tagged, see gateway
   container_name: pqc-ocsp-pq
-  # The responder signs OCSP answers with the delegated OCSP key and touches
-  # nothing else, so it has no need of root. uid/gid 1002 is the dedicated
-  # responder identity setup-pki.sh grants group read on ocsp/ocsp-pq.key
-  # (mode 640 root:1002), and nothing else in the CA tree. That is a second,
-  # independent barrier in front of the root CA key: root/private is
-  # 0700 root:root, so this uid cannot traverse it even if the mask below were
-  # ever dropped. 1002, not the custodian's 1001, so this container cannot
-  # reach the intermediate key by group either.
+  # The responder signs OCSP answers with its own delegated key (RFC 6960
+  # 4.2.2.2) and nothing else, as uid/gid 1002. ADR-024: it mounts its own key
+  # directory, the custodian's index snapshot (status) and the public CA files,
+  # each read-only; no CA tree, so nothing to mask.
   user: "1002:1002"
   networks:
    - pqc-pki
   volumes:
-   - /etc/pki/pqc-ca:/etc/pki/pqc-ca:ro
-   # The responder reads exactly four paths: intermediate/db/index.txt,
-   # intermediate/certs/intermediate-ca.crt and ocsp/ocsp-pq.{crt,key} (see
-   # docker/ocsp-pq/Dockerfile). The delegated OCSP key is the ONLY private key
-   # it has any business holding, so mask the other two key-bearing subdirs
-   # with an empty dir, exactly as the gateway does above, and the internal TLS
-   # CA keys (internal-tls/).
-   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/intermediate/private:ro
-   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/root/private:ro
-   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/internal-tls:ro
+   - /var/lib/pqc-ocsp:/var/lib/pqc-ocsp:ro
+   - /var/lib/pqc-ca-status:/var/lib/pqc-ca-status:ro
+   - /var/lib/pqc-ca-public:/var/lib/pqc-ca-public:ro
   security_opt:
    - no-new-privileges:true
   read_only: true
@@ -269,22 +255,24 @@ services:
    start_period: 30s
    start_interval: 2s
   build: docker/pki-dist
+  image: pqc-gw-pki-dist:adr024-4b   # release-tagged, see gateway
   container_name: pqc-pki-dist
   networks:
    - pqc-pki
+  # ADR-024: serves the custodian's public directory (CA certificates, chains,
+  # CRLs, DER at the names in certificate URLs), read-only, as nginx's own
+  # unprivileged user on :8090; no root, no capability.
+  user: "101:101"
   volumes:
-   - pqc-www-pki:/var/www/pki:ro
+   - /var/lib/pqc-ca-public:/var/www/pki:ro
+  read_only: true
+  tmpfs:
+   - /tmp
   restart: unless-stopped
   security_opt:
    - no-new-privileges:true
   cap_drop:
    - ALL
-  cap_add:
-   - NET_BIND_SERVICE
-   - SETGID
-   - SETUID
-   - CHOWN
-   - DAC_OVERRIDE
   deploy:
    resources:
     limits:
@@ -294,85 +282,12 @@ services:
      memory: 32M
      cpus: '0.125'
 
- crl-renewer:
-  # cap_drop ALL, but DAC_OVERRIDE has to come back. The CA tree is
-  # deliberately mixed ownership: intermediate/db/ and /signals are 1001:1001
-  # 0775 so the unprivileged management-api can write them, while the top level
-  # and intermediate/crl/ are root-owned. Renewal writes BOTH sets, and
-  # container-root with no capabilities cannot write a 0775 directory it does
-  # not own, so `openssl ca -gencrl` fails on intermediate/db/crlnumber.new and
-  # the reload sentinel cannot be touched. Reasoning about the listening socket
-  # alone (an unprivileged port) suggests cap_drop ALL is enough; filesystem DAC
-  # is what makes it fail, and only when the container is next recreated.
-  #
-  # This does not weaken the root-key masking below. DAC_OVERRIDE bypasses file
-  # permission bits; it cannot see through a bind mount, and root/private is
-  # masked by an empty directory, so the key is absent from this mount
-  # namespace rather than merely unreadable in it.
-  cap_drop:
-   - ALL
-  cap_add:
-   - DAC_OVERRIDE
-  build:
-   context: docker/crl-renewer
-   args:
-    OPENSSL_VERSION: ${OPENSSL_VERSION:-}
-  container_name: pqc-crl-renewer
-  environment:
-   # Watch this sentinel (touched by management-api on revoke) for on-demand CRL regen.
-   - CRL_RENEW_SIGNAL_FILE=/signals/renew-crl
-   # Sentinel check interval (s). Dominates revoke-to-refusal time; see
-   # docker/crl-renewer/entrypoint.sh before raising it.
-   - CRL_POLL_INTERVAL=1
-  networks:
-   - pqc-pki
-  # Stays root, deliberately, unlike ocsp-pq above: the renewal script writes
-  # intermediate/crl/, root/crl/ and the two combined-CRL files that sit in the
-  # root-owned top level of the CA tree, and `mv` into that directory needs
-  # write permission ON the directory. Dropping to a non-root uid would mean
-  # making the top level of the CA tree group-writable, which widens the write
-  # surface at the root of the tree to buy back a uid, a worse trade. The
-  # mask below is the control here, not the uid.
-  volumes:
-   - /etc/pki/pqc-ca:/etc/pki/pqc-ca:rw
-   # Regenerating the intermediate CRL means signing it, so this container does
-   # legitimately need intermediate/private. It needs neither the delegated
-   # OCSP key nor the root CA key, so both are masked with an empty dir.
-   # Masking root/private makes root-CRL regeneration an offline operation:
-   # pqc-crl-renew.sh Step 2 detects the absent key, says so loudly, and keeps
-   # the intermediate path working rather than failing the whole run. The
-   # internal TLS CA keys (internal-tls/) are masked too: this mount is rw, and
-   # nothing here signs for :8081.
-   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/ocsp:ro
-   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/root/private:ro
-   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/internal-tls:ro
-   - /usr/local/bin/pqc-crl-renew.sh:/usr/local/bin/pqc-crl-renew.sh:ro
-   - pqc-www-pki:/var/www/pki:rw
-   - pqc-logs-crl:/var/log/pqc-gw:rw
-   - pqc-signals:/signals:rw
-  security_opt:
-   - no-new-privileges:true
-  restart: unless-stopped
-  deploy:
-   resources:
-    limits:
-     memory: 256M
-     cpus: '0.5'
-    reservations:
-     memory: 64M
-     cpus: '0.125'
-
- # The ONLY component with any access to the intermediate CA private key.
- # management-api no longer mounts /etc/pki/pqc-ca at all (see below); it
- # instead calls sign()/revoke()/index()/issued() here over the internal-only
- # pqc-pki network, HMAC-authenticated with a dedicated secret (separate from
- # control-plane-hmac, so a leaked route-push secret can't also mint/revoke
- # certs). Left off pqc-mgmt on purpose, unreachable from anything
- # internet-facing that isn't already on pqc-pki.
- #
- # crl-renewer (above) keeps its own separate broad CA :rw mount for CRL
- # regeneration, a different, already-isolated concern, and is intentionally
- # NOT consolidated into this service.
+ # ADR-024: the ONLY holder of the intermediate CA key and the only writer of
+ # CA state. It signs certificates, records revocations and issues every
+ # intermediate CRL itself (on revocation, daily, at start), publishing the
+ # public files for the gateway, ocsp-pq and pki-dist. management-api calls it
+ # over the internal-only pqc-pki network, HMAC-authenticated with a dedicated
+ # secret. Left off pqc-mgmt on purpose.
  pqc-ca-custodian:
   read_only: true
   # read_only above makes the whole rootfs immutable; this service creates a
@@ -384,12 +299,11 @@ services:
    dockerfile: docker/pqc-ca-custodian/Dockerfile
    args:
     OPENSSL_VERSION: ${OPENSSL_VERSION:-}
+  image: pqc-gw-pqc-ca-custodian:adr024-4b   # release-tagged, see gateway
   container_name: pqc-ca-custodian
-  # Same fixed service account as management-api. Host CA ownership from
-  # scripts/setup-pki.sh already grants 1001:1001 exactly this access
-  # (private/ group-readable, db/ + issued/ owned outright), no reason for
-  # the most sensitive process in the stack to run as root.
-  user: "1001:1001"
+  # Its own uid and gid, shared with no other service (ADR-024; owner and modes
+  # in scripts/lib/ca-layout.sh, created by setup-pki.sh).
+  user: "1003:1003"
   environment:
    - CERT_VALIDITY_DAYS=${CERT_VALIDITY_DAYS:-365}
    # Item 4 switches (ADR-019): off unless set to 1. Read by the custodian and
@@ -399,17 +313,12 @@ services:
   networks:
    - pqc-pki
   volumes:
-   - /etc/pki/pqc-ca:/etc/pki/pqc-ca:rw
-   # The custodian signs with the intermediate key and reads nothing under root/
-   # or ocsp/. root/private is already unreachable to uid 1001 by file mode
-   # (0700 root:root), but that is a single barrier: a regression of `user:` back
-   # to root would silently reopen it, because this was the one service with no
-   # mask. Mask both key-bearing subdirs so the property holds by mount list as
-   # well as by uid, as it does for every other service that mounts this tree.
-   # Same for the internal TLS CA keys (internal-tls/, 0700 root).
-   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/ocsp:ro
-   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/root/private:ro
-   - /etc/pki/pqc-empty:/etc/pki/pqc-ca/internal-tls:ro
+   # Same paths inside as on the host, so the CA configuration's paths hold.
+   - /var/lib/pqc-ca/key:/var/lib/pqc-ca/key:ro       # the key: read-only
+   - /var/lib/pqc-ca/state:/var/lib/pqc-ca/state:rw   # index, serial, crlnumber, issued/
+   - /var/lib/pqc-ca/inbox:/var/lib/pqc-ca/inbox:ro   # root CRL from the offline procedure
+   - /var/lib/pqc-ca-public:/var/lib/pqc-ca-public:rw # what it publishes
+   - /var/lib/pqc-ca-status:/var/lib/pqc-ca-status:rw # OCSP index snapshot
    # Docker standalone always mounts secrets as 0600/root, uid 1001 can't read
    # them. Mount as a regular bind so host file permissions (0644) apply instead
    # (same workaround already used for control-plane-hmac below).
@@ -450,10 +359,9 @@ services:
  # only this short-lived helper is privileged, the API itself stays non-root.
  mgmt-volume-init:
   image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
-  command: sh -c "chown -R 1001:1001 /var/lib/pqc-mgmt /signals && chmod 775 /var/lib/pqc-mgmt /signals"
+  command: sh -c "chown -R 1001:1001 /var/lib/pqc-mgmt && chmod 775 /var/lib/pqc-mgmt"
   volumes:
    - pqc-mgmt-data:/var/lib/pqc-mgmt:rw
-   - pqc-signals:/signals:rw
   restart: "no"
   deploy:
    resources:
@@ -532,7 +440,11 @@ services:
   # Pinned by digest for the same reason base.lock is, a tag can be moved under
   # you. To bump: take the digest from the publish run's job summary in
   # pqc-mtls-management-api and change it here, in this one place.
-  image: ghcr.io/pqc-ra/pqc-mtls-management-api@sha256:d70503f12ac3d36fd794551e181541e90f62c8cbb305458741e87b9d7e90e01c
+  # This is main at 3a7ec9f (ADR-024 PR 3: the custodian as CRL issuer, 202 on
+  # a pending CRL, no CRL renewer script), publish run 41672787711. The
+  # cut-over needs it: an image from before PR 3 runs a renewer script this
+  # compose file no longer has, so every revoke answers 500.
+  image: ghcr.io/pqc-ra/pqc-mtls-management-api@sha256:1056f30855bd3cd28d76147baf98ce8a118c93f57cf9594a0ea5342dfdfc5b69
   # Dedicated non-root account (matches the image + setup-pki.sh host perms).
   user: "1001:1001"
   depends_on:
@@ -592,11 +504,8 @@ services:
    # pinned CA). Set it once :8081 runs the ML-DSA-65 leaf (ADR-022 end state).
    - GATEWAY_TLS_LEAF_ALG=${GATEWAY_TLS_LEAF_ALG:-}
    - OPENSSL_CONF=/etc/ssl/openssl.cnf
-   # pqc-logs-audit is mounted read-only here; redirect CRL renewal logs to /tmp
-   - CRL_LOG_FILE=/tmp/crl-renewal.log
-   # Decouple CRL regeneration: signal the crl-renewer instead of running the
-   # broad CRL script in-process, so this worker needs no CA write beyond db/issued.
-   - CRL_RENEW_SIGNAL_FILE=/signals/renew-crl
+   # No CRL settings: the CA custodian issues every CRL itself and says so in
+   # its revoke answer (ADR-024; management-api PR 3).
    # Route persistence on a dedicated volume (not the read-only CA tree).
    - ROUTES_FILE=/var/lib/pqc-mgmt/routes.json
    # Admin-action audit trail (NDJSON), appended on the writable app volume.
@@ -614,7 +523,7 @@ services:
    # be switched either way (scripts/internal-tls-switch.sh) without a restart.
    - GATEWAY_JWKS_URI=https://gateway:8081/.well-known/jwks.json
    - GATEWAY_CONTROL_URL=https://gateway:8081/update-routes
-   - NODE_EXTRA_CA_CERTS=/etc/pki/internal-tls-ca.crt
+   - NODE_EXTRA_CA_CERTS=/etc/pki/pqc-trust/internal-tls-ca.crt
    - RENEWAL_ENABLED=${RENEWAL_ENABLED:-}
    # Profile of an enrollment token whose creator names none: client-30d or
    # legacy (365 days, not renewable). client-30d takes effect only with renewal on.
@@ -630,7 +539,6 @@ services:
    # exception is a single narrow file below, the internal-TLS CA cert used to
    # verify the gateway's control-plane TLS cert, which is public CA material,
    # not the tree, and not reachable from any path to the intermediate key.
-   - pqc-signals:/signals:rw
    - pqc-mgmt-data:/var/lib/pqc-mgmt:rw
    - pqc-logs-audit:/var/log/pqc-gw:ro
    # Docker standalone always mounts secrets as 0600/root, uid 1001 can't read them.
@@ -643,7 +551,9 @@ services:
    # Item 4: attests the mTLS client on the /renew hop (renew_attest.lua /
    # RenewAttestGuard). Same 0640 bind-mount convention as enroll-hmac.
    - ./secrets/renew-hmac.key:/run/secrets/renew-hmac:ro
-   - /etc/pki/pqc-ca/internal-tls-ca.crt:/etc/pki/internal-tls-ca.crt:ro
+   # The public trust anchors (ADR-024 §3), as a directory: NODE_EXTRA_CA_CERTS
+   # above names the file in it.
+   - /etc/pki/pqc-trust:/etc/pki/pqc-trust:ro
   ports:
    - "127.0.0.1:3000:3000"
   security_opt:
