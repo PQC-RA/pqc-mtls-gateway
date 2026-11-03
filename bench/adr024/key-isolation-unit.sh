@@ -40,7 +40,11 @@ q "$OSSL" req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -subj "/C
 q "$OSSL" req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -subj "/CN=Unit Internal TLS CA" -days 2 -keyout tls.key -out tls.crt
 q "$OSSL" genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out leaf.key
 q "$OSSL" pkey -in int.key -aes256 -passout pass:secret -out int-enc.key
+q "$OSSL" req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -subj "/CN=Unit RSA Internal CA" -days 2 -keyout rsaca.key -out rsaca.crt
+cat tls.crt rsaca.crt > bundle.crt                 # the trust file during an ADR-022 transition
+q "$OSSL" pkey -in root.key -outform DER -out root.der
 export CA_CERTS="$T/pki/root.crt $T/pki/int.crt $T/pki/tls.crt" CA_INT_CERT="$T/pki/int.crt" CUSTODIAN_CONTAINER=cust
+export CA_REQUIRED="$T/pki/root.crt $T/pki/int.crt"
 run() { "$CHK" --root "$@" > "$T/out" 2>&1; echo $? > "$T/rc"; }
 rc() { cat "$T/rc"; }
 tree() { rm -rf "${T:?}/${1:?}"; mkdir -p "$T/$1"; }
@@ -54,6 +58,7 @@ printf 'To make one: openssl genpkey ... > key.pem\n# -----BEGIN PRIVATE KEY----
 put app/proc/1/root-ca.pem < root.key            # pruned: /proc
 put app/sys/x/root-ca.pem < root.key             # pruned: /sys
 ln -s "$T/pki/root.key" "$T/app/etc-root-link.pem"  # a symlink is not followed
+printf '\060\003\002\001\000' | put app/usr/lib/looks-like-der.bin  # a DER candidate that is no key
 # A library that carries the header text, as libgnutls does: not a key.
 printf '\177ELF\0\0\n-----BEGIN RSA PRIVATE KEY-----\n\0\001\002not base64\n-----END RSA PRIVATE KEY-----\n' | put app/usr/lib/libfake.so
 run cust="$T/cust" app="$T/app/"
@@ -72,6 +77,17 @@ check "a root given as a symlink (as /proc/<pid>/root is) is scanned through" "[
 tree multi; cat leaf.key tls.key | put multi/etc/ssl/bundle.pem
 run cust="$T/cust" multi="$T/multi"
 check "a CA key as the SECOND block of a file is found" "[ $(rc) = 1 ] && grep -q 'multi CAN READ THE tls PRIVATE KEY (/etc/ssl/bundle.pem)' $T/out" || show
+
+# 9-5: the RSA internal CA only inside the trust bundle; a CA key in DER;
+# an expected CA certificate missing.
+tree inbundle; put inbundle/opt/x/rsa.key < rsaca.key
+CA_CERTS="$T/pki/root.crt $T/pki/int.crt $T/pki/bundle.crt" run cust="$T/cust" inbundle="$T/inbundle"
+check "9-5: a CA whose certificate is only inside the trust bundle (the RSA internal CA) is compared, its key found" "[ $(rc) = 1 ] && grep -q 'inbundle CAN READ THE bundle#2 PRIVATE KEY (/opt/x/rsa.key)' $T/out" || show
+tree der; put der/var/cache/root.der < root.der
+run cust="$T/cust" der="$T/der"
+check "9-5: a CA key in DER (no PEM header) is found" "[ $(rc) = 1 ] && grep -q 'der CAN READ THE root PRIVATE KEY (/var/cache/root.der, DER)' $T/out" || show
+CA_REQUIRED="$T/pki/root.crt $T/pki/int.crt $T/pki/gone.crt" run cust="$T/cust"
+check "9-5: an expected CA certificate that is missing fails the check, not skipped" "[ $(rc) = 1 ] && grep -q 'expected CA certificate missing: $T/pki/gone.crt' $T/out" || show
 
 tree enc; put enc/opt/x/key.pem < int-enc.key
 run cust="$T/cust" enc="$T/enc"

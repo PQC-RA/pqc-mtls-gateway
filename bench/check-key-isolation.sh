@@ -32,7 +32,12 @@ PKI=${PKI:-/etc/pki/pqc-ca}
 PROJECT=${COMPOSE_PROJECT:-pqc-gw}
 CUSTODIAN=${CUSTODIAN_CONTAINER:-pqc-ca-custodian}
 CA_INT_CERT=${CA_INT_CERT:-$CA_STATE_DIR/certs/intermediate-ca.crt}
-CA_CERTS=${CA_CERTS:-"$PKI/root/certs/root-ca.crt $CA_INT_CERT $TRUST_DIR/internal-tls-ca-mldsa.crt $TRUST_DIR/internal-tls-ca-rsa.crt $PKI/enroll-classical-ca.crt"}
+# Every certificate in these files is compared with, each on its own: the trust
+# file is a bundle during an ADR-022 transition, and the RSA internal CA may
+# exist only inside it. CA_REQUIRED must be there: a missing one fails the
+# check instead of being skipped.
+CA_CERTS=${CA_CERTS:-"$PKI/root/certs/root-ca.crt $CA_INT_CERT $TRUST_DIR/internal-tls-ca.crt $TRUST_DIR/internal-tls-ca-mldsa.crt $TRUST_DIR/internal-tls-ca-rsa.crt $PKI/enroll-classical-ca.crt"}
+CA_REQUIRED=${CA_REQUIRED:-"$PKI/root/certs/root-ca.crt $CA_INT_CERT $TRUST_DIR/internal-tls-ca.crt"}
 # A PEM private-key header line: PRIVATE KEY (PKCS#8), ENCRYPTED, RSA, EC,
 # OPENSSH, ... Only a well-formed block counts (header, base64 body, matching
 # END line): libraries such as libgnutls carry the header text itself.
@@ -49,10 +54,20 @@ spki_of_cert() {
 }
 
 declare -A CA_SPKI=()
+for req in $CA_REQUIRED; do
+    [ -f "$req" ] || fail "expected CA certificate missing: $req (nothing to compare its key with)"
+done
 for crt in $CA_CERTS; do
-    [ -f "$crt" ] || continue
-    h=$(spki_of_cert "$crt") || { fail "cannot read the public key of $crt"; continue; }
-    CA_SPKI[$h]=$(basename "$crt" .crt)
+    [ -f "$crt" ] || { echo "  (no $crt here)"; continue; }
+    rm -rf "$T/c"; mkdir "$T/c"
+    awk -v d="$T/c" '/-----BEGIN CERTIFICATE-----/ { k++ } k { print > (d "/" k ".pem") }' "$crt"
+    k=$(find "$T/c" -name '*.pem' | wc -l | tr -d ' ')
+    [ "$k" -gt 0 ] || { fail "$crt holds no certificate"; continue; }
+    for c in "$T"/c/*.pem; do
+        h=$(spki_of_cert "$c") || { fail "cannot read the public key of a certificate in $crt"; continue; }
+        if [ "$k" = 1 ]; then CA_SPKI[$h]=$(basename "$crt" .crt)
+        else CA_SPKI[$h]="$(basename "$crt" .crt)#$(basename "$c" .pem)"; fi
+    done
 done
 INT_SPKI=$(spki_of_cert "$CA_INT_CERT") || fail "cannot read the intermediate certificate $CA_INT_CERT"
 [ "${#CA_SPKI[@]}" -gt 0 ] || fail "no CA certificate to compare with"
@@ -98,6 +113,43 @@ scan() {
             fi
         done
     done < "$T/files"
+    # DER private keys (PKCS#8, PKCS#1, SEC1) have no header to grep for.
+    # Candidates are files that start with a SEQUENCE whose first element is
+    # INTEGER 0 or 1 (the version every one of those formats begins with);
+    # openssl then decides, and a candidate it cannot read as a key is not one.
+    if ! find -H "${r:-/}" \( -path "$r/proc" -o -path "$r/sys" -o -path "$r/dev" \) -prune -o -type f -print0 \
+         | python3 -I -c '
+import sys
+paths = sys.stdin.buffer.read().split(b"\0")
+out = sys.stdout.buffer
+for p in paths:
+    if not p:
+        continue
+    try:
+        with open(p, "rb") as fh:
+            b = fh.read(8)
+    except OSError as e:
+        sys.stderr.write(f"cannot read {p!r}: {e}\n")
+        sys.exit(2)
+    if len(b) < 5 or b[0] != 0x30:
+        continue
+    off = {0x81: 3, 0x82: 4, 0x83: 5}.get(b[1], 2 if b[1] < 0x80 else 0)
+    if off and b[off:off + 3] in (b"\x02\x01\x00", b"\x02\x01\x01"):
+        out.write(p + b"\0")
+' > "$T/der"; then
+        fail "$name: the scan for DER keys reported errors (above), key isolation UNVERIFIED"
+    fi
+    while IFS= read -r -d '' f; do
+        "$OSSL" pkey -inform DER -in "$f" -pubout -outform DER -out "$T/key.der" 2> "$T/err" && [ -s "$T/key.der" ] || continue
+        n=$((n + 1))
+        h=$(sha256sum < "$T/key.der" | cut -c1-64)
+        [ -n "${CA_SPKI[$h]:-}" ] || continue
+        if [ "$name" = "$CUSTODIAN" ] && [ "$h" = "$INT_SPKI" ]; then
+            CUSTODIAN_SAW_KEY=1; held="$held ${CA_SPKI[$h]}"
+        else
+            fail "$name CAN READ THE ${CA_SPKI[$h]} PRIVATE KEY (${f#"$r"}, DER)"
+        fi
+    done < "$T/der"
     printf '  %-26s private keys found: %-4s CA keys: %s\n' "$name" "$n" "${held:-none}"
 }
 
