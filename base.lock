@@ -1,10 +1,10 @@
 {
   "image": "ghcr.io/pqc-ra/pqc-mtls-openssl-base",
-  "digest": "sha256:321c0a2aa38893f3ea0c4652c1428de7873b84279bc166191d021b94967079ed",
+  "digest": "sha256:ca0e7f9f2b75cc92722cf8af7cd647ad756b16e3da1f37ce67dbff6469b9fdcd",
   "openssl_version": "3.6.5",
   "openresty_image": "ghcr.io/pqc-ra/pqc-mtls-openresty-base",
-  "openresty_digest": "sha256:8f15aa4ccf6b7dfa93a4b30959317d4f97971b4702eb3fe426bdf549e4ca3b92",
+  "openresty_digest": "sha256:2328dda02a8b58cda5d804e46a577598b71351a1bec3a3ec7ca7f26b4db8a496",
   "openresty_version": "1.31.8.1",
-  "builtFrom_sha": "16f03060a3100ea1fa29487ba4ad73714da761d9",
-  "created": "2026-10-28T08:49:09Z"
+  "builtFrom_sha": "5ddf143e38f34d864ceacb37eab99efde05eebd4",
+  "created": "2026-11-03T18:37:03Z"
 }
