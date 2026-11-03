@@ -524,8 +524,11 @@ echo "==> Generating CRLs"
 echo "==> Assembling trust chain + combined CRL"
 cat "$PKI_DIR/intermediate/certs/intermediate-ca.crt" \
     "$PKI_DIR/root/certs/root-ca.crt"            > "$PKI_DIR/hybrid-ca-chain.crt"
-cat "$PKI_DIR/root/crl/root-ca.crl" \
-    "$PKI_DIR/intermediate/crl/intermediate-ca.crl" > "$PKI_DIR/hybrid-combined-crl.pem"
+# Intermediate FIRST: crl_worker.lua reads only the first CRL (its revoked
+# serials and pqc_crl_next_update_seconds), as the renewer and, from ADR-024,
+# the custodian write it.
+cat "$PKI_DIR/intermediate/crl/intermediate-ca.crl" \
+    "$PKI_DIR/root/crl/root-ca.crl" > "$PKI_DIR/hybrid-combined-crl.pem"
 cp "$PKI_DIR/hybrid-ca-chain.crt"     "$PKI_DIR/ca-chain.crt"
 cp "$PKI_DIR/hybrid-combined-crl.pem" "$PKI_DIR/combined-crl.pem"
 
