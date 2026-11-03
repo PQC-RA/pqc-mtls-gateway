@@ -121,6 +121,8 @@ function itemUnitPasses() {
 	check("flag off: revoke answers exactly as before (200 {ok:true}, no crl field)", r.status === 200 && r.raw === '{"ok":true}', `${r.status} ${r.raw}`);
 	r = await get("/metrics");
 	check("flag off: no /metrics (falls through to authenticated routes, 404)", r.status === 404, r.status);
+	r = await req("POST", "/crl/issue");
+	check("flag off: POST /crl/issue is 404 not_crl_issuer (management-api then uses the renewer)", r.status === 404 && r.j.error === "not_crl_issuer", `${r.status} ${r.j.error}`);
 	check("flag off: nothing published", fs.readdirSync(PUB).length === 0, fs.readdirSync(PUB).join(","));
 	check("flag off: bench/item4/custodian-unit.js all pass", itemUnitPasses(), lastUnit);
 	await stop();
@@ -166,6 +168,9 @@ function itemUnitPasses() {
 	check("CRL number went up", n1 > n0, `${n0} -> ${n1}`);
 	r = await req("POST", "/revoke", { serialNumber: serial });
 	check("revoke again: 409 already_revoked, as before", r.status === 409 && r.j.error === "already_revoked", r.status);
+	const nm = crlNumber(`${PUB}/hybrid-combined-crl.pem`);
+	r = await req("POST", "/crl/issue");
+	check("POST /crl/issue: 200 with a new, higher CRL number", r.status === 200 && r.j.crl === "published" && BigInt(r.j.crlNumber) > nm && crlNumber(`${PUB}/hybrid-combined-crl.pem`) === BigInt(r.j.crlNumber), `${r.status} ${r.raw}`);
 
 	// ------------------------------------------------------------- batching
 	const batch = [];

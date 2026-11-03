@@ -1151,6 +1151,21 @@ const server = http.createServer(async (req, res) => {
 			return await handleFreeze(res, payload);
 		}
 
+		// An operator's "renew the CRL now" (management-api's forced renewal).
+		// 404 while this process is not the CRL issuer, so the caller knows to
+		// use the renewer instead; that is how management-api tells the two
+		// apart during the migration.
+		if (req.method === "POST" && url === "/crl/issue") {
+			if (!CRL_ISSUER) return sendError(res, 404, "not_crl_issuer", "This custodian does not issue CRLs");
+			if (!crlState.ready) return sendError(res, 503, "not_ready", "Custodian has not published its first CRL yet; retry");
+			try {
+				const pass = await requestCrlPass("manual", { updatedb: true });
+				return sendJson(res, 200, { ok: true, crl: "published", crlNumber: pass.crlNumber });
+			} catch (err) {
+				return sendError(res, 500, "crl_failed", `CRL not published: ${err.message}`);
+			}
+		}
+
 		return sendError(res, 404, "not_found", "No such endpoint");
 	} catch (err) {
 		log("ERROR", `Unhandled error: ${err && err.stack ? err.stack : err}`);
