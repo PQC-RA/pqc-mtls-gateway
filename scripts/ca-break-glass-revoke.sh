@@ -62,13 +62,15 @@ reason_args=(); [ "$REASON" = unspecified ] || reason_args=(-crl_reason "$REASON
 out=$(ca -revoke "$CERT" "${reason_args[@]}" 2>&1) || {
     echo "$out" | grep -qi "already revoked" && echo "    already revoked; issuing a CRL anyway" || die "revoke failed: $out"
 }
-ca -updatedb >/dev/null 2>&1 || echo "    WARN: -updatedb failed; continuing with the CRL"
+# Every openssl failure stops here with openssl's own message, as in the
+# custodian. The revocation is already recorded; running this again is safe.
+out=$(ca -updatedb 2>&1) || die "-updatedb failed (the revocation is recorded, not yet published; fix the cause and run this again): $out"
 
 echo "==> issuing the next intermediate CRL"
 last=$(crlno "$CA_STATE_DIR/crl/intermediate-ca.crl")
 tmp=$(mktemp "$CA_STATE_DIR/crl/.intermediate-ca.crl.tmp-XXXXXX")
 trap 'rm -f "$tmp"' EXIT
-ca -gencrl -out "$tmp" 2>/dev/null
+out=$(ca -gencrl -out "$tmp" 2>&1) || die "-gencrl failed (the revocation is recorded, not yet published; fix the cause and run this again): $out"
 "$OPENSSL" crl -in "$tmp" -noout -CAfile "$CA_STATE_DIR/certs/intermediate-ca.crt" 2>&1 | grep -q "verify OK" || die "the new CRL does not verify"
 new=$(crlno "$tmp")
 [ $((16#$new)) -gt $((16#$last)) ] || die "CRL number $new is not above the last published $last"

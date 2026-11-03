@@ -382,6 +382,9 @@ case " $* " in
   *" -gencrl "*) [ -e /tmp/hang ] && exec sleep 600 ;;
   *" -updatedb "*) [ -e /tmp/updb-fail ] && { echo "forced -updatedb failure" >&2; exit 1; } ;;
 esac
+case " $* " in
+  *" -gencrl "*) [ -e /tmp/gencrl-fail ] && { echo "forced -gencrl failure" >&2; exit 1; } ;;
+esac
 exec ${O} "$@"
 `, { mode: 0o755 });
 	const HYB2 = `${PUB}/hybrid-combined-crl.pem`;
@@ -446,6 +449,26 @@ exec ${O} "$@"
 	s = await start(CRL_ENV);
 	check("index.txt missing after an interrupted rename: recovered from .new at start, custodian serves", s.exitCode === null && fs.existsSync(`${STATE}/db/index.txt`) && /Recovered .*index\.txt from index\.txt\.new/.test(logs) && fs.readFileSync(`${STATE}/db/index.txt`).length >= want.length, s.exitCode);
 	await stop();
+
+	// break-glass stops on an openssl failure and shows it (no hidden errors)
+	s = await start(CRL_ENV);
+	const bgf = await issue("bgfail");
+	await stop();
+	const bgRun = () => {
+		try { return { rc: 0, out: execFileSync(BG, [bgf, "keyCompromise"], { stdio: "pipe", env: { ...process.env, OPENSSL_BIN: "/tmp/fake-openssl" } }).toString() }; }
+		catch (e) { return { rc: e.status, out: String(e.stdout) + String(e.stderr) }; }
+	};
+	const nBgf = crlNumber(HYB2);
+	fs.writeFileSync("/tmp/updb-fail", "");
+	let br = bgRun();
+	check("break-glass: a failed -updatedb stops it with openssl's message, nothing published", br.rc !== 0 && /forced -updatedb failure/.test(br.out) && crlNumber(HYB2) === nBgf && !serialsIn(HYB2).has(bgf), `${br.rc} ${br.out.trim().slice(-120)}`);
+	fs.rmSync("/tmp/updb-fail");
+	fs.writeFileSync("/tmp/gencrl-fail", "");
+	br = bgRun();
+	check("break-glass: a failed -gencrl stops it with openssl's message, nothing published", br.rc !== 0 && /forced -gencrl failure/.test(br.out) && crlNumber(HYB2) === nBgf && !serialsIn(HYB2).has(bgf), `${br.rc} ${br.out.trim().slice(-120)}`);
+	fs.rmSync("/tmp/gencrl-fail");
+	br = bgRun();
+	check("  ... run again once openssl behaves: the recorded revocation is published", br.rc === 0 && serialsIn(HYB2).has(bgf) && crlNumber(HYB2) > nBgf, `${br.rc} ${br.out.trim().slice(-120)}`);
 
 	// ----------------------------------------- start-up failure fails closed
 	fs.writeFileSync(FAILFLAG, "");
