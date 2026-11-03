@@ -585,9 +585,10 @@ actionlint and an OpenSSL version-consistency gate.
   gateway, `ocsp-pq` and `pki-dist` mount only the public directory `/var/lib/pqc-ca-public`,
   read-only; `ocsp-pq` also reads its own key and the custodian's index snapshot. `management-api`
   has no CA mount at all and goes through the custodian over an HMAC-authenticated internal API.
-  `bench/verify-suite.sh` section 6 checks from inside every container, as uid 0 and by public key,
-  that no container but the custodian can read any CA key; `scripts/check-compose-policy.sh` checks
-  the compose file in CI.
+  `bench/verify-suite.sh` section 6 (`bench/check-key-isolation.sh`) scans the whole filesystem of
+  every container (image layers, writable layer, mounts, tmpfs) from the host and compares every
+  private key by public key with the CA certificates, so no container but the custodian can hold
+  any CA key; `scripts/check-compose-policy.sh` checks the compose file in CI.
 - **Classical elements remain only on internal hops, and naming them is part of the result:** the
   RS256/RSA-2048 JWTs that ride every proxied request (Token 1, backend identity, and Token 2,
   cert lookup). That is a deliberate trade: an ML-DSA-65 signature adds 4,412 characters to a

@@ -189,57 +189,12 @@ $OSSL crl -in $CA_PUBLIC_DIR/hybrid-combined-crl.pem -noout -text 2>/dev/null | 
 docker exec pqc-gateway sh -c "grep -ihE 'revoked serial' /var/log/nginx/error.log 2>/dev/null | tail -1" 2>/dev/null | sed 's/^/  data plane: /'
 echo
 echo "=============== 6. CA PRIVATE KEY ISOLATION (ADR-024) ==============="
-# Only the custodian may hold any CA key, and only the intermediate's. Checked
-# at runtime, from the inside, as uid 0 in every container of the stack (the
-# strongest view a compromise there could have), and by PUBLIC KEY, not by path:
-# every private key a container can read is compared with every CA certificate
-# this deployment has, so a copied or renamed key is caught too. A key whose
-# public key cannot be derived counts as a failure, never as a pass.
-PROJECT=${COMPOSE_PROJECT:-pqc-gw}
-spki_of_cert(){ $OSSL x509 -in "$1" -noout -pubkey 2>/dev/null | $OSSL pkey -pubin -outform DER 2>/dev/null | $OSSL dgst -sha256 | awk '{print $2}'; }
-declare -A CA_SPKI=()
-for crt in "$PKI/root/certs/root-ca.crt" "$CA_STATE_DIR/certs/intermediate-ca.crt" \
-           "$PKI/internal-tls-ca-mldsa.crt" "$PKI/internal-tls-ca-rsa.crt" "$PKI/enroll-classical-ca.crt"; do
-  [ -f "$crt" ] || continue
-  h=$(spki_of_cert "$crt"); [ -n "$h" ] && CA_SPKI[$h]=$(basename "$crt" .crt)
-done
-INT_SPKI=$(spki_of_cert "$CA_STATE_DIR/certs/intermediate-ca.crt")
-echo "  CA certificates compared against: ${CA_SPKI[*]}"
-CONTAINERS=$(docker ps --filter "label=com.docker.compose.project=$PROJECT" --format '{{.Names}}' 2>/dev/null | sort)
-[ -n "$CONTAINERS" ] || fail "no running container in compose project $PROJECT, section 6 verified nothing"
-CUSTODIAN_SAW_KEY=0
-for c in $CONTAINERS; do
-  if ! docker exec -u 0 "$c" true 2>/dev/null; then fail "$c: cannot exec into it, key isolation UNVERIFIED"; continue; fi
-  # Every mount destination (where private keys arrive), scanned as uid 0.
-  DESTS=$(docker inspect -f '{{range .Mounts}}{{.Destination}} {{end}}' "$c")
-  found=""; held=""
-  for f in $(docker exec -u 0 "$c" sh -c "for d in $DESTS; do grep -rl 'PRIVATE KEY' \"\$d\" 2>/dev/null; done" 2>/dev/null | sort -u); do
-    h=$(docker exec -u 0 "$c" cat "$f" 2>/dev/null | $OSSL pkey -passin pass: -pubout -outform DER 2>/dev/null | $OSSL dgst -sha256 | awk '{print $2}')
-    if [ -z "$h" ] || [ "$h" = "$(printf '' | $OSSL dgst -sha256 | awk '{print $2}')" ]; then
-      fail "$c: $f looks like a private key but its public key cannot be derived"; continue
-    fi
-    found="$found $f"
-    if [ -n "${CA_SPKI[$h]:-}" ]; then
-      if [ "$c" = pqc-ca-custodian ] && [ "$h" = "$INT_SPKI" ]; then CUSTODIAN_SAW_KEY=1; held="$held ${CA_SPKI[$h]}"
-      else fail "$c CAN READ THE ${CA_SPKI[$h]} PRIVATE KEY ($f)"; fi
-    fi
-  done
-  printf '  %-26s uid=%-5s private keys readable: %-4s CA keys: %s\n' "$c" "$(docker exec "$c" id -u 2>/dev/null)" \
-    "$(echo "$found" | wc -w)" "${held:-none}"
-  # Mounts: the custodian's private directories belong to it alone, and no
-  # container mounts the CA tree itself (one public certificate file is fine).
-  for src in $(docker inspect -f '{{range .Mounts}}{{.Source}} {{end}}' "$c"); do
-    case "$src" in
-      "$CA_KEY_DIR"|"$CA_STATE_DIR"|"$CA_INBOX_DIR") [ "$c" = pqc-ca-custodian ] || fail "$c mounts the custodian's $src" ;;
-    esac
-    if [ "$src" = "$PKI" ] || { [ -d "$src" ] && [ "${src#"$PKI"/}" != "$src" ]; }; then
-      fail "$c mounts the CA tree (or a directory in it): $src"
-    fi
-  done
-done
-# The canary: the scan must find the one key that is supposed to be there.
-[ "$CUSTODIAN_SAW_KEY" = 1 ] && echo "     ==> PASS: only pqc-ca-custodian holds a CA key, and only the intermediate's" \
-  || fail "the scan did not find the intermediate key in pqc-ca-custodian, key isolation UNVERIFIED"
+# Only the custodian may hold any CA key, and only the intermediate's: the
+# WHOLE filesystem of every container of the stack (image layers, writable
+# layer, mounts, tmpfs) read from the host, keys compared by public key, the
+# custodian's key as the canary. See bench/check-key-isolation.sh.
+COMPOSE_PROJECT=${COMPOSE_PROJECT:-pqc-gw} PKI="$PKI" OSSL="$OSSL" REPO="$REPO" \
+  "$BENCH_HOME/check-key-isolation.sh" || fail "CA private key isolation (section 6)"
 
 echo
 echo "evidence -> $(pwd)/$EV/"
