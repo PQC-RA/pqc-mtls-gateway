@@ -116,6 +116,21 @@ $M reverse > /tmp/rev0.log 2>&1; rc=$?
 check "reverse refuses while the custodian holds the writer lock" "[ $rc != 0 ] && grep -q \"holds\" /tmp/rev0.log"
 wait
 
+# --- a reverse whose checks fail changes nothing ----------------------------------
+PB=$(treehash $P); NB=$(treehash $CA_ROOT)
+cp -p $CA_PUBLIC_DIR/hybrid-combined-crl.pem /tmp/keepcomb
+cat $CA_STATE_DIR/crl/root-ca.crl $CA_STATE_DIR/crl/intermediate-ca.crl > $CA_PUBLIC_DIR/hybrid-combined-crl.pem
+$M reverse > /tmp/revf.log 2>&1; rc=$?
+check "reverse refuses a root-first combined CRL (exit 1)" "[ $rc != 0 ] && grep -q \"does not start with the intermediate\" /tmp/revf.log"
+check "and leaves the old tree byte for byte as it was (still retired, no staging left)" "[ \"$(treehash $P)\" = \"$PB\" ] && [ ! -d $INT ] && [ -z \"$(find $P -maxdepth 1 -name \".reverse-staging-*\")\" ]"
+check "and the new layout too" "[ \"$(treehash $CA_ROOT)\" = \"$NB\" ]"
+cp -p /tmp/keepcomb $CA_PUBLIC_DIR/hybrid-combined-crl.pem
+cp -p $CA_STATE_DIR/db/index.txt /tmp/keepidx
+awk -F"\t" -v OFS="\t" -v s=$S1 "\$4==s{\$1=\"V\";\$3=\"\"}1" /tmp/keepidx > $CA_STATE_DIR/db/index.txt
+$M reverse > /tmp/revu.log 2>&1; rc=$?
+check "reverse refuses a state index that would un-revoke $S1, and changes nothing" "[ $rc != 0 ] && grep -q \"un-revoke\" /tmp/revu.log && grep -q $S1 /tmp/revu.log && [ \"$(treehash $P)\" = \"$PB\" ]"
+cp -p /tmp/keepidx $CA_STATE_DIR/db/index.txt
+
 # --- reverse --------------------------------------------------------------------
 $M reverse > /tmp/rev.log 2>&1; rc=$?
 check "reverse succeeds" "[ $rc = 0 ]" || tail -8 /tmp/rev.log
@@ -123,6 +138,7 @@ check "the old tree is back in place" "[ -d $INT ] && [ -f $P/hybrid-combined-cr
 check "the revocation made in the new layout is in the old index" "grep -q \"^R.*	$S2	\" $INT/db/index.txt"
 check "the old combined CRL is the latest one: $S1 and $S2 revoked, intermediate first" "serials $P/hybrid-combined-crl.pem | grep -qx $S1 && serials $P/hybrid-combined-crl.pem | grep -qx $S2 && $O crl -in $P/hybrid-combined-crl.pem -noout -issuer | grep -q Intermediate"
 check "crlnumber was copied back: the next CRL is above $NC" "[ $((16#$(cat $INT/db/crlnumber))) -gt $((16#$NC)) ]"
+check "the previous old tree is kept, renamed, and no staging is left" "ls -d $INT.pre-reverse-* >/dev/null && [ -z \"$(find $P -maxdepth 1 -name \".reverse-staging-*\")\" ]"
 check "the new layout is set aside, not deleted" "[ ! -d $CA_ROOT ] && ls -d $CA_ROOT.reversed-* $CA_PUBLIC_DIR.reversed-* >/dev/null"
 
 # --- the old renewer runs again: numbers keep rising ------------------------------

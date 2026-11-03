@@ -22,12 +22,15 @@
 #                                              and top-level CRL and chain files
 #                                              so a tool still pointed at them
 #                                              fails instead of using stale data
-#   migrate-ca-state.sh reverse [--from DIR]   rollback: copy the state back
-#                                              (index, serial, crlnumber, issued/,
-#                                              the custodian's JSON state) and the
+#   migrate-ca-state.sh reverse [--from DIR]   rollback: stage the old tree with
+#                                              the state copied back (index,
+#                                              serial, crlnumber, issued/, the
+#                                              custodian's JSON state) and the
 #                                              latest published CRLs, check that
-#                                              nothing was un-revoked, then set
-#                                              the new layout aside
+#                                              nothing is un-revoked and no CRL
+#                                              number reused, and only then
+#                                              rename it into place and set the
+#                                              new layout aside
 #
 # DIR defaults to /etc/pki/pqc-ca. Run as root on the host, with the custodian
 # and the CRL renewer stopped: forward and reverse refuse otherwise, and every
@@ -58,7 +61,7 @@ TS=$(date -u +%Y%m%dT%H%M%SZ)
 die() { echo "ERROR: $*" >&2; exit 1; }
 say() { echo "==> $*"; }
 
-cmd=${1:-}; shift || true
+cmd=${1:-}; [ $# -eq 0 ] || shift
 FROM=/etc/pki/pqc-ca
 while [ $# -gt 0 ]; do
     case "$1" in
@@ -89,10 +92,13 @@ take_writer_lock() {
 }
 
 # --- helpers ------------------------------------------------------------------
-# The public key of a private key (pkey) or of a certificate (x509), base64.
-pub_of() {
-    if [ "$1" = pkey ]; then "$OPENSSL" pkey -in "$2" -pubout 2>/dev/null
-    else "$OPENSSL" x509 -in "$2" -noout -pubkey 2>/dev/null; fi | sed '/^-----/d' | tr -d '\n'
+# same_key KEY CERT: true when the private key belongs to the certificate. A
+# file that cannot be read is an error, never two empty strings that match.
+same_key() {
+    local a b
+    a=$("$OPENSSL" pkey -in "$1" -pubout) || die "cannot read the key $1"
+    b=$("$OPENSSL" x509 -in "$2" -noout -pubkey) || die "cannot read the certificate $2"
+    [ -n "$a" ] && [ "$a" = "$b" ]
 }
 crl_number() { "$OPENSSL" crl -in "$1" -noout -crlnumber | sed 's/^crlNumber=0x//'; }
 crl_serials() { "$OPENSSL" crl -in "$1" -noout -text | sed -n 's/^ *Serial Number: *//p' | sort -u; }
@@ -128,7 +134,7 @@ forward() {
              "$FROM/root/certs/root-ca.crt" "$FROM/root/crl/root-ca.crl"; do
         [ -f "$f" ] || die "missing $f"
     done
-    [ "$(pub_of pkey "$INT/private/intermediate-ca.key")" = "$(pub_of x509 "$INT/certs/intermediate-ca.crt")" ] \
+    same_key "$INT/private/intermediate-ca.key" "$INT/certs/intermediate-ca.crt" \
         || die "the intermediate key does not match its certificate"
     crl_verify "$INT/crl/intermediate-ca.crl" "$INT/certs/intermediate-ca.crt" || die "intermediate CRL does not verify"
     crl_verify "$FROM/root/crl/root-ca.crl" "$FROM/root/certs/root-ca.crt" || die "root CRL does not verify"
@@ -179,7 +185,7 @@ forward() {
         [ "$a" = "$b" ] || die "$f: $a lines in the source, $b in the copy"
     done
     [ "$(ls "$CA_STATE_DIR/issued" | wc -l)" = "$n_issued" ] || die "issued/ count differs"
-    [ "$(pub_of pkey "$CA_KEY_FILE")" = "$(pub_of x509 "$CA_STATE_DIR/certs/intermediate-ca.crt")" ] || die "copied key does not match"
+    same_key "$CA_KEY_FILE" "$CA_STATE_DIR/certs/intermediate-ca.crt" || die "copied key does not match"
     ca_layout_check || die "layout owners or modes are wrong"
     echo "    index: $(wc -l < "$CA_STATE_DIR/db/index.txt") rows, $(grep -c '^R' "$CA_STATE_DIR/db/index.txt") revoked;" \
          "serial $(cat "$CA_STATE_DIR/db/serial"); next CRL number $(cat "$CA_STATE_DIR/db/crlnumber");" \
@@ -236,66 +242,108 @@ retire() {
 }
 
 # --- reverse ------------------------------------------------------------------
+# The rollback is assembled and checked in a staging copy inside $FROM first.
+# The old tree changes only after every check has passed, and then by rename on
+# the same filesystem: a failed check leaves $FROM exactly as it was.
+newest() { find "$FROM" -maxdepth 1 -name "$1" -type d | sort | tail -1; }
+revoked_in_index() { awk -F'\t' '$1 == "R" { print $4 }' "$1" | sort -u; }
 reverse() {
     refuse_if_writers_run
     take_writer_lock
     [ -d "$CA_STATE_DIR" ] || die "no new layout at $CA_STATE_DIR"
-    say "un-retiring $FROM if it was retired"
-    local d
-    if [ ! -d "$INT" ]; then
-        d=$(ls -d "$INT".migrated-* 2>/dev/null | sort | tail -1); [ -n "$d" ] || die "$INT is missing and no retired copy exists"
-        mv "$d" "$INT"
-        d=$(ls -d "$FROM"/ocsp.migrated-* 2>/dev/null | sort | tail -1); [ -n "$d" ] && [ ! -d "$FROM/ocsp" ] && mv "$d" "$FROM/ocsp"
-        d=$(ls -d "$FROM"/public.migrated-* 2>/dev/null | sort | tail -1)
-        if [ -n "$d" ]; then
-            for f in "$d"/*; do [ -f "$FROM/$(basename "$f")" ] || mv "$f" "$FROM/"; done
-            rmdir "$d" 2>/dev/null || true
-        fi
+    local src retired="" f b m published next missing comb
+    if [ -d "$INT" ]; then
+        src=$INT
+    else
+        retired=$(newest "intermediate.migrated-*")
+        [ -n "$retired" ] || die "$INT is missing and no retired copy exists"
+        src=$retired
     fi
-
-    say "copying the state back into $INT (the previous files are kept as *.pre-reverse-$TS)"
-    local f
+    STAGE=$(mktemp -d "$FROM/.reverse-staging-XXXXXX")
+    trap 'rm -rf -- "$STAGE"' EXIT
+    local S="$STAGE/intermediate"
+    say "staging the rollback in $STAGE (nothing in $FROM changes until every check passes)"
+    cp -a "$src" "$S"
     for f in index.txt index.txt.attr serial crlnumber fingerprint-index.json idempotency.json lineage.json; do
         [ -f "$CA_STATE_DIR/db/$f" ] || continue
-        [ -f "$INT/db/$f" ] && cp -p "$INT/db/$f" "$INT/db/$f.pre-reverse-$TS"
-        install -m 0644 -o "$APP_UID" -g "$APP_GID" "$CA_STATE_DIR/db/$f" "$INT/db/$f"
+        case "$f" in *.json) m=0640 ;; *) m=0644 ;; esac
+        install -m "$m" -o "$APP_UID" -g "$APP_GID" "$CA_STATE_DIR/db/$f" "$S/db/$f"
     done
-    chmod 0640 "$INT"/db/*.json 2>/dev/null || true
     for f in "$CA_STATE_DIR"/issued/*; do
-        [ -f "$f" ] && install -m 0644 -o "$APP_UID" -g "$APP_GID" "$f" "$INT/issued/$(basename "$f")"
+        [ -f "$f" ] || continue
+        install -m 0644 -o "$APP_UID" -g "$APP_GID" "$f" "$S/issued/$(basename "$f")"
     done
-    install -m 0644 -o 0 -g 0 "$CA_STATE_DIR/crl/intermediate-ca.crl" "$INT/crl/intermediate-ca.crl"
+    install -m 0644 -o 0 -g 0 "$CA_STATE_DIR/crl/intermediate-ca.crl" "$S/crl/intermediate-ca.crl"
+    # The gateway's CRL files: the latest the custodian published, so a
+    # gateway started on the old tree has every revocation from its first read.
+    mkdir "$STAGE/public"
+    for f in hybrid-combined-crl.pem combined-crl.pem ca-chain.crt hybrid-ca-chain.crt; do
+        [ -f "$CA_PUBLIC_DIR/$f" ] || continue
+        install -m 0644 -o 0 -g 0 "$CA_PUBLIC_DIR/$f" "$STAGE/public/$f"
+    done
     # The root CRL the custodian published may be newer than the tree's (the
     # inbox); keep whichever has the higher number.
     if hex_gt "$(crl_number "$CA_STATE_DIR/crl/root-ca.crl")" "$(crl_number "$FROM/root/crl/root-ca.crl")"; then
-        cp -p "$FROM/root/crl/root-ca.crl" "$FROM/root/crl/root-ca.crl.pre-reverse-$TS"
-        install -m 0644 -o 0 -g 0 "$CA_STATE_DIR/crl/root-ca.crl" "$FROM/root/crl/root-ca.crl"
+        install -m 0644 -o 0 -g 0 "$CA_STATE_DIR/crl/root-ca.crl" "$STAGE/root-ca.crl"
     fi
-    # The gateway's CRL files: the latest the custodian published, so a
-    # gateway started on the old tree has every revocation from its first read.
-    for f in hybrid-combined-crl.pem combined-crl.pem ca-chain.crt hybrid-ca-chain.crt; do
-        [ -f "$CA_PUBLIC_DIR/$f" ] || continue
-        [ -f "$FROM/$f" ] && cp -p "$FROM/$f" "$FROM/$f.pre-reverse-$TS"
-        install -m 0644 -o 0 -g 0 "$CA_PUBLIC_DIR/$f" "$FROM/$f"
-    done
 
-    say "checking the old tree"
-    [ "$(pub_of x509 "$INT/certs/intermediate-ca.crt")" = "$(pub_of pkey "$INT/private/intermediate-ca.key")" ] \
+    say "checking the staged tree"
+    same_key "$S/private/intermediate-ca.key" "$S/certs/intermediate-ca.crt" \
         || die "the old tree's key does not match its certificate"
-    local published next missing
-    published=$(crl_number "$CA_STATE_DIR/crl/intermediate-ca.crl")
-    next=$(tr -d '\n' < "$INT/db/crlnumber")
+    crl_verify "$S/crl/intermediate-ca.crl" "$S/certs/intermediate-ca.crt" \
+        || die "the custodian's last intermediate CRL does not verify against the old tree's certificate"
+    if [ -f "$STAGE/root-ca.crl" ]; then
+        crl_verify "$STAGE/root-ca.crl" "$FROM/root/certs/root-ca.crt" || die "the custodian's root CRL does not verify"
+    fi
+    published=$(crl_number "$S/crl/intermediate-ca.crl")
+    next=$(tr -d '\n' < "$S/db/crlnumber")
     hex_gt "$next" "$published" || die "crlnumber $next is not above the last published $published: the next CRL would reuse a number"
-    missing=$(comm -23 <(crl_serials "$CA_STATE_DIR/crl/intermediate-ca.crl") <(crl_serials "$FROM/hybrid-combined-crl.pem"))
-    [ -z "$missing" ] || die "revoked serials missing from $FROM/hybrid-combined-crl.pem: $missing"
-    "$OPENSSL" crl -in "$FROM/hybrid-combined-crl.pem" -noout -issuer | grep -q "Intermediate" \
-        || die "$FROM/hybrid-combined-crl.pem does not start with the intermediate CRL"
-    echo "    last published CRL $published, next $next; every revoked serial is in $FROM/hybrid-combined-crl.pem"
+    missing=$(comm -23 <(revoked_in_index "$src/db/index.txt") <(revoked_in_index "$S/db/index.txt"))
+    [ -z "$missing" ] || die "revoked in the old index but not in the custodian's: $missing (rolling back would un-revoke them)"
+    # The combined CRL the gateway reads after the rollback.
+    comb="$STAGE/public/hybrid-combined-crl.pem"
+    [ -f "$comb" ] || comb="$FROM/hybrid-combined-crl.pem"
+    [ -f "$comb" ] || comb="$(newest "public.migrated-*")/hybrid-combined-crl.pem"
+    [ -f "$comb" ] || die "no combined CRL for the old tree"
+    [ "$("$OPENSSL" crl -in "$comb" -noout -issuer | sed 's/^issuer=//')" = \
+      "$("$OPENSSL" x509 -in "$S/certs/intermediate-ca.crt" -noout -subject | sed 's/^subject=//')" ] \
+        || die "the combined CRL the gateway would read does not start with the intermediate CRL"
+    missing=$(comm -23 <(crl_serials "$S/crl/intermediate-ca.crl") <(crl_serials "$comb"))
+    [ -z "$missing" ] || die "revoked serials missing from the combined CRL the gateway would read: $missing"
+    echo "    last published CRL $published, next $next; nothing un-revoked; every revoked serial is in the combined CRL"
+
+    say "every check passed: moving the staged tree into place (the previous one is kept as $INT.pre-reverse-$TS)"
+    mv -T "$src" "$INT.pre-reverse-$TS"
+    mv -T "$S" "$INT" || die "could not move $S into place: rename $INT.pre-reverse-$TS back to $INT"
+    for f in "$STAGE"/public/*; do
+        [ -f "$f" ] || continue
+        b=$(basename "$f")
+        if [ -f "$FROM/$b" ]; then cp -p "$FROM/$b" "$FROM/$b.pre-reverse-$TS"; fi
+        mv -f "$f" "$FROM/$b"
+    done
+    if [ -f "$STAGE/root-ca.crl" ]; then
+        cp -p "$FROM/root/crl/root-ca.crl" "$FROM/root/crl/root-ca.crl.pre-reverse-$TS"
+        mv -f "$STAGE/root-ca.crl" "$FROM/root/crl/root-ca.crl"
+    fi
+    if [ -n "$retired" ]; then   # un-retire the rest of what retire renamed
+        f=$(newest "ocsp.migrated-*")
+        if [ -n "$f" ] && [ ! -d "$FROM/ocsp" ]; then mv -T "$f" "$FROM/ocsp"; fi
+        f=$(newest "public.migrated-*")
+        if [ -n "$f" ]; then
+            for b in "$f"/*; do
+                [ -f "$b" ] || continue
+                [ -e "$FROM/$(basename "$b")" ] || mv "$b" "$FROM/"
+            done
+            if [ -z "$(ls -A "$f")" ]; then rmdir "$f"
+            else echo "    kept $f: $FROM already has a newer copy of what it holds"; fi
+        fi
+    fi
+    echo "    $INT.pre-reverse-$TS holds a copy of the intermediate key: destroy it when no longer needed, and record that."
 
     say "setting the new layout aside (renamed, not deleted)"
     exec 9>&-
-    for d in "$CA_ROOT" "$CA_PUBLIC_DIR" "$CA_STATUS_DIR" "$OCSP_KEY_DIR"; do
-        [ -d "$d" ] && mv "$d" "$d.reversed-$TS"
+    for f in "$CA_ROOT" "$CA_PUBLIC_DIR" "$CA_STATUS_DIR" "$OCSP_KEY_DIR"; do
+        if [ -d "$f" ]; then mv "$f" "$f.reversed-$TS"; fi
     done
     echo "    $CA_ROOT.reversed-$TS holds a copy of the intermediate key: destroy it when no longer needed, and record that."
     say "reverse done. Start the old containers; the renewer's next CRL is number $next."
@@ -307,5 +355,5 @@ case "$cmd" in
     retire)  take_writer_lock; retire ;;
     check-next) check_next ;;
     reverse) reverse ;;
-    *) sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,35p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac
