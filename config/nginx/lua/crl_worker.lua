@@ -74,12 +74,16 @@ local CRL_FILE = "/etc/pki/pqc-ca/hybrid-combined-crl.pem"
 local CHAIN_FILE = "/etc/pki/pqc-ca/hybrid-ca-chain.crt"
 
 -- Subject of the first certificate in CHAIN_FILE, in the form `openssl crl
--- -text` prints an Issuer (same default name format), or nil.
+-- -text` prints an Issuer (same default name format); or nil and what openssl
+-- said instead (its stderr is read, not discarded).
 local function intermediate_subject()
-    local f = io.popen(string.format("%s x509 -in %s -noout -subject 2>/dev/null", OPENSSL, CHAIN_FILE), "r")
-    if not f then return nil end
-    local line = f:read("*l"); f:close()
-    return line and line:match("^subject=%s*(.-)%s*$")
+    local f, err = io.popen(string.format("%s x509 -in %s -noout -subject 2>&1", OPENSSL, CHAIN_FILE), "r")
+    if not f then return nil, "cannot run openssl: " .. tostring(err) end
+    local out = f:read("*a") or ""; f:close()
+    local subject = out:match("^subject=%s*([^\n]-)%s*\n?$")
+    if subject then return subject end
+    out = out:gsub("%s+$", ""):gsub("\n", " | ")
+    return nil, out ~= "" and out or "no output"
 end
 
 -- nextUpdate of the CRL this poller last loaded, published for
@@ -226,8 +230,16 @@ poll_crl = function(premature)
             -- would hide an intermediate CRL that runs out. Revocation loading
             -- above is not affected by either.
             local next_update = M.parse_openssl_time(next_update_text)
-            local expected = intermediate_subject()
-            if next_update and (not expected or issuer_text ~= expected) then
+            -- Each reason is logged on its own, once.
+            local expected, why = intermediate_subject()
+            if not next_update then
+                ngx.log(ngx.ERR, "[crl_worker] CRL has no parsable Next Update (",
+                    tostring(next_update_text), "), pqc_crl_next_update_seconds withdrawn")
+            elseif not expected then
+                next_update = nil
+                ngx.log(ngx.ERR, "[crl_worker] cannot read the intermediate's subject from ", CHAIN_FILE,
+                    ": ", why, "; pqc_crl_next_update_seconds withdrawn")
+            elseif issuer_text ~= expected then
                 next_update = nil
                 ngx.log(ngx.ERR, "[crl_worker] the first CRL in ", CRL_FILE, " is issued by '",
                     tostring(issuer_text), "', not by the intermediate '", tostring(expected),
@@ -240,8 +252,6 @@ poll_crl = function(premature)
                 end
             else
                 ngx.shared.pqc_route_meta:delete("crl_next_update")
-                ngx.log(ngx.ERR, "[crl_worker] CRL has no parsable Next Update (",
-                    tostring(next_update_text), "), pqc_crl_next_update_seconds withdrawn")
             end
             ngx.log(ngx.WARN, "[crl_worker] CRL poll OK, ", loaded, " revoked serial(s) loaded")
         end

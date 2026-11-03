@@ -8,6 +8,8 @@
 --   metric value must be withdrawn and say why. The intermediate's revocations
 --   are then NOT loaded either (crl_worker reads only the first CRL), which is
 --   why every writer of the file puts the intermediate first.
+--   nochain: the chain file cannot be read; the metric value must be withdrawn
+--   and the ERR must carry openssl's own message, not a guess.
 local here = arg[0]:match("^(.*)/[^/]*$") or "."
 package.path = here .. "/../../config/nginx/lua/?.lua;" .. package.path
 
@@ -40,6 +42,17 @@ if arg[1] == "withdrawn" then
     for _, e in ipairs(errors) do said = said or e:find("not by the intermediate", 1, true) ~= nil end
     check("root-first file: nextUpdate withdrawn, not the root CRL's", store.crl_next_update, nil)
     check("  ... and the ERR says why", said, true)
+    check("  ... and only that reason (one ERR)", #errors, 1)
+elseif arg[1] == "nochain" then
+    local said = false
+    for _, e in ipairs(errors) do
+        said = said or (e:find("cannot read the intermediate's subject", 1, true) ~= nil
+            and e:find("Could not", 1, true) ~= nil)
+    end
+    check("chain unreadable: nextUpdate withdrawn", store.crl_next_update, nil)
+    check("  ... and the ERR carries openssl's own message", said, true)
+    check("  ... and only that reason (one ERR)", #errors, 1)
+    for _, e in ipairs(errors) do print("      ERR " .. e) end
 else
     check("no error logged", #errors, 0)
     for _, e in ipairs(errors) do print("      ERR " .. e) end
