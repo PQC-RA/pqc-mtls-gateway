@@ -74,5 +74,28 @@ printf 'services:\n  gateway:\n    volumes:\n      - ext:/e:ro\nvolumes:\n  ext:
 run "$repo/docker-compose.yml" "$T/external.yml"
 check "B2: an external volume, whose host path cannot be checked, is refused" "[ $(rc) = 1 ] && grep -q 'gateway: mounts the external volume ext' $T/out" || show
 
+# Ways past the mounts (pre-merge review, B2 second round).
+case_() { # case_ NAME YAML EXPECTED-TEXT DESCRIPTION
+    printf '%b' "$2" > "$T/$1.yml"
+    run "$repo/docker-compose.yml" "$T/$1.yml"
+    check "B2: $4" "[ $(rc) = 1 ] && grep -q '$3' $T/out" || show
+}
+case_ rbind 'services:\n  gateway:\n    volumes:\n      - rb:/k:ro\nvolumes:\n  rb:\n    driver_opts:\n      type: none\n      o: rbind\n      device: /var/lib/pqc-ca/key\n' \
+    'gateway: mounts the custodian.s /var/lib/pqc-ca/key' "a named volume with o=rbind of the key directory is refused"
+case_ reldev 'services:\n  gateway:\n    volumes:\n      - rd:/r:ro\nvolumes:\n  rd:\n    driver_opts:\n      type: none\n      o: bind\n      device: ./var/lib/pqc-ca/key\n' \
+    'binds the relative device' "a named bind volume with a relative device is refused"
+case_ secret 'services:\n  gateway:\n    secrets:\n      - ksec\nsecrets:\n  ksec:\n    file: /var/lib/pqc-ca/key/intermediate-ca.key\n' \
+    'secret ksec: file /var/lib/pqc-ca/key/intermediate-ca.key is under or above the protected /var/lib/pqc-ca/key' "a secret whose file is in the key directory is refused"
+case_ config 'services:\n  gateway:\n    configs:\n      - kconf\nconfigs:\n  kconf:\n    file: /etc/pki/pqc-ca/root/private/root-ca.key\n' \
+    'config kconf: file /etc/pki/pqc-ca/root/private/root-ca.key is under or above the protected /etc/pki/pqc-ca' "a config whose file is in the CA tree is refused"
+case_ vfrom 'services:\n  gateway:\n    volumes_from:\n      - pqc-ca-custodian\n' \
+    'gateway: volumes_from the custodian' "volumes_from the custodian is refused"
+case_ priv 'services:\n  gateway:\n    privileged: true\n' \
+    'gateway: privileged' "a privileged service is refused"
+case_ pidhost 'services:\n  gateway:\n    pid: host\n' \
+    'gateway: shares a PID namespace (host)' "pid: host is refused"
+case_ pidcust 'services:\n  management-api:\n    pid: service:pqc-ca-custodian\n' \
+    'management-api: shares a PID namespace (service:pqc-ca-custodian)' "pid: service:pqc-ca-custodian is refused"
+
 echo "$PASS/$((PASS + FAIL)) passed"
 [ "$FAIL" = 0 ]

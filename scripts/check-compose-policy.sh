@@ -17,7 +17,19 @@
 #     rollback would otherwise rerun this release's build);
 #   - a service runs as root, without a read-only rootfs, without cap_drop ALL,
 #     with an added capability or without no-new-privileges, unless it is a
-#     named exception below. The CA path (custodian, ocsp-pq, pki-dist) never is.
+#     named exception below. The CA path (custodian, ocsp-pq, pki-dist) never is;
+#   - a named volume binds (o=bind or rbind) a protected path, a parent of one,
+#     or a relative device it cannot resolve; a mount uses an external volume;
+#   - a top-level secret or config file is under or above a protected path;
+#   - a service uses volumes_from the custodian, runs privileged, or shares a
+#     PID namespace with the host or the custodian (/proc/<pid>/root reaches
+#     the custodian's filesystem).
+#
+# What it cannot see: a symbolic link on the host (an innocent-looking source
+# that points into a protected directory) is resolved by Docker at run time,
+# not in the compose file. The runtime check, bench/check-key-isolation.sh
+# (verify-suite.sh section 6), scans every container's filesystem and is the
+# backstop for that.
 #
 # Usage: check-compose-policy.sh [compose file ...]   (default docker-compose.yml)
 # Needs docker compose (no images are pulled) and python3.
@@ -62,20 +74,51 @@ def host_path(v):
     if v.get("type") == "volume" and src:
         vol = VOLS.get(src) or {}
         opts = vol.get("driver_opts") or {}
-        if "bind" in str(opts.get("o", "")).split(",") and opts.get("device"):
+        # bind, rbind, or either among other options: the device is a host path.
+        if any("bind" in o.strip() for o in str(opts.get("o", "")).split(",")) and opts.get("device"):
             src = str(opts["device"])
+            if not src.startswith("/"):
+                return "RELATIVE:" + src
         elif vol.get("external"):
             return None
     if src.startswith("/"):
         src = os.path.normpath(re.sub(r"^/+", "/", src))
     return src
 bad = []
+# Secrets and configs with file: are bind-mounted into the services that use them.
+for kind in ("secrets", "configs"):
+    for sname, sdef in sorted((cfg.get(kind) or {}).items()):
+        f = str((sdef or {}).get("file") or "")
+        if not f:
+            continue
+        f = os.path.normpath(re.sub(r"^/+", "/", f)) if f.startswith("/") else f
+        for d in PROTECTED:
+            if under(f, d) or parent_of(f, d):
+                bad.append(f"{kind[:-1]} {sname}: file {f} is under or above the protected {d}")
+CUSTODIAN = "pqc-ca-custodian"
 for name, svc in sorted(cfg.get("services", {}).items()):
+    # Ways into another container that are not mounts: its volumes, its
+    # processes (/proc/<pid>/root reaches its filesystem, key included), or
+    # everything (privileged).
+    for vf in svc.get("volumes_from") or []:
+        ref = str(vf).split(":")
+        target = ref[1] if len(ref) > 1 and ref[0] in ("service", "container") else ref[0]
+        if target == CUSTODIAN:
+            bad.append(f"{name}: volumes_from the custodian ({vf})")
+    if svc.get("privileged"):
+        bad.append(f"{name}: privileged")
+    pid = str(svc.get("pid") or "")
+    if pid == "host" or (pid.split(":", 1)[-1] == CUSTODIAN and name != CUSTODIAN):
+        bad.append(f"{name}: shares a PID namespace ({pid}), which reaches the custodian through /proc/<pid>/root")
     for v in svc.get("volumes", []):
         src, dst = host_path(v), v.get("target", "")
         if src is None:
             ext = v.get("source")
             bad.append(f"{name}: mounts the external volume {ext}, whose host path cannot be checked")
+            continue
+        if src.startswith("RELATIVE:"):
+            vs = v.get("source")
+            bad.append(f"{name}: the volume {vs} binds the relative device {src[9:]}, which this check cannot resolve")
             continue
         # Compared normalised: /var/lib/pqc-ca//key, //var/lib/pqc-ca/key and
         # /var/lib/pqc-ca/./key are /var/lib/pqc-ca/key.
