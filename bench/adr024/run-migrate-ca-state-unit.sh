@@ -115,6 +115,12 @@ cp -p /tmp/keep $F
 chown 0:0 $CA_WRITER_LOCK; chmod 644 $CA_WRITER_LOCK
 $M verify > /dev/null 2>&1
 check "8-4: a writer lock left root-owned 0644 is given back to the custodian (1003, 0600)" "[ \"$(stat -c %u:%a $CA_WRITER_LOCK)\" = 1003:600 ]"
+chown 0:0 $CA_WRITER_LOCK; chmod 644 $CA_WRITER_LOCK
+( flock -x 9; sleep 4 ) 9>>$CA_WRITER_LOCK & sleep 0.5
+$M verify > /tmp/vheld.log 2>&1; rc=$?
+check "L1: while the custodian holds the writer lock, a host tool refuses and leaves the lock file as it is" "[ $rc != 0 ] && grep -q holds /tmp/vheld.log && [ \"$(stat -c %u:%a $CA_WRITER_LOCK)\" = 0:644 ]"
+wait
+$M verify > /dev/null 2>&1
 mv $CA_WRITER_LOCK /tmp/lock.keep; ln -s /tmp/lock-target $CA_WRITER_LOCK
 $M verify > /tmp/lsym.log 2>&1; rc=$?
 check "8-1: a symbolic link as the writer lock is refused, and what it points at is not created" "[ $rc != 0 ] && grep -q \"not a regular file\" /tmp/lsym.log && [ ! -e /tmp/lock-target ]"
@@ -236,6 +242,17 @@ printf "V\t301231000000Z\t\tFFFF01\tunknown\t/CN=unit-new\n" >> $CA_STATE_DIR/db
 $M abort > /tmp/abort1.log 2>&1; rc=$?
 cp -p /tmp/keepidx2 $CA_STATE_DIR/db/index.txt
 check "8-2: abort refuses once the custodian issued in the new layout (that row exists nowhere else)" "[ $rc != 0 ] && grep -q \"has issued or revoked\" /tmp/abort1.log"
+# L2: once the custodian has published beyond its first CRL the readers may
+# have read it: abort refuses (the old system would reissue that number).
+NOLD=$(crlno $INT/crl/intermediate-ca.crl)
+for _ in 1 2 3 4 5; do
+    [ $((16#$(crlno $CA_STATE_DIR/crl/intermediate-ca.crl))) -gt $((16#$NOLD + 1)) ] && break
+    as_ca $O ca -config $CA_CNF_FILE -gencrl -out $CA_STATE_DIR/crl/intermediate-ca.crl 2>/dev/null
+done
+cat $CA_STATE_DIR/crl/intermediate-ca.crl $CA_STATE_DIR/crl/root-ca.crl > $CA_PUBLIC_DIR/hybrid-combined-crl.pem
+$M abort > /tmp/abortL2.log 2>&1; rc=$?
+rm $CA_PUBLIC_DIR/hybrid-combined-crl.pem
+check "L2: abort refuses once the custodian has published beyond its first CRL (the readers may have read it)" "[ $rc != 0 ] && grep -q \"beyond its first\" /tmp/abortL2.log" || tail -3 /tmp/abortL2.log
 PA=$(treehash $P)
 $M abort > /tmp/abort2.log 2>&1; rc=$?
 check "8-2: abort sets the unused layout aside and leaves the old tree as the old system left it" "[ $rc = 0 ] && [ ! -d $CA_ROOT ] && [ \"$(treehash $P)\" = \"$PA\" ]" || tail -5 /tmp/abort2.log

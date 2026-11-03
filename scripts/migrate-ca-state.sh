@@ -98,6 +98,21 @@ container_running() {
         die "cannot ask docker whether $1 is running ($out); refusing"
     fi
 }
+# True when a container (running or not) other than the custodian mounts the
+# public directory: this release's readers exist, so they may have read it.
+# Fails closed like container_running.
+readers_on_public() {
+    local c out line name
+    command -v docker >/dev/null 2>&1 || return 1
+    out=$(docker ps -aq 2>&1) || die "cannot ask docker for its containers ($out); refusing"
+    for c in $out; do
+        line=$(docker inspect -f '{{.Name}} {{range .Mounts}}{{.Source}} {{end}}' "$c" 2>&1) || die "cannot inspect container $c ($line); refusing"
+        name=${line%% *}
+        [ "${name#/}" = "$CUSTODIAN_CONTAINER" ] && continue
+        case " ${line#* } " in *" $CA_PUBLIC_DIR "*) return 0 ;; esac
+    done
+    return 1
+}
 refuse_if_writers_run() {
     local c
     for c in "$CUSTODIAN_CONTAINER" "$RENEWER_CONTAINER"; do
@@ -520,6 +535,19 @@ abort() {
         [ "$(sha256sum < "$CA_STATE_DIR/db/$f" | cut -d' ' -f1)" = "$want" ] \
             || die "the custodian has issued or revoked in the new layout ($CA_STATE_DIR/db/$f changed since forward): abort would lose that; roll back with reverse"
     done
+    # The readers must not have moved (switch step 5): after that the custodian's
+    # CRLs were served, and the old system would reissue numbers already seen
+    # (RFC 5280 5.2.3). The first CRL of the custodian is N+1, published before
+    # step 4 and read by nobody; anything beyond it, or a reader container
+    # mounting the public directory, means the readers moved.
+    local n pub
+    n=$(crl_number "$INT/crl/intermediate-ca.crl")
+    if [ -f "$CA_PUBLIC_DIR/hybrid-combined-crl.pem" ]; then
+        pub=$(crl_number "$CA_PUBLIC_DIR/hybrid-combined-crl.pem")
+        [ $((16#$pub)) -le $((16#$n + 1)) ] \
+            || die "the custodian has published CRL 0x$pub, beyond its first (0x$n + 1): the readers may have read it, so the old system must not reissue that number. Roll back with reverse, not abort"
+    fi
+    readers_on_public && die "a container other than the custodian mounts $CA_PUBLIC_DIR (the readers moved): roll back with reverse, not abort"
     say "setting the unused new layout aside (renamed, not deleted); nothing in $FROM changes"
     if [ -f "$CA_STATE_DIR/crl/intermediate-ca.crl" ]; then
         echo "    its last intermediate CRL, number $(crl_number "$CA_STATE_DIR/crl/intermediate-ca.crl"), was never read by the gateway (it reads $FROM until the switch)"

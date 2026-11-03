@@ -116,10 +116,19 @@ ca_take_writer_lock() {
         exit 1
     fi
     [ -e "$CA_WRITER_LOCK" ] || install -m 0600 -o "$CA_UID" -g "$CA_GID" /dev/null "$CA_WRITER_LOCK"
-    chown "$CA_UID:$CA_GID" "$CA_WRITER_LOCK"
-    chmod 0600 "$CA_WRITER_LOCK"
     exec 9>>"$CA_WRITER_LOCK"
-    flock -n 9
+    # Locked first: while the custodian (or another host tool) holds it, this
+    # touches nothing. Once held, nothing else writes the state directory, and
+    # the owner and mode are set on the file this opened, through its
+    # descriptor (in chown and chmod, /proc/self/fd/9 is the inherited fd 9),
+    # never through the name a link could have redirected meanwhile.
+    flock -n 9 || return 1
+    if [ -L "$CA_WRITER_LOCK" ]; then
+        echo "ERROR: $CA_WRITER_LOCK became a symbolic link; refusing to use it" >&2
+        exit 1
+    fi
+    chown "$CA_UID:$CA_GID" /proc/self/fd/9
+    chmod 0600 /proc/self/fd/9
 }
 
 # ca_regular_tree PATH...: every entry under each PATH (and PATH itself) is a
