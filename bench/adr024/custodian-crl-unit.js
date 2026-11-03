@@ -513,6 +513,10 @@ exec ${O} "$@"
 	fs.rmSync("/tmp/tamper");
 	check("7-4: the file replaced right after it is written: the checked CRL is still what is published (DER and combined)", r.status === 200 && /Intermediate/.test(ossl(["crl", "-inform", "DER", "-in", `${PUB}/intermediate-ca.crl`, "-noout", "-issuer"])) && /Intermediate/.test(firstIssuer(HYB2)) && crlNumber(HYB2) === BigInt(r.j.crlNumber), `${r.status} ${r.raw.slice(0, 120)}`);
 	await stop();
+	s = await start(CRL_ENV);
+	r = s.exitCode === null ? await req("POST", "/crl/issue") : { status: 0, raw: "" };
+	check("7-5: the intermediate CRL file left replaced by 7-4 is not taken as the baseline of revoked serials (said), the pass publishes", s.exitCode === null && /not a verifiable intermediate CRL/.test(logs) && r.status === 200, `${s.exitCode} ${r.status}`);
+	await stop();
 
 	// ----------------------------------------- start-up failure fails closed
 	fs.writeFileSync(FAILFLAG, "");

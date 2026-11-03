@@ -954,6 +954,23 @@ async function crlSerials(file) {
 	return new Set([...stdout.matchAll(/^\s*Serial Number:\s*([0-9A-Fa-f]+)\s*$/gm)].map(m => m[1].toUpperCase()));
 }
 const droppedSerials = (newer, older) => [...older].filter(x => !newer.has(x));
+// The serials of the last intermediate CRL: the one in the state if it is the
+// intermediate's (it verifies against the intermediate certificate), else the
+// first block of the published combined CRL; null, and said, if neither is. A
+// file someone else replaced is never the baseline.
+async function lastIntermediateSerials() {
+	for (const f of [INT_CRL, path.join(CRL_PUBLIC_DIR, "hybrid-combined-crl.pem")]) {
+		if (!fs.existsSync(f)) continue;
+		try {
+			await inspectCrl(f, INT_CERT);
+			return await crlSerials(f);
+		} catch (err) {
+			log("WARN", `${f} is not a verifiable intermediate CRL (${err.message}); not used as the baseline of revoked serials`);
+		}
+	}
+	log("WARN", "no verifiable earlier intermediate CRL: the new one is checked against none");
+	return null;
+}
 
 // PEM bytes in hand, checked and converted from a private copy: what is
 // published is exactly what was checked, never a second read of a file that
@@ -1125,8 +1142,9 @@ async function issueCrlNow(withUpdatedb) {
 			if (crlState.crlNumber !== null && c.number <= crlState.crlNumber) {
 				throw new Error(`CRL number ${c.number} is not above the last published ${crlState.crlNumber}`);
 			}
-			if (fs.existsSync(INT_CRL)) {
-				const gone = droppedSerials(await crlSerials(copy), await crlSerials(INT_CRL));
+			const last = await lastIntermediateSerials();
+			if (last) {
+				const gone = droppedSerials(await crlSerials(copy), last);
 				if (gone.length) throw new Error(`the new CRL drops revoked serial(s) ${gone.join(" ")} that the last one lists; not published`);
 			}
 			return { crl: c, intDer: await derOf("crl", copy) };
