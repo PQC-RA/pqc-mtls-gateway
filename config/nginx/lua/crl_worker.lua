@@ -69,6 +69,49 @@ end
 local OPENSSL  = "/opt/openssl/bin/openssl"
 local CRL_FILE = "/etc/pki/pqc-ca/hybrid-combined-crl.pem"
 
+-- nextUpdate of the CRL this poller last loaded, published for
+-- pqc_crl_next_update_seconds (ADR-024). pqc_crl_age_seconds says whether this
+-- poller is alive, and is refreshed on an unchanged file, so it cannot see a
+-- CRL that nobody renews run out. This value can: the metric falls by one per
+-- second until a new CRL arrives and goes negative once the CRL has expired,
+-- which is when nginx's ssl_crl starts refusing every client certificate.
+-- `openssl crl -text` reads only the FIRST CRL in the file, so this is the
+-- intermediate CRL as long as the combined file is written intermediate first,
+-- as pqc-crl-renew.sh does.
+local MONTHS = {
+    Jan = 1, Feb = 2, Mar = 3, Apr = 4, May = 5, Jun = 6,
+    Jul = 7, Aug = 8, Sep = 9, Oct = 10, Nov = 11, Dec = 12,
+}
+
+-- "Nov 10 08:52:27 2026 GMT", as ASN1_TIME_print writes it (day space-padded,
+-- optional fractional seconds) -> seconds since the epoch, or nil. Computed
+-- here rather than with os.time, which reads its table as LOCAL time.
+function M.parse_openssl_time(s)
+    if type(s) ~= "string" then
+        return nil
+    end
+    local mon, d, h, mi, sec, y =
+        s:match("^(%a%a%a)%s+(%d%d?)%s+(%d%d):(%d%d):(%d%d)%.?%d*%s+(%d%d%d%d)%s+GMT$")
+    local m = mon and MONTHS[mon]
+    if not m then
+        return nil
+    end
+    d, h, mi, sec, y = tonumber(d), tonumber(h), tonumber(mi), tonumber(sec), tonumber(y)
+    if d < 1 or d > 31 or h > 23 or mi > 59 or sec > 60 then
+        return nil
+    end
+    -- Days since 1970-01-01 in the proleptic Gregorian calendar
+    -- (H. Hinnant's days_from_civil).
+    local yy  = (m <= 2) and (y - 1) or y
+    local era = math.floor(yy / 400)
+    local yoe = yy - era * 400
+    local mp  = (m + 9) % 12
+    local doy = math.floor((153 * mp + 2) / 5) + d - 1
+    local doe = yoe * 365 + math.floor(yoe / 4) - math.floor(yoe / 100) + doy
+    local days = era * 146097 + doe - 719468
+    return days * 86400 + h * 3600 + mi * 60 + sec
+end
+
 -- Forward declaration: reschedule() refers to poll_crl, which refers back to
 -- reschedule(). Declared local so neither ever becomes a global: a global here
 -- would be shared across every request in the worker's Lua VM.
@@ -117,11 +160,15 @@ poll_crl = function(premature)
     else
         local saw_crl   = false
         local loaded    = 0
+        local next_update_text
         for line in f:lines() do
             -- The header confirms openssl actually parsed a CRL (vs. an error).
             if line:find("Certificate Revocation List", 1, true)
                 or line:find("Last Update", 1, true) then
                 saw_crl = true
+            end
+            if not next_update_text then
+                next_update_text = line:match("^%s*Next Update:%s*(.-)%s*$")
             end
             -- Match plain hex ("1A2B") and colon-delimited serials ("1A:2B:3C").
             local raw = line:match("Serial Number:%s*([0-9A-Fa-f:]+)")
@@ -156,6 +203,19 @@ poll_crl = function(premature)
             held      = loaded
             last_beat = ngx.now()
             publish(last_beat)
+            -- A CRL without a parsable nextUpdate ("NONE") withdraws the value,
+            -- so the metric disappears rather than reporting the previous CRL's.
+            local next_update = M.parse_openssl_time(next_update_text)
+            if next_update then
+                local nu_ok, nu_err = ngx.shared.pqc_route_meta:set("crl_next_update", next_update)
+                if not nu_ok then
+                    ngx.log(ngx.ERR, "[crl_worker] failed to publish crl_next_update: ", tostring(nu_err))
+                end
+            else
+                ngx.shared.pqc_route_meta:delete("crl_next_update")
+                ngx.log(ngx.ERR, "[crl_worker] CRL has no parsable Next Update (",
+                    tostring(next_update_text), "), pqc_crl_next_update_seconds withdrawn")
+            end
             ngx.log(ngx.WARN, "[crl_worker] CRL poll OK, ", loaded, " revoked serial(s) loaded")
         end
     end
