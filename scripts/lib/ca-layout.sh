@@ -155,3 +155,21 @@ ca_refuse_unmigrated() {
         return 1
     fi
 }
+
+# ca_run_as_root_writer CMD...: run CMD, an `openssl ca` call that writes the
+# custodian's state as root (the caller holds the writer lock), and give the
+# files back to the custodian however it ends: success, failure, or a signal
+# (INT, TERM and HUP end the script, so the EXIT trap runs). A root-owned
+# index.txt or crlnumber.new left behind would make every later CRL pass of
+# the custodian (uid 1003) fail with EACCES. Call it in the main shell, not
+# inside $(...), so a signal to the script reaches these traps. Returns CMD's
+# status; the caller's EXIT, INT, TERM and HUP traps are cleared afterwards.
+ca_run_as_root_writer() {
+    local rc=0
+    trap 'ca_layout_file_perms' EXIT
+    trap 'exit 130' INT TERM HUP
+    "$@" || rc=$?
+    ca_layout_file_perms
+    trap - EXIT INT TERM HUP
+    return "$rc"
+}
