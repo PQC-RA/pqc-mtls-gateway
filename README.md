@@ -452,7 +452,9 @@ reload**, over the HMAC-authenticated control channel.
 > **Not available in this release.** `scripts/stand-up.sh` refuses to run: a stand built by it
 > has the pre-ADR-024 design, and since ADR-024 `setup-pki.sh` moves the intermediate into the
 > custodian's layout under `/var/lib/pqc-ca`, which on a host with a running deployment is that
-> deployment's. TEMPORARY, until the stand tooling gets its own layout paths (a follow-up PR).
+> deployment's. TEMPORARY: the stand tooling is not ported to the custodian layout yet. Exit: it
+> is, in its own PR, before the stand rehearsal ADR-024 requires ahead of the first production
+> deployment. Owner: Rumen.
 > The offline suites under `bench/adr024/` and `bench/lua/` do not need a stand. The description
 > below is how it worked before.
 
