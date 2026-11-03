@@ -14,7 +14,7 @@ REPO=${REPO:-$(cd "$BENCH_HOME/.." && pwd)}
 CN="${1:-bench-client}"
 BACKEND="${2:-http://shadow-mock:80}"
 
-timeout 25 curl -sk --cacert /etc/pki/pqc-ca/ca-chain.crt \
+timeout 25 curl -sk --cacert /var/lib/pqc-ca-public/ca-chain.crt \
   --cert "$REPO/admin-cert/gateway-admin.crt" \
   --key  "$REPO/admin-cert/gateway-admin.key" \
   -H "X-PQC-CSRF:1" \

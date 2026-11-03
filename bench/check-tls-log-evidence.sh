@@ -21,7 +21,7 @@
 #
 # Env:
 #   GW_HOST (127.0.0.1)  GW_PORT (443)  SNI (pqc-gw.local)
-#   CA        CA bundle that validates the server   (default /etc/pki/pqc-ca/ca-chain.crt)
+#   CA        CA bundle that validates the server   (default /var/lib/pqc-ca-public/ca-chain.crt)
 #   LOG_DIR   host path of the gateway's /var/log/nginx volume
 #             (default /var/lib/docker/volumes/pqc-gw_pqc-logs-nginx/_data)
 #   CLIENT_CRT/CLIENT_KEY      a valid ML-DSA-65 client identity (required)
@@ -34,7 +34,7 @@
 #                              this script never mints one (that needs a CA key)
 set -uo pipefail
 GW_HOST=${GW_HOST:-127.0.0.1}; GW_PORT=${GW_PORT:-443}; SNI=${SNI:-pqc-gw.local}
-CA=${CA:-/etc/pki/pqc-ca/ca-chain.crt}
+CA=${CA:-/var/lib/pqc-ca-public/ca-chain.crt}
 LOG_DIR=${LOG_DIR:-/var/lib/docker/volumes/pqc-gw_pqc-logs-nginx/_data}
 ACC=$LOG_DIR/pqc-mtls-access.log; HS=$LOG_DIR/pqc-mtls-handshake.log
 : "${CLIENT_CRT:?set CLIENT_CRT}" "${CLIENT_KEY:?set CLIENT_KEY}"

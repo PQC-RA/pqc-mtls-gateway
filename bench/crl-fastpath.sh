@@ -7,7 +7,7 @@
 # The gateway enforces revocation twice:
 #
 #   1. nginx's static `ssl_crl`, refreshed only when the entrypoint's
-#      /signals/reload-nginx watcher reloads nginx (NGINX_RELOAD_POLL_INTERVAL,
+#      entrypoint's CRL-file watcher reloads nginx (NGINX_RELOAD_POLL_INTERVAL,
 #      default 5 s). Refuses at the TLS/HTTP boundary -> HTTP 400.
 #   2. crl_worker.lua's shared-dict mirror, checked inline by policy_router.lua,
 #      admin_jwt.lua and revocation_check.lua -> ngx.exit(444): connection
@@ -18,8 +18,8 @@
 # no test asserted it. This test is the tripwire.
 #
 # How it times
-# No signal is sent to the crl-renewer; the regeneration under test is the real
-# one, triggered by the revoke API's sentinel exactly as in production. All
+# Nothing is signalled by hand; the CRL under test is the real one, which the CA
+# custodian publishes inside the revoke call exactly as in production. All
 # three paths are probed in parallel from one T0 taken immediately BEFORE the
 # revoke call, so the figure is revoke-to-refusal, not refusal after the call
 # returned.
@@ -38,7 +38,7 @@
 # Environment (defaults target the standard deployment on this host):
 #   GW_URL            https://127.0.0.1         mTLS listener
 #   GW_CONTAINER      pqc-gateway
-#   RENEWER_CONTAINER pqc-crl-renewer
+#   CUSTODIAN_CONTAINER pqc-ca-custodian
 #   PKI               /etc/pki/pqc-ca
 #   ADMIN_CERT/KEY    admin-cert/gateway-admin.{crt,key} (authenticates issue+revoke only)
 #   CN_PREFIX         crlfast
@@ -55,9 +55,9 @@ OSSL=${OSSL:-$([ -x /opt/openssl/bin/openssl ] && echo /opt/openssl/bin/openssl 
 REPO=${REPO:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}
 GW_URL=${GW_URL:-https://127.0.0.1}
 GW=${GW_CONTAINER:-pqc-gateway}
-RENEWER=${RENEWER_CONTAINER:-pqc-crl-renewer}
+CUSTODIAN=${CUSTODIAN_CONTAINER:-pqc-ca-custodian}
 PKI=${PKI:-/etc/pki/pqc-ca}
-CA=$PKI/ca-chain.crt
+CA=/var/lib/pqc-ca-public/ca-chain.crt
 C=${ADMIN_CERT:-$REPO/admin-cert/gateway-admin.crt}
 K=${ADMIN_KEY:-$REPO/admin-cert/gateway-admin.key}
 BUDGET_MS=${BUDGET_MS:-30000}
@@ -129,7 +129,7 @@ for p in /api/v1/status /admin/health /; do watch_path "$p" "$WORK/res$(echo "$p
 if ! grep -q '"message"' "$WORK/revoke.log"; then
   echo "  ==> *** revocation call failed: $(head -c 150 "$WORK/revoke.log") ***"; wait; exit 1
 fi
-echo "[*] revoked at T0 (sentinel only, the renewer is not signalled); watching /api/, /admin/, /"
+echo "[*] revoked at T0 (the custodian published the CRL in the call); watching /api/, /admin/, /"
 wait
 
 for p in /api/v1/status /admin/health /; do
@@ -143,9 +143,9 @@ for p in /api/v1/status /admin/health /; do
   fi
 done
 
-# -- stage timestamps from the renewer (same host clock) ---------------------
+# -- when the custodian published the CRL (same host clock) -------------------
 since=$(date -u -d @$(( T0 / 1000 - 1 )) +%FT%TZ)
-echo "  renewer: $(docker logs --timestamps --since "$since" "$RENEWER" 2>&1 | grep -m1 'running CRL renewal' | cut -d' ' -f1)"
+echo "  CRL published: $(docker logs --timestamps --since "$since" "$CUSTODIAN" 2>&1 | grep -m1 'Published intermediate CRL' | cut -d' ' -f1)"
 
 # -- restore and confirm the slow path still works ---------------------------
 resume; trap - EXIT INT TERM

@@ -29,7 +29,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
 GW="${PQC_GATEWAY:-https://127.0.0.1}"
-CA_CHAIN="${PQC_CA_CHAIN:-/etc/pki/pqc-ca/ca-chain.crt}"
+CA_CHAIN="${PQC_CA_CHAIN:-/var/lib/pqc-ca-public/ca-chain.crt}"
 # :8443 is post-quantum-only since 2026-10 and is verified with the PQ chain.
 ENROLL_CA="${PQC_ENROLL_CA:-$CA_CHAIN}"
 ADMIN_CERT="${PQC_ADMIN_CERT:-$ROOT_DIR/admin-cert/gateway-admin.crt}"

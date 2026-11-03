@@ -19,7 +19,7 @@ GW=127.0.0.1
 # The repository this harness lives in: admin-cert/, scripts/ and secrets/.
 REPO=${REPO:-$(cd "$BENCH_HOME/.." && pwd)}
 EXPORT="$EXPORT_DIR"
-CA=/etc/pki/pqc-ca/ca-chain.crt
+CA=/var/lib/pqc-ca-public/ca-chain.crt
 C=$REPO/admin-cert/gateway-admin.crt
 K=$REPO/admin-cert/gateway-admin.key
 CN=bench-client
@@ -44,7 +44,7 @@ for t in bc tc tcpdump ss; do
 done
 command -v docker >/dev/null 2>&1 && ok "docker present" || bad "docker MISSING"
 
-for c in pqc-gateway pqc-mtls-management-api pqc-ca-custodian pqc-ocsp-pq pqc-crl-renewer pqc-shadow-mock; do
+for c in pqc-gateway pqc-mtls-management-api pqc-ca-custodian pqc-ocsp-pq pqc-pki-dist pqc-shadow-mock; do
   st=$(docker inspect -f '{{.State.Status}}' "$c" 2>/dev/null || echo missing)
   if [ "$st" = running ]; then ok "$c running"; else bad "$c is '$st'  (docker start $c)"; fi
 done
@@ -76,7 +76,7 @@ la=$(awk '{print $1}' /proc/loadavg)
 if awk -v l="$la" 'BEGIN{exit !(l<1.0)}'; then ok "load average $la (idle)"
 else bad "load average $la, let the box settle"; fi
 
-idx=/etc/pki/pqc-ca/intermediate/db/index.txt
+idx=/var/lib/pqc-ca/state/db/index.txt   # the custodian's state (ADR-024)
 echo "  INFO  CA index: $(grep -c '^R' $idx 2>/dev/null || echo 0) revoked, $(grep -c '^V' $idx 2>/dev/null || echo 0) valid"
 echo "  INFO  cores=$(nproc)  mem=$(free -m | awk '/Mem:/{print $2}')MiB  openssl=$(/opt/openssl/bin/openssl version | awk '{print $2}')"
 

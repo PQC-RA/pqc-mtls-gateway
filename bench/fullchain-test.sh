@@ -21,7 +21,7 @@ cd "$(dirname "$0")"
 E="$EXPORT_DIR"
 LEAF=$E/client.crt
 CHAIN=/tmp/client-fullchain.pem
-cat $E/client.crt /etc/pki/pqc-ca/ca-chain.crt > $CHAIN
+cat $E/client.crt /var/lib/pqc-ca-public/ca-chain.crt > $CHAIN
 
 ORIG_MTU=$(ip link show lo | grep -oE 'mtu [0-9]+' | awk '{print $2}')
 cleanup(){ tc qdisc del dev lo root 2>/dev/null || true; ip link set dev lo mtu "$ORIG_MTU" 2>/dev/null || true; }

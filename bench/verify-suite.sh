@@ -16,11 +16,14 @@ export OPENSSL_CONF=/etc/ssl/openssl.cnf
 OSSL=/opt/openssl/bin/openssl
 cd "$(dirname "$0")"
 E="$EXPORT_DIR"
-PKI=/etc/pki/pqc-ca
+PKI=/etc/pki/pqc-ca   # host-only CAs: root, internal TLS, classical enrollment
 # The repository this harness lives in: admin-cert/, scripts/ and secrets/.
 REPO=${REPO:-$(cd "$BENCH_HOME/.." && pwd)}
+# The custodian's layout (ADR-024): CA_STATE_DIR, CA_KEY_FILE, CA_PUBLIC_DIR, ...
+# shellcheck source=scripts/lib/ca-layout.sh
+. "$REPO/scripts/lib/ca-layout.sh"
 EV=evidence; mkdir -p $EV
-CA=$PKI/ca-chain.crt; C=$REPO/admin-cert/gateway-admin.crt; K=$REPO/admin-cert/gateway-admin.key
+CA=$CA_PUBLIC_DIR/ca-chain.crt; C=$REPO/admin-cert/gateway-admin.crt; K=$REPO/admin-cert/gateway-admin.key
 
 RC=0
 fail(){ echo "  ==> *** $* ***"; RC=1; }
@@ -47,7 +50,7 @@ der() { $OSSL x509 -in "$1" -outform DER 2>/dev/null | wc -c; }
 {
 printf '%-28s %8s\n' "role" "DER B"
 printf '%-28s %8s\n' "Root CA"          "$(der $PKI/root/certs/root-ca.crt)"
-printf '%-28s %8s\n' "Intermediate CA"  "$(der $PKI/intermediate/certs/intermediate-ca.crt)"
+printf '%-28s %8s\n' "Intermediate CA"  "$(der $CA_STATE_DIR/certs/intermediate-ca.crt)"
 printf '%-28s %8s\n' "Server (TLS leaf)" "$(der /etc/ssl/pqc/server-mldsa65.crt)"
 printf '%-28s %8s\n' "Client (leaf)"    "$(der ${CLI_CRT:-/nonexistent})"
 printf '%-28s %8s\n' "enroll-classical leaf" "$(der /etc/ssl/pqc/enroll-classical.crt)"
@@ -80,7 +83,7 @@ echo | timeout 25 $OSSL s_client -connect 127.0.0.1:443 -CAfile $CA 2>/dev/null 
 grep -qxE "Requested Signature Algorithms: (id-ml-dsa-65|mldsa65|ML-DSA-65)" $EV/sigalgs.txt \
   || fail "the server requests client signatures other than ML-DSA-65 (or none was read)"
 echo "  -- issuance guard: RSA / EC / ML-DSA-44 CSRs must be refused"
-IDXB=$($OSSL dgst -sha256 $PKI/intermediate/db/index.txt | awk '{print $2}')
+IDXB=$($OSSL dgst -sha256 $CA_STATE_DIR/db/index.txt | awk '{print $2}')
 TD=$(mktemp -d)
 for alg in rsa ec mldsa44; do
   case $alg in
@@ -104,7 +107,7 @@ for alg in rsa ec mldsa44; do
   [ "$CODE" = "400" ] || fail "$alg CSR: expected HTTP 400 from the issuance guard, got $CODE"
 done
 rm -rf $TD
-IDXA=$($OSSL dgst -sha256 $PKI/intermediate/db/index.txt | awk '{print $2}')
+IDXA=$($OSSL dgst -sha256 $CA_STATE_DIR/db/index.txt | awk '{print $2}')
 echo "  CA index SHA-256 before: ${IDXB:0:24}"
 echo "  CA index SHA-256 after : ${IDXA:0:24}"
 [ "$IDXB" = "$IDXA" ] && echo "  ==> CA DATABASE UNCHANGED (fail-closed before any write)" \
@@ -121,8 +124,8 @@ echo "  CA index SHA-256 after : ${IDXA:0:24}"
 # is live: this one, and the requested-sigalgs assertion above. That is why it
 # belongs in CI rather than in a benchmark script run by hand.
 echo "  -- handshake guard: classical cert SIGNED BY THE LEGITIMATE intermediate must be refused"
-INT_CRT=$PKI/intermediate/certs/intermediate-ca.crt
-INT_KEY=$PKI/intermediate/private/intermediate-ca.key
+INT_CRT=$CA_STATE_DIR/certs/intermediate-ca.crt
+INT_KEY=$CA_KEY_FILE
 if [ ! -r "$INT_KEY" ]; then
   fail "cannot read the intermediate key, G10 could not run"
 else
@@ -180,54 +183,63 @@ echo "     no-cert -> HTTP ${NOCERT:-000}"
 
 echo
 echo "=============== 5. CRL / REVOCATION STATE ==============="
-echo "  revoked in CA index : $(grep -c '^R' $PKI/intermediate/db/index.txt)"
-echo "  serials in live CRL : $($OSSL crl -in $PKI/hybrid-combined-crl.pem -noout -text 2>/dev/null | grep -c 'Serial Number:')"
-$OSSL crl -in $PKI/hybrid-combined-crl.pem -noout -text 2>/dev/null | grep -E "Signature Algorithm|Last Update|Next Update" | head -3 | sed 's/^/  /'
+echo "  revoked in CA index : $(grep -c '^R' $CA_STATE_DIR/db/index.txt)"
+echo "  serials in live CRL : $($OSSL crl -in $CA_PUBLIC_DIR/hybrid-combined-crl.pem -noout -text 2>/dev/null | grep -c 'Serial Number:')"
+$OSSL crl -in $CA_PUBLIC_DIR/hybrid-combined-crl.pem -noout -text 2>/dev/null | grep -E "Signature Algorithm|Last Update|Next Update" | head -3 | sed 's/^/  /'
 docker exec pqc-gateway sh -c "grep -ihE 'revoked serial' /var/log/nginx/error.log 2>/dev/null | tail -1" 2>/dev/null | sed 's/^/  data plane: /'
 echo
-echo "=============== 6. CA PRIVATE KEY ISOLATION ==============="
-# The tiered CA exists so that compromising an online component does not
-# compromise the trust anchor. That property lives in the MOUNT LIST, not in a
-# comment: a compose comment can assert a mask that the mount lines below it do
-# not implement, and nothing fails. So this is a runtime check, and it
-# enumerates every container that mounts the CA tree rather than a hard-coded
-# list, so a service that gains the mount later is covered without anyone
-# remembering to add it here.
-ROOT_KEY=/etc/pki/pqc-ca/root/private/root-ca.key
-MOUNTERS=$(docker ps --format '{{.Names}}' 2>/dev/null | while read -r c; do
-  docker inspect -f '{{range .Mounts}}{{.Destination}}{{"\n"}}{{end}}' "$c" 2>/dev/null \
-    | grep -qx '/etc/pki/pqc-ca' && echo "$c"
-done)
-if [ -z "$MOUNTERS" ]; then
-  fail "no running container mounts the CA tree, section 6 verified nothing"
-else
-  for c in $MOUNTERS; do
-    # Canary first. `docker exec ... [ -r key ]` returning non-zero is
-    # indistinguishable from exec itself failing, and reading that as "key not
-    # readable" is exactly the false green this suite exists to prevent. So
-    # prove the probe can read a file that IS supposed to be there before
-    # trusting it about one that is not.
-    if ! docker exec "$c" sh -c '[ -r /etc/pki/pqc-ca/ca-chain.crt ]' 2>/dev/null; then
-      fail "$c: could not probe the CA tree, root-key isolation UNVERIFIED"
-      continue
+echo "=============== 6. CA PRIVATE KEY ISOLATION (ADR-024) ==============="
+# Only the custodian may hold any CA key, and only the intermediate's. Checked
+# at runtime, from the inside, as uid 0 in every container of the stack (the
+# strongest view a compromise there could have), and by PUBLIC KEY, not by path:
+# every private key a container can read is compared with every CA certificate
+# this deployment has, so a copied or renamed key is caught too. A key whose
+# public key cannot be derived counts as a failure, never as a pass.
+PROJECT=${COMPOSE_PROJECT:-pqc-gw}
+spki_of_cert(){ $OSSL x509 -in "$1" -noout -pubkey 2>/dev/null | $OSSL pkey -pubin -outform DER 2>/dev/null | $OSSL dgst -sha256 | awk '{print $2}'; }
+declare -A CA_SPKI=()
+for crt in "$PKI/root/certs/root-ca.crt" "$CA_STATE_DIR/certs/intermediate-ca.crt" \
+           "$PKI/internal-tls-ca-mldsa.crt" "$PKI/internal-tls-ca-rsa.crt" "$PKI/enroll-classical-ca.crt"; do
+  [ -f "$crt" ] || continue
+  h=$(spki_of_cert "$crt"); [ -n "$h" ] && CA_SPKI[$h]=$(basename "$crt" .crt)
+done
+INT_SPKI=$(spki_of_cert "$CA_STATE_DIR/certs/intermediate-ca.crt")
+echo "  CA certificates compared against: ${CA_SPKI[*]}"
+CONTAINERS=$(docker ps --filter "label=com.docker.compose.project=$PROJECT" --format '{{.Names}}' 2>/dev/null | sort)
+[ -n "$CONTAINERS" ] || fail "no running container in compose project $PROJECT, section 6 verified nothing"
+CUSTODIAN_SAW_KEY=0
+for c in $CONTAINERS; do
+  if ! docker exec -u 0 "$c" true 2>/dev/null; then fail "$c: cannot exec into it, key isolation UNVERIFIED"; continue; fi
+  # Every mount destination (where private keys arrive), scanned as uid 0.
+  DESTS=$(docker inspect -f '{{range .Mounts}}{{.Destination}} {{end}}' "$c")
+  found=""; held=""
+  for f in $(docker exec -u 0 "$c" sh -c "for d in $DESTS; do grep -rl 'PRIVATE KEY' \"\$d\" 2>/dev/null; done" 2>/dev/null | sort -u); do
+    h=$(docker exec -u 0 "$c" cat "$f" 2>/dev/null | $OSSL pkey -passin pass: -pubout -outform DER 2>/dev/null | $OSSL dgst -sha256 | awk '{print $2}')
+    if [ -z "$h" ] || [ "$h" = "$(printf '' | $OSSL dgst -sha256 | awk '{print $2}')" ]; then
+      fail "$c: $f looks like a private key but its public key cannot be derived"; continue
     fi
-    U=$(docker exec "$c" id -u 2>/dev/null)
-    KEYS=$(docker exec "$c" sh -c "grep -rl 'PRIVATE KEY' /etc/pki/pqc-ca 2>/dev/null | sed 's#/etc/pki/pqc-ca/##' | tr '\n' ' '" 2>/dev/null)
-    printf '  %-20s uid=%-5s private keys visible: %s\n' "$c" "${U:-?}" "${KEYS:-none}"
-    if docker exec "$c" sh -c "[ -r $ROOT_KEY ]" 2>/dev/null; then
-      fail "$c CAN READ THE ROOT CA PRIVATE KEY, the tiered CA design is defeated"
-    else
-      echo "     ==> PASS: root-ca.key not readable"
-    fi
-    # The internal TLS CA key (ADR-022): whoever holds it can impersonate the
-    # :8081 control plane to management-api. No container needs it.
-    if docker exec "$c" sh -c "ls /etc/pki/pqc-ca/internal-tls/ 2>/dev/null | grep -q ." 2>/dev/null; then
-      fail "$c sees files under /etc/pki/pqc-ca/internal-tls (internal TLS CA key not masked)"
-    else
-      echo "     ==> PASS: internal-tls/ masked (empty)"
+    found="$found $f"
+    if [ -n "${CA_SPKI[$h]:-}" ]; then
+      if [ "$c" = pqc-ca-custodian ] && [ "$h" = "$INT_SPKI" ]; then CUSTODIAN_SAW_KEY=1; held="$held ${CA_SPKI[$h]}"
+      else fail "$c CAN READ THE ${CA_SPKI[$h]} PRIVATE KEY ($f)"; fi
     fi
   done
-fi
+  printf '  %-26s uid=%-5s private keys readable: %-4s CA keys: %s\n' "$c" "$(docker exec "$c" id -u 2>/dev/null)" \
+    "$(echo "$found" | wc -w)" "${held:-none}"
+  # Mounts: the custodian's private directories belong to it alone, and no
+  # container mounts the CA tree itself (one public certificate file is fine).
+  for src in $(docker inspect -f '{{range .Mounts}}{{.Source}} {{end}}' "$c"); do
+    case "$src" in
+      "$CA_KEY_DIR"|"$CA_STATE_DIR"|"$CA_INBOX_DIR") [ "$c" = pqc-ca-custodian ] || fail "$c mounts the custodian's $src" ;;
+    esac
+    if [ "$src" = "$PKI" ] || { [ -d "$src" ] && [ "${src#"$PKI"/}" != "$src" ]; }; then
+      fail "$c mounts the CA tree (or a directory in it): $src"
+    fi
+  done
+done
+# The canary: the scan must find the one key that is supposed to be there.
+[ "$CUSTODIAN_SAW_KEY" = 1 ] && echo "     ==> PASS: only pqc-ca-custodian holds a CA key, and only the intermediate's" \
+  || fail "the scan did not find the intermediate key in pqc-ca-custodian, key isolation UNVERIFIED"
 
 echo
 echo "evidence -> $(pwd)/$EV/"

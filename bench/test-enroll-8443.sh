@@ -27,7 +27,7 @@
 #
 # Env (defaults = the deployment on this host, docker-compose.yml as shipped):
 #   ENROLL_PORT (8443)  ADMIN_PORT (443)  HOST (127.0.0.1)  SNI (pqc-gw.local)
-#   CA        PQ chain that verifies the gateway   (/etc/pki/pqc-ca/ca-chain.crt)
+#   CA        PQ chain that verifies the gateway   (/var/lib/pqc-ca-public/ca-chain.crt)
 #   OLD_CA    classical enrollment CA              (/etc/pki/pqc-ca/enroll-classical-ca.crt)
 #   PKI       CA tree, for index.txt               (/etc/pki/pqc-ca)
 #   ADMIN_CRT/ADMIN_KEY  admin identity for token creation (admin-cert/gateway-admin.*)
@@ -44,7 +44,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; ROOT="$(dirname "$HERE")"
 HOST=${HOST:-127.0.0.1}; SNI=${SNI:-pqc-gw.local}
 case "$HOST" in 127.*|::1|localhost) ;; *) echo "refusing non-loopback HOST=$HOST: this test reads the gateway's logs and CA index on this host"; exit 2 ;; esac
 ENROLL_PORT=${ENROLL_PORT:-8443}; ADMIN_PORT=${ADMIN_PORT:-443}
-CA=${CA:-/etc/pki/pqc-ca/ca-chain.crt}; OLD_CA=${OLD_CA:-/etc/pki/pqc-ca/enroll-classical-ca.crt}
+CA=${CA:-/var/lib/pqc-ca-public/ca-chain.crt}; OLD_CA=${OLD_CA:-/etc/pki/pqc-ca/enroll-classical-ca.crt}
 PKI=${PKI:-/etc/pki/pqc-ca}
 ADMIN_CRT=${ADMIN_CRT:-$ROOT/admin-cert/gateway-admin.crt}; ADMIN_KEY=${ADMIN_KEY:-$ROOT/admin-cert/gateway-admin.key}
 LOG_DIR=${LOG_DIR:-/var/lib/docker/volumes/pqc-gw_pqc-logs-nginx/_data}
@@ -87,7 +87,7 @@ pace(){ local now last; now=$(date +%s%N); last=$(cat "$W/last" 2>/dev/null || e
 enroll(){ local j=$1; shift; local code rc; pace
   code=$(curl -sS -o "$W/body" -w '%{http_code}' --max-time 15 --cacert "$CA" "${RES[@]}" "$@" \
          -H 'Content-Type: application/json' --data-binary @"$j" "$URL" 2>"$W/err"); rc=$?; echo "$rc $code"; }
-idx(){ wc -l < "$PKI/intermediate/db/index.txt"; }
+idx(){ wc -l < "/var/lib/pqc-ca/state/db/index.txt"; }
 mark(){ A0=$(wc -l < "$ACC"); H0=$(wc -l < "$HS"); }
 newacc(){ sleep 0.6; tail -n +$((A0+1)) "$ACC"; }
 newhs(){ sleep 0.6; tail -n +$((H0+1)) "$HS"; }

@@ -29,7 +29,10 @@ OSSL=${OSSL:-$([ -x /opt/openssl/bin/openssl ] && echo /opt/openssl/bin/openssl 
 # The repository this harness lives in: admin-cert/, scripts/ and secrets/.
 REPO=${REPO:-$(cd "$BENCH_HOME/.." && pwd)}
 PKI=/etc/pki/pqc-ca
-CA=$PKI/ca-chain.crt
+# The custodian's layout (ADR-024): CA_PUBLIC_DIR, CA_STATE_DIR, CA_KEY_FILE.
+# shellcheck source=scripts/lib/ca-layout.sh
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib" && pwd)/ca-layout.sh"
+CA=$CA_PUBLIC_DIR/ca-chain.crt
 C=$REPO/admin-cert/gateway-admin.crt
 K=$REPO/admin-cert/gateway-admin.key
 W=$WORKDIR/negative-controls-work; rm -rf $W; mkdir -p $W
@@ -71,12 +74,12 @@ say "  route restored; pre-revocation request -> HTTP $(req)   (expect 200)"
 "${ADM[@]}" -X POST "https://127.0.0.1/admin/certs/$SER/revoke" \
   -H "Content-Type: application/json" -d '{"reason":"cessationOfOperation"}' >/tmp/revoke.log 2>&1
 say "  revoke -> $(head -c 160 /tmp/revoke.log)"
-# force a CRL regeneration + let the data-plane poller pick it up
-docker exec pqc-crl-renewer sh -c 'kill -USR1 1 2>/dev/null' >/dev/null 2>&1 || true
+# The custodian published the CRL inside the revoke call (ADR-024); give the
+# data-plane poller and the reload watcher time to pick it up.
 sleep 12
 say "  -- offline path validation against the live CRL (the paper's error 23):"
-$OSSL verify -crl_check -CAfile "$CA" -CRLfile $PKI/hybrid-combined-crl.pem "$CRT" 2>&1 | sed 's/^/     /' | tee -a "$OUT"
-V=$($OSSL verify -crl_check -CAfile "$CA" -CRLfile $PKI/hybrid-combined-crl.pem "$CRT" 2>&1)
+$OSSL verify -crl_check -CAfile "$CA" -CRLfile $CA_PUBLIC_DIR/hybrid-combined-crl.pem "$CRT" 2>&1 | sed 's/^/     /' | tee -a "$OUT"
+V=$($OSSL verify -crl_check -CAfile "$CA" -CRLfile $CA_PUBLIC_DIR/hybrid-combined-crl.pem "$CRT" 2>&1)
 echo "$V" | grep -q "error 23" && say "  ==> PASS: X509 error 23 (certificate revoked)" || say "  ==> *** no error 23 ***"
 say "  -- live request with the revoked certificate:"
 CODE=$(req)
@@ -87,8 +90,8 @@ say
 say "=============== classical-keyed cert signed by the PQC intermediate ==============="
 say "  Minting out-of-band with the intermediate key directly -- deliberately"
 say "  creating the artifact issuance is designed to refuse."
-INT_CRT=$PKI/intermediate/certs/intermediate-ca.crt
-INT_KEY=$PKI/intermediate/private/intermediate-ca.key
+INT_CRT=$CA_STATE_DIR/certs/intermediate-ca.crt
+INT_KEY=$CA_KEY_FILE
 [ -r "$INT_KEY" ] || { say "FATAL: cannot read $INT_KEY"; exit 1; }
 
 for alg in rsa ec; do
