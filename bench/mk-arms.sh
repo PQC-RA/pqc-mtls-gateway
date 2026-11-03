@@ -31,7 +31,7 @@ OSSL=${OSSL:-$([ -x /opt/openssl/bin/openssl ] && echo /opt/openssl/bin/openssl 
 BASE=$WORKDIR
 PKI=$BASE/pki
 CONF=$BASE/conf
-IMAGE=pqc-gateway:1.0.0
+IMAGE=pqc-gateway:adr024-4b
 NET=pqc-gw_pqc-pki
 # Resolve the backend by service name; a container IP changes whenever the
 # network is recreated, and a stale one fails as a timeout rather than loudly.

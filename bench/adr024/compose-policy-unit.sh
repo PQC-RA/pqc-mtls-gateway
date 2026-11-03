@@ -35,5 +35,29 @@ override rw management-api "/etc/pki/pqc-trust:/etc/pki/pqc-trust:rw"
 run "$repo/docker-compose.yml" "$T/rw.yml"
 check "the trust directory mounted writable is refused" "[ $(rc) = 1 ] && grep -q 'management-api: mounts the trust directory /etc/pki/pqc-trust writable' $T/out" || show
 
+printf 'services:\n  extra:\n    build: docker/pki-dist\n' > "$T/untagged.yml"
+run "$repo/docker-compose.yml" "$T/untagged.yml"
+check "a built service without an image tag is refused" "[ $(rc) = 1 ] && grep -q 'extra: built without an explicit release tag' $T/out" || show
+
+printf 'services:\n  pki-dist:\n    image: pqc-gw-pki-dist:latest\n' > "$T/latest.yml"
+run "$repo/docker-compose.yml" "$T/latest.yml"
+check "a built service tagged latest is refused" "[ $(rc) = 1 ] && grep -q 'pki-dist: built without an explicit release tag (image: pqc-gw-pki-dist:latest)' $T/out" || show
+
+override parent gateway "/var/lib/pqc-ca:/x:ro"
+run "$repo/docker-compose.yml" "$T/parent.yml"
+check "9-4: a parent of the custodian key directory (/var/lib/pqc-ca) is refused" "[ $(rc) = 1 ] && grep -q 'gateway: mounts /var/lib/pqc-ca, a parent of /var/lib/pqc-ca/key' $T/out" || show
+
+override etcpki gateway "/etc/pki:/y:ro"
+run "$repo/docker-compose.yml" "$T/etcpki.yml"
+check "9-4: a parent of the CA tree (/etc/pki) is refused" "[ $(rc) = 1 ] && grep -q 'gateway: mounts /etc/pki, a parent of /etc/pki/pqc-ca' $T/out" || show
+
+override dslash gateway "/var/lib/pqc-ca//key:/z:ro"
+run "$repo/docker-compose.yml" "$T/dslash.yml"
+check "9-4: a non-normalised path to the key directory (/var/lib/pqc-ca//key) is refused" "[ $(rc) = 1 ] && grep -q 'gateway: mounts the custodian.s /var/lib/pqc-ca/key' $T/out" || show
+
+override keyrw pqc-ca-custodian "/var/lib/pqc-ca/key:/var/lib/pqc-ca/key:rw"
+run "$repo/docker-compose.yml" "$T/keyrw.yml"
+check "9-4: the custodian key mount writable is refused" "[ $(rc) = 1 ] && grep -q 'pqc-ca-custodian: mounts the CA key directory /var/lib/pqc-ca/key writable' $T/out" || show
+
 echo "$PASS/$((PASS + FAIL)) passed"
 [ "$FAIL" = 0 ]

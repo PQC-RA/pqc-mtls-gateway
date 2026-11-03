@@ -84,7 +84,13 @@ services:
    args:
     OPENRESTY_VERSION: ${OPENRESTY_VERSION:-}
     OPENSSL_VERSION: ${OPENSSL_VERSION:-}
-  image: pqc-gateway:1.0.0
+  # Every image built here carries this release's tag, never a name another
+  # release builds too: a rollback ("check out the previous release, docker
+  # compose up -d") then finds the previous release's own images unchanged,
+  # instead of rerunning these (pre-merge review 9-2). A release that changes
+  # an image bumps its tag; check-compose-policy.sh refuses a built service
+  # without an explicit, non-latest tag.
+  image: pqc-gateway:adr024-4b
   container_name: pqc-gateway
   depends_on:
    gateway-volume-init:
@@ -213,6 +219,7 @@ services:
    context: docker/ocsp-pq
    args:
     OPENSSL_VERSION: ${OPENSSL_VERSION:-}
+  image: pqc-gw-ocsp-pq:adr024-4b   # release-tagged, see gateway
   container_name: pqc-ocsp-pq
   # The responder signs OCSP answers with its own delegated key (RFC 6960
   # 4.2.2.2) and nothing else, as uid/gid 1002. ADR-024: it mounts its own key
@@ -248,6 +255,7 @@ services:
    start_period: 30s
    start_interval: 2s
   build: docker/pki-dist
+  image: pqc-gw-pki-dist:adr024-4b   # release-tagged, see gateway
   container_name: pqc-pki-dist
   networks:
    - pqc-pki
@@ -291,6 +299,7 @@ services:
    dockerfile: docker/pqc-ca-custodian/Dockerfile
    args:
     OPENSSL_VERSION: ${OPENSSL_VERSION:-}
+  image: pqc-gw-pqc-ca-custodian:adr024-4b   # release-tagged, see gateway
   container_name: pqc-ca-custodian
   # Its own uid and gid, shared with no other service (ADR-024; owner and modes
   # in scripts/lib/ca-layout.sh, created by setup-pki.sh).

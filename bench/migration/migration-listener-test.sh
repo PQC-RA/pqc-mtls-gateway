@@ -47,7 +47,7 @@ if [ -n "${STAND_DIR:-}" ]; then
 fi
 # only the path: the library path stays local to O() below, so curl and python3 keep theirs
 [ -n "${OSSL:-}" ] || OSSL=$(bash -c '. "$1" && echo "$O"' _ "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts/lib" && pwd)/pq-openssl.sh")
-GW_IMAGE=${GW_IMAGE:-pqc-gateway:1.0.0}
+GW_IMAGE=${GW_IMAGE:-pqc-gateway:adr024-4b}
 PKI_DIR=${PKI_DIR:?PKI_DIR}; SSL_DIR=${SSL_DIR:?SSL_DIR}; SECRETS_DIR=${SECRETS_DIR:?SECRETS_DIR}
 ADMIN_CRT=${ADMIN_CRT:?ADMIN_CRT}; ADMIN_KEY=${ADMIN_KEY:?ADMIN_KEY}
 NETWORKS=${NETWORKS:?space-separated docker networks}

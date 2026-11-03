@@ -12,7 +12,7 @@
 #
 # Images: every image this repository builds is built from COMMIT with tags of
 # the stand's own ($PROJECT-<service>:<commit>), so no shared tag such as
-# pqc-gateway:1.0.0 is ever overwritten; the base images come from base.lock
+# pqc-gateway:adr024-4b is ever overwritten; the base images come from base.lock
 # (scripts/build-all.sh BASES_ONLY=1). management-api is the image pinned in
 # docker-compose.yml, pulled from GHCR. The rollback rehearsal's "old code" is
 # ROLLBACK_COMMIT (default: the commit before item 4): its custodian is built

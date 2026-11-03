@@ -2,7 +2,10 @@
 # check-compose-policy.sh: static checks of the resolved compose file against
 # ADR-024 (test 4). Fails if:
 #   - a service other than pqc-ca-custodian mounts the custodian's key, state
-#     or inbox directory;
+#     or inbox directory, the custodian mounts its key directory writable, or
+#     any service mounts a PARENT of a protected directory (the custodian's,
+#     the CA tree, the OCSP key directory, /etc/ssl/pqc); bind sources are
+#     normalised first (//, /./, trailing /);
 #   - any service mounts anything from the CA tree /etc/pki/pqc-ca (not even a
 #     single public certificate), an empty-directory mask (/etc/pki/pqc-empty)
 #     or a /signals volume;
@@ -10,6 +13,8 @@
 #     whole and read-only (ADR-024 §3: public certificates only, replaced by
 #     rename, so never a single file);
 #   - any service sets CUSTODIAN_TEST_FAULT (test-only fault injection);
+#   - a built service has no image: with an explicit tag other than latest (a
+#     rollback would otherwise rerun this release's build);
 #   - a service runs as root, without a read-only rootfs, without cap_drop ALL,
 #     with an added capability or without no-new-privileges, unless it is a
 #     named exception below. The CA path (custodian, ocsp-pq, pki-dist) never is.
@@ -36,12 +41,29 @@ EXCEPTIONS = {
     "mgmt-volume-init": "one-shot root helper that chowns a volume; its own ADR (ADR-024 owner decision 2)",
     "shadow-mock": "a test backend, not part of a deployment",
 }
+import os.path
+# Directories no container may reach through a mount of a PARENT directory
+# (a mount of /var/lib/pqc-ca exposes key/, one of /etc/pki the CA tree).
+PROTECTED = CUSTODIAN_ONLY + ("/etc/pki/pqc-ca", "/var/lib/pqc-ocsp", "/etc/ssl/pqc")
+def under(p, d):
+    return p == d or p.startswith(d + "/")
+def parent_of(p, d):
+    return p != d and (p == "/" or d.startswith(p + "/"))
 bad = []
 for name, svc in sorted(cfg.get("services", {}).items()):
     for v in svc.get("volumes", []):
         src, dst = v.get("source", ""), v.get("target", "")
-        if src.startswith(CUSTODIAN_ONLY) and name != "pqc-ca-custodian":
+        # Bind sources are compared normalised: /var/lib/pqc-ca//key and
+        # /var/lib/pqc-ca/./key are /var/lib/pqc-ca/key.
+        if src.startswith("/"):
+            src = os.path.normpath(src)
+            for d in PROTECTED:
+                if parent_of(src, d):
+                    bad.append(f"{name}: mounts {src}, a parent of {d}")
+        if any(under(src, d) for d in CUSTODIAN_ONLY) and name != "pqc-ca-custodian":
             bad.append(f"{name}: mounts the custodian\x27s {src}")
+        if under(src, "/var/lib/pqc-ca/key") and not v.get("read_only"):
+            bad.append(f"{name}: mounts the CA key directory {src} writable")
         if src == "/etc/pki/pqc-ca" or src.startswith("/etc/pki/pqc-ca/"):
             bad.append(f"{name}: mounts from the CA tree: {src}")
         if src == "/etc/pki/pqc-trust" or src.startswith("/etc/pki/pqc-trust/"):
@@ -53,6 +75,13 @@ for name, svc in sorted(cfg.get("services", {}).items()):
             bad.append(f"{name}: empty-directory mask {src} -> {dst}")
         if dst == "/signals" or v.get("source") == "pqc-signals":
             bad.append(f"{name}: /signals volume")
+    # A built image is named and tagged by its release, so a rollback to the
+    # previous release finds the images of that release, not these (9-2).
+    if "build" in svc:
+        img = svc.get("image", "")
+        tag = img.rsplit("/", 1)[-1].partition("@")[0].partition(":")[2]
+        if not tag or tag == "latest":
+            bad.append(f"{name}: built without an explicit release tag (image: {img or "none"})")
     if "CUSTODIAN_TEST_FAULT" in (svc.get("environment") or {}):
         bad.append(f"{name}: sets CUSTODIAN_TEST_FAULT (test-only)")
     user = str(svc.get("user", ""))
