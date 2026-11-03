@@ -48,6 +48,11 @@ $O ca -config $INT/openssl-intermediate.cnf -revoke /tmp/old-a.crt 2>/dev/null; 
 N=$(crlno $INT/crl/intermediate-ca.crl)
 echo "old tree: serials $S1 $S2 $S3, $S1 revoked, last CRL number $N"
 BEFORE=$(treehash $P)
+TRUST=/etc/pki/pqc-trust
+
+# --- setup-pki.sh of this release, re-run on the old deployment: changes nothing --
+( cd /tmp/r && PKI_DIR=$P SSL_DIR=/etc/ssl/pqc SERVER_IP=127.0.0.1 ./scripts/setup-pki.sh ) > /tmp/rerun.log 2>&1; rc=$?
+check "setup-pki.sh re-run on a pre-ADR-024 deployment: exit 0, the tree unchanged, no trust directory made" "[ $rc = 0 ] && [ \"$(treehash $P)\" = \"$BEFORE\" ] && [ ! -e $TRUST ] && grep -q \"internal TLS left as it is\" /tmp/rerun.log" || tail -8 /tmp/rerun.log
 
 # --- forward -----------------------------------------------------------------
 $M forward > /tmp/fwd.log 2>&1; rc=$?
@@ -57,6 +62,7 @@ check "forward leaves the old tree byte for byte unchanged" "[ \"$(treehash $P)\
 check "layout owners and modes match the spec" "ca_layout_check >/dev/null"
 check "key: 0400, owned by the custodian uid, only in the key directory" "[ \"$(stat -c %u:%a $CA_KEY_FILE)\" = 1003:400 ] && ! grep -rlq \"PRIVATE KEY\" $CA_STATE_DIR $CA_INBOX_DIR $CA_PUBLIC_DIR $CA_STATUS_DIR"
 check "OCSP key: only in its own directory, root:1002 0640" "[ \"$(stat -c %u:%g:%a $OCSP_KEY_DIR/ocsp-pq.key)\" = 0:1002:640 ]"
+check "trust anchors copied to $TRUST: root, 0755, files 0644, identical to the copies in the old tree" "[ \"$(stat -c %u:%g:%a $TRUST)\" = 0:0:755 ] && [ \"$(stat -c %u:%g:%a $TRUST/internal-tls-ca.crt)\" = 0:0:644 ] && cmp -s $TRUST/internal-tls-ca.crt $P/internal-tls-ca.crt && cmp -s $TRUST/internal-tls-ca-mldsa.crt $P/internal-tls-ca-mldsa.crt && ! grep -rlq \"PRIVATE KEY\" $TRUST"
 check "configuration points at the new layout" "grep -qx \"dir               = $CA_STATE_DIR\" $CA_CNF_FILE && grep -qx \"private_key       = $CA_KEY_FILE\" $CA_CNF_FILE"
 as_ca sh -c "echo x > $CA_STATUS_DIR/probe"
 check "a file the custodian writes into the status directory is readable by group 1002 (setgid)" "[ \"$(stat -c %g $CA_STATUS_DIR/probe)\" = 1002 ]"
@@ -108,7 +114,8 @@ check "check-next refuses N+2 (it must be the first CRL of the custodian, N+1)" 
 $M retire > /tmp/ret.log 2>&1; rc=$?
 check "retire renames the old intermediate, ocsp and public files" "[ $rc = 0 ] && [ ! -d $INT ] && [ ! -d $P/ocsp ] && [ ! -f $P/hybrid-combined-crl.pem ] && ls -d $INT.migrated-* $P/ocsp.migrated-* $P/public.migrated-* >/dev/null"
 check "the writer lock a host tool created belongs to the custodian (uid 1003), so it can still start" "[ \"$(stat -c %u $CA_WRITER_LOCK)\" = 1003 ]"
-check "retire keeps the host-only CAs where they are" "[ -f $P/root/private/root-ca.key ] && [ -f $P/internal-tls-ca.crt ]"
+check "retire keeps the host-only CAs where they are" "[ -f $P/root/private/root-ca.key ] && [ -f $P/internal-tls/internal-tls-ca.key ]"
+check "retire renames the old trust-file copies (the trust directory holds them now)" "[ ! -e $P/internal-tls-ca.crt ] && ls $P/public.migrated-*/internal-tls-ca.crt >/dev/null && [ -f $TRUST/internal-tls-ca.crt ]"
 
 # --- the writer lock keeps a host writer out ------------------------------------
 ( flock -x 9; sleep 4 ) 9>>$CA_WRITER_LOCK & sleep 0.5
@@ -132,6 +139,10 @@ check "reverse refuses a state index that would un-revoke $S1, and changes nothi
 cp -p /tmp/keepidx $CA_STATE_DIR/db/index.txt
 
 # --- reverse --------------------------------------------------------------------
+# An ADR-022 switch after the cut-over changed the trust file: the ML-DSA-65 CA only.
+cp $TRUST/internal-tls-ca-mldsa.crt /tmp/trust-new.crt
+cat /tmp/trust-new.crt /tmp/trust-new.crt > $TRUST/internal-tls-ca.crt
+TRUST_NOW=$(sha256sum < $TRUST/internal-tls-ca.crt)
 $M reverse > /tmp/rev.log 2>&1; rc=$?
 check "reverse succeeds" "[ $rc = 0 ]" || tail -8 /tmp/rev.log
 check "the old tree is back in place" "[ -d $INT ] && [ -f $P/hybrid-combined-crl.pem ] && [ -d $P/ocsp ]"
@@ -139,6 +150,7 @@ check "the revocation made in the new layout is in the old index" "grep -q \"^R.
 check "the old combined CRL is the latest one: $S1 and $S2 revoked, intermediate first" "serials $P/hybrid-combined-crl.pem | grep -qx $S1 && serials $P/hybrid-combined-crl.pem | grep -qx $S2 && $O crl -in $P/hybrid-combined-crl.pem -noout -issuer | grep -q Intermediate"
 check "crlnumber was copied back: the next CRL is above $NC" "[ $((16#$(cat $INT/db/crlnumber))) -gt $((16#$NC)) ]"
 check "the previous old tree is kept, renamed, and no staging is left" "ls -d $INT.pre-reverse-* >/dev/null && [ -z \"$(find $P -maxdepth 1 -name \".reverse-staging-*\")\" ]"
+check "the trust file as it is now is back where the previous release reads it; the trust directory set aside" "[ \"$(sha256sum < $P/internal-tls-ca.crt)\" = \"$TRUST_NOW\" ] && [ -f $P/internal-tls-ca-mldsa.crt ] && [ ! -e $TRUST ] && ls -d $TRUST.reversed-* >/dev/null"
 check "the new layout is set aside, not deleted" "[ ! -d $CA_ROOT ] && ls -d $CA_ROOT.reversed-* $CA_PUBLIC_DIR.reversed-* >/dev/null"
 
 # --- the old renewer runs again: numbers keep rising ------------------------------

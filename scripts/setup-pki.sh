@@ -203,12 +203,16 @@ generate_internal_tls() {
     #                     behind its back: Node reads NODE_EXTRA_CA_CERTS only at
     #                     start. With REISSUE_INTERNAL_CA=1 the ML-DSA-65 CA and
     #                     leaf are created NEXT TO the RSA ones, the trust file
-    #                     becomes a bundle of both CAs (written in place), and
+    #                     becomes a bundle of both CAs (replaced atomically), and
     #                     :8081 keeps serving the RSA leaf. The served leaf is
     #                     switched only by scripts/internal-tls-switch.sh, after
     #                     management-api has been restarted on the bundle.
     mkdir -p "$ITLS_KEY_DIR" "$SSL_DIR"
     chmod 700 "$ITLS_KEY_DIR"
+    # The public trust anchors live in $TRUST_DIR (ADR-024 §3); a host that
+    # still has them in $PKI_DIR has them copied first, never re-created.
+    itls_trust_dir
+    itls_adopt_legacy_trust
 
     # A draft of this change (never released) kept the ML-DSA-65 CA only in
     # the trust file; adopt that layout.
@@ -248,7 +252,7 @@ generate_internal_tls() {
             # the trust file: finish it (ML-DSA-65 CA, plus the classical one if kept).
             cp "$ITLS_CA_MLDSA" "$tmp/bundle.crt"
             [ -f "$ITLS_CA_RSA" ] && cat "$ITLS_CA_RSA" >> "$tmp/bundle.crt"
-            itls_write_in_place "$tmp/bundle.crt" "$ITLS_BUNDLE"; chmod 644 "$ITLS_BUNDLE"
+            itls_install "$tmp/bundle.crt" "$ITLS_BUNDLE" 644
             echo "==> Trust file completed: $(itls_bundle_fprs "$ITLS_BUNDLE" | wc -l) CA(s). Restart management-api next."
         fi
         if ! itls_bundle_has "$ITLS_BUNDLE" "$ITLS_CA_MLDSA"; then
@@ -277,11 +281,11 @@ generate_internal_tls() {
         [ -e "$ITLS_LEAF_CRT" ] || was_served=1
         itls_issue_leaf "$ITLS_CA_MLDSA" "$ITLS_CA_KEY" "$tmp"
         ( umask 077; cp "$tmp/leaf.key" "$tmp/served.key" ); cp "$tmp/leaf.crt" "$tmp/served.crt"
-        itls_write_in_place "$tmp/leaf.key" "$ITLS_ML_KEY"; chmod 600 "$ITLS_ML_KEY"
-        itls_write_in_place "$tmp/leaf.crt" "$ITLS_ML_CRT"; chmod 644 "$ITLS_ML_CRT"
+        itls_install "$tmp/leaf.key" "$ITLS_ML_KEY" 600
+        itls_install "$tmp/leaf.crt" "$ITLS_ML_CRT" 644
         if [ "$was_served" = 1 ]; then
-            itls_write_in_place "$tmp/served.key" "$ITLS_LEAF_KEY"; chmod 600 "$ITLS_LEAF_KEY"
-            itls_write_in_place "$tmp/served.crt" "$ITLS_LEAF_CRT"; chmod 644 "$ITLS_LEAF_CRT"
+            itls_install "$tmp/served.key" "$ITLS_LEAF_KEY" 600
+            itls_install "$tmp/served.crt" "$ITLS_LEAF_CRT" 644
             echo "    :8081 serves the new leaf after a gateway reload (docker exec pqc-gateway nginx -s reload)."
         fi
         rm -rf "$tmp"; trap - EXIT
@@ -341,7 +345,7 @@ generate_internal_tls() {
     cp "$tmp/ca.crt" "$tmp/bundle.crt"
     [ -f "$ITLS_CA_RSA" ] && cat "$ITLS_CA_RSA" >> "$tmp/bundle.crt"
 
-    # Install: keys first (600), then certificates (644), all in place. The
+    # Install: keys first (600), then certificates (644), each by rename. The
     # served leaf is written only on a fresh host; on an RSA host it is
     # switched by scripts/internal-tls-switch.sh.
     local fresh=1
@@ -349,15 +353,15 @@ generate_internal_tls() {
     if [ "$fresh" = 1 ]; then
         ( umask 077; cp "$tmp/leaf.key" "$tmp/served.key" ); cp "$tmp/leaf.crt" "$tmp/served.crt"
     fi
-    itls_write_in_place "$tmp/ca.key" "$ITLS_CA_KEY"; chmod 600 "$ITLS_CA_KEY"
-    itls_write_in_place "$tmp/leaf.key" "$ITLS_ML_KEY"; chmod 600 "$ITLS_ML_KEY"
-    itls_write_in_place "$tmp/ca.crt" "$ITLS_CA_MLDSA"; chmod 644 "$ITLS_CA_MLDSA"
-    itls_write_in_place "$tmp/leaf.crt" "$ITLS_ML_CRT"; chmod 644 "$ITLS_ML_CRT"
+    itls_install "$tmp/ca.key" "$ITLS_CA_KEY" 600
+    itls_install "$tmp/leaf.key" "$ITLS_ML_KEY" 600
+    itls_install "$tmp/ca.crt" "$ITLS_CA_MLDSA" 644
+    itls_install "$tmp/leaf.crt" "$ITLS_ML_CRT" 644
     if [ "$fresh" = 1 ]; then
-        itls_write_in_place "$tmp/served.key" "$ITLS_LEAF_KEY"; chmod 600 "$ITLS_LEAF_KEY"
-        itls_write_in_place "$tmp/served.crt" "$ITLS_LEAF_CRT"; chmod 644 "$ITLS_LEAF_CRT"
+        itls_install "$tmp/served.key" "$ITLS_LEAF_KEY" 600
+        itls_install "$tmp/served.crt" "$ITLS_LEAF_CRT" 644
     fi
-    itls_write_in_place "$tmp/bundle.crt" "$ITLS_BUNDLE"; chmod 644 "$ITLS_BUNDLE"
+    itls_install "$tmp/bundle.crt" "$ITLS_BUNDLE" 644
     rm -rf "$tmp"
     trap - EXIT
     echo "    trust file $ITLS_BUNDLE: $(itls_bundle_fprs "$ITLS_BUNDLE" | wc -l) CA(s); :8081 serves $(itls_alg "$ITLS_LEAF_CRT")"
@@ -387,7 +391,13 @@ warn_leaf_profile() {
 if [ -f "$PKI_DIR/root/certs/root-ca.crt" ]; then
     echo "Root CA already exists at $PKI_DIR, leaving the CA untouched."
     echo "==> Catching up any newer artifacts introduced after initial bootstrap..."
-    generate_internal_tls
+    if [ ! -d "$CA_STATE_DIR" ] && [ -d "$PKI_DIR/intermediate" ]; then
+        # Pre-ADR-024: its management-api still mounts the trust file from
+        # $PKI_DIR. Its internal TLS moves to $TRUST_DIR with the cut-over.
+        echo "NOTE: internal TLS left as it is: this deployment predates ADR-024 (see below)."
+    else
+        generate_internal_tls
+    fi
     set_ocsp_key_perms
     if [ -d "$CA_STATE_DIR" ]; then
         # The custodian's layout (ADR-024): owners and modes back to the spec.

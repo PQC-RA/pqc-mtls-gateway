@@ -587,6 +587,10 @@ actionlint and an OpenSSL version-consistency gate.
   gateway, `ocsp-pq` and `pki-dist` mount only the public directory `/var/lib/pqc-ca-public`,
   read-only; `ocsp-pq` also reads its own key and the custodian's index snapshot. `management-api`
   has no CA mount at all and goes through the custodian over an HMAC-authenticated internal API.
+  The internal TLS trust anchors (ADR-022) are in their own public directory,
+  `/etc/pki/pqc-trust` (root, 0755, certificates 0644), mounted whole and read-only into the
+  gateway and `management-api`. **No container mounts anything from `/etc/pki/pqc-ca`**, not even
+  one public certificate; the compose policy check refuses it.
   `bench/verify-suite.sh` section 6 (`bench/check-key-isolation.sh`) scans the whole filesystem of
   every container (image layers, writable layer, mounts, tmpfs) from the host and compares every
   private key by public key with the CA certificates, so no container but the custodian can hold
@@ -708,8 +712,9 @@ admin path (enrollment, renewal, revocation) is down during it, for minutes:
 not, until step 5):
 
 1. Stop `management-api`, `crl-renewer` and `pqc-ca-custodian`.
-2. `scripts/migrate-ca-state.sh forward`: copies the key and state into the custodian's layout and
-   verifies every copy. Nothing in `/etc/pki/pqc-ca` changes.
+2. `scripts/migrate-ca-state.sh forward`: copies the key and state into the custodian's layout,
+   and the internal TLS trust files into `/etc/pki/pqc-trust`, and verifies every copy. Nothing in
+   `/etc/pki/pqc-ca` changes.
 3. Start **only** the custodian: `docker compose up -d --no-deps pqc-ca-custodian`. It publishes
    CRL N+1.
 4. `scripts/migrate-ca-state.sh check-next`: N+1 verifies, is numbered N+1, carries every serial of
@@ -718,11 +723,13 @@ not, until step 5):
    empty).
 5. Only now move the readers and the rest: `docker compose up -d` (recreates the gateway,
    `ocsp-pq`, `pki-dist` and `management-api`).
-6. `scripts/migrate-ca-state.sh retire`, then remove the old `crl-renewer` container and the
+6. `scripts/migrate-ca-state.sh retire` (it also renames the old copies of the trust files in
+   `/etc/pki/pqc-ca`), then remove the old `crl-renewer` container and the
    `pqc-signals`, `pqc-www-pki` and `pqc-logs-crl` volumes once the rollback window is over.
 7. Rollback at any point: stop the new containers, `scripts/migrate-ca-state.sh reverse` (it copies
-   the state back, including the CRL number and the latest CRLs, and checks nothing is
-   un-revoked), check out the previous release, `docker compose up -d`.
+   the state back, including the CRL number, the latest CRLs and the trust files as they are now,
+   checks nothing is un-revoked, and sets `/etc/pki/pqc-trust` aside), check out the previous
+   release, `docker compose up -d`.
 
 Keep the retired copy of the intermediate key for the rollback window, then destroy it and record
 that.
@@ -761,7 +768,9 @@ migration inventory) needs OpenSSL 3.5 or later; Node 22 has it.
   creates the ML-DSA-65 CA and leaf next to the RSA ones (`internal-tls-ca-mldsa.crt`,
   `internal-tls-mldsa.{crt,key}`; the RSA ones are kept as `internal-tls-ca-rsa.crt` and
   `internal-tls-rsa.{crt,key}`) and writes `internal-tls-ca.crt`, the file management-api pins,
-  in place as a bundle of both CAs. `:8081` keeps serving the RSA leaf. Once management-api has
+  as a bundle of both CAs. The certificates are in `/etc/pki/pqc-trust`, replaced by rename (the
+  directory is mounted, never single files); the CA keys stay in `/etc/pki/pqc-ca/internal-tls`.
+  `:8081` keeps serving the RSA leaf. Once management-api has
   started on the bundle, `scripts/internal-tls-switch.sh mldsa` and `... rsa` switch the served
   leaf with a gateway reload only, no management-api restart. The switch refuses while
   management-api still runs on a CA set older than the bundle.

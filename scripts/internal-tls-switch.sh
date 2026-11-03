@@ -8,12 +8,13 @@
 #   internal-tls-switch.sh drop-rsa   end of the transition: the trust file holds
 #                                     the ML-DSA-65 CA only
 #
-# The trust file ($PKI_DIR/internal-tls-ca.crt) is what management-api pins
-# (NODE_EXTRA_CA_CERTS, read only at start). During the transition it is a
-# bundle of the ML-DSA-65 and the RSA internal CA, written by
-# `REISSUE_INTERNAL_CA=1 scripts/setup-pki.sh`, so once management-api has
-# started on it, either leaf verifies and both switches need only a gateway
-# reload. The leaf copies are written IN PLACE (bind-mount inode pitfall).
+# The trust file ($TRUST_DIR/internal-tls-ca.crt, /etc/pki/pqc-trust by
+# default) is what management-api pins (NODE_EXTRA_CA_CERTS, read only at
+# start). During the transition it is a bundle of the ML-DSA-65 and the RSA
+# internal CA, written by `REISSUE_INTERNAL_CA=1 scripts/setup-pki.sh`, so once
+# management-api has started on it, either leaf verifies and both switches need
+# only a gateway reload. Every file is replaced by rename: the gateway and
+# management-api mount $TRUST_DIR and $SSL_DIR as directories (ADR-024 §3).
 #
 # Refuses, and changes nothing, when:
 #   mldsa  the trust file lacks the ML-DSA-65 CA, or management-api was started
@@ -24,13 +25,17 @@
 #          RSA leaf does not verify
 #   drop-rsa  :8081 does not serve the ML-DSA-65 leaf
 #
-# Env: PKI_DIR (/etc/pki/pqc-ca), SSL_DIR (/etc/ssl/pqc), OPENSSL_BIN,
+# Env: PKI_DIR (/etc/pki/pqc-ca), SSL_DIR (/etc/ssl/pqc), TRUST_DIR
+#      (/etc/pki/pqc-trust), OPENSSL_BIN,
 #      GATEWAY_CONTAINER (pqc-gateway), API_CONTAINER (pqc-mtls-management-api),
 #      FORCE=1 skips the management-api start-time check (not the CA checks).
 set -euo pipefail
 MODE=${1:?status|mldsa|rsa|drop-rsa}
 PKI_DIR=${PKI_DIR:-/etc/pki/pqc-ca}
 SSL_DIR=${SSL_DIR:-/etc/ssl/pqc}
+TRUST_DIR=${TRUST_DIR:-/etc/pki/pqc-trust}
+# Where the gateway and management-api see the trust file (docker-compose.yml).
+TRUST_IN_CONTAINER=/etc/pki/pqc-trust/internal-tls-ca.crt
 GW=${GATEWAY_CONTAINER:-pqc-gateway}
 API=${API_CONTAINER:-pqc-mtls-management-api}
 ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
@@ -58,12 +63,11 @@ describe() { # describe FILE: "alg, subject" of every certificate in it
 }
 
 # What :8081 serves, verified with the trust file as the gateway mounts it
-# (/etc/pki/internal-tls-ca.crt, the healthcheck's file; since ADR-024 the
-# gateway's /etc/pki/pqc-ca is the custodian's public directory, without it).
-# Without a verification line, openssl's own error is shown instead.
+# (the file its healthcheck verifies with). Without a verification line,
+# openssl's own error is shown instead.
 served() {
 	local out rc=0
-	out=$(docker exec "$GW" sh -c 'echo | /opt/openssl/bin/openssl s_client -connect 127.0.0.1:8081 -servername gateway -CAfile /etc/pki/internal-tls-ca.crt -verify_return_error -brief 2>&1') || rc=$?
+	out=$(docker exec "$GW" sh -c "echo | /opt/openssl/bin/openssl s_client -connect 127.0.0.1:8081 -servername gateway -CAfile $TRUST_IN_CONTAINER -verify_return_error -brief 2>&1") || rc=$?
 	if printf '%s\n' "$out" | grep -q '^Verification: '; then
 		printf '%s\n' "$out" | sed -n 's/^Signature type: //p; s/^Verification: /verification /p' | tr '\n' ' '
 	else
@@ -93,19 +97,21 @@ api_started_on_bundle() { # management-api's CA set is read at start: it must po
 	written=$(stat -c %Y "$ITLS_BUNDLE")
 	[ "$started" -gt "$written" ] \
 		|| die "$API started before $ITLS_BUNDLE was last written, so it does not trust the CA added then. Restart it first (docker restart $API), then run this again."
-	# The file as the container sees it (single-file mount, inode pitfall).
-	docker exec "$API" cat /etc/pki/internal-tls-ca.crt > "$TMP/api-view.crt" 2>/dev/null \
-		|| die "cannot read /etc/pki/internal-tls-ca.crt inside $API"
+	# The file as the container sees it: a container still on the pre-ADR-024
+	# single-file mount would not.
+	docker exec "$API" cat "$TRUST_IN_CONTAINER" > "$TMP/api-view.crt" 2> "$TMP/api-view.err" \
+		|| die "cannot read $TRUST_IN_CONTAINER inside $API: $(cat "$TMP/api-view.err") (recreate it with this release's compose file)"
 	itls_bundle_has "$TMP/api-view.crt" "$1" \
-		|| die "$API's mounted /etc/pki/internal-tls-ca.crt does not hold $(basename "$1") (stale mount? recreate it)"
+		|| die "$API's $TRUST_IN_CONTAINER does not hold $(basename "$1") (not mounting $TRUST_DIR? recreate it)"
 }
 
-install_leaf() { # install_leaf CRT KEY: write over the served pair in place, test, reload
+install_leaf() { # install_leaf CRT KEY: replace the served pair (by rename), test, reload
 	cp -p "$ITLS_LEAF_CRT" "$TMP/prev.crt"; ( umask 077; cp -p "$ITLS_LEAF_KEY" "$TMP/prev.key" )
-	cat "$2" > "$ITLS_LEAF_KEY"; cat "$1" > "$ITLS_LEAF_CRT"
+	( umask 077; cp "$2" "$TMP/new.key" ); cp "$1" "$TMP/new.crt"
+	itls_install "$TMP/new.key" "$ITLS_LEAF_KEY" 600; itls_install "$TMP/new.crt" "$ITLS_LEAF_CRT" 644
 	if ! running "$GW"; then echo "  $GW is not running: the new leaf is served from its next start"; return 0; fi
 	if ! docker exec "$GW" nginx -t -q 2>"$TMP/nginx-t.err"; then
-		cat "$TMP/prev.key" > "$ITLS_LEAF_KEY"; cat "$TMP/prev.crt" > "$ITLS_LEAF_CRT"
+		itls_install "$TMP/prev.key" "$ITLS_LEAF_KEY" 600; itls_install "$TMP/prev.crt" "$ITLS_LEAF_CRT" 644
 		cat "$TMP/nginx-t.err" >&2
 		die "nginx -t failed with the new leaf; the previous leaf is back in place"
 	fi
@@ -142,7 +148,7 @@ drop-rsa)
 	[ -f "$ITLS_ML_CRT" ] && [ "$(itls_fpr "$ITLS_LEAF_CRT")" = "$(itls_fpr "$ITLS_ML_CRT")" ] \
 		|| die ":8081 does not serve the ML-DSA-65 leaf; run '$0 mldsa' first"
 	itls_ossl x509 -in "$ITLS_CA_MLDSA" -out "$TMP/bundle.crt"
-	itls_write_in_place "$TMP/bundle.crt" "$ITLS_BUNDLE"; chmod 644 "$ITLS_BUNDLE"
+	itls_install "$TMP/bundle.crt" "$ITLS_BUNDLE" 644
 	echo "OK: the trust file holds the ML-DSA-65 CA only. A running management-api keeps"
 	echo "    the RSA CA in memory until its next restart (restart it, or let the release"
 	echo "    that removes admin-v1 do it). Then move $ITLS_CA_RSA_KEY and"

@@ -2,8 +2,10 @@
 # migrate-ca-state.sh: move a running deployment's intermediate CA from the
 # shared CA tree into the custodian's own layout, and back (ADR-024).
 #
-#   migrate-ca-state.sh forward [--from DIR]   copy key, state, root CRL and the
-#                                              OCSP key into the layout of
+#   migrate-ca-state.sh forward [--from DIR]   copy key, state, root CRL, the
+#                                              OCSP key and the internal TLS
+#                                              trust files (into TRUST_DIR) into
+#                                              the layout of
 #                                              scripts/lib/ca-layout.sh, verify
 #                                              every copy against a SHA-256
 #                                              manifest. Copies, never moves.
@@ -141,6 +143,16 @@ forward() {
     for f in "$CA_KEY_DIR" "$CA_STATE_DIR" "$CA_INBOX_DIR" "$CA_PUBLIC_DIR" "$CA_STATUS_DIR" "$OCSP_KEY_DIR"; do
         [ ! -d "$f" ] || [ -z "$(ls -A "$f")" ] || die "$f is not empty; a forward has been done already (reverse first)"
     done
+    # The internal TLS trust file: in the old tree on a running deployment
+    # (copied below), or already in $TRUST_DIR on a bootstrap by this release.
+    local trust_from=""
+    if [ -f "$FROM/internal-tls-ca.crt" ]; then
+        [ ! -e "$TRUST_DIR/internal-tls-ca.crt" ] \
+            || die "an internal TLS trust file is in both $FROM and $TRUST_DIR; which one management-api pins is unclear"
+        trust_from=$FROM
+    elif [ ! -f "$TRUST_DIR/internal-tls-ca.crt" ]; then
+        die "no internal TLS trust file (internal-tls-ca.crt) in $FROM or $TRUST_DIR: management-api pins it"
+    fi
 
     say "creating the layout"
     ca_layout_create
@@ -163,6 +175,15 @@ forward() {
     copy "$FROM/root/crl/root-ca.crl" "$CA_INBOX_DIR/root-ca.crl"
     for f in ocsp-pq.key ocsp-pq.crt; do
         [ -f "$FROM/ocsp/$f" ] && copy "$FROM/ocsp/$f" "$OCSP_KEY_DIR/$f"
+    done
+
+    # The public trust anchors (ADR-024 §3): a directory of their own, mounted
+    # whole and read-only; nothing is mounted from $FROM any more.
+    install -d -o 0 -g 0 -m 0755 "$TRUST_DIR"
+    for f in internal-tls-ca.crt internal-tls-ca-mldsa.crt internal-tls-ca-rsa.crt; do
+        [ -n "$trust_from" ] && [ -f "$FROM/$f" ] || continue
+        install -m 0644 -o 0 -g 0 "$FROM/$f" "$TRUST_DIR/$f"
+        printf '%s  %s  %s\n' "$(sha256sum < "$FROM/$f" | cut -d' ' -f1)" "$TRUST_DIR/$f" "$FROM/$f" >> "$MANIFEST.new"
     done
 
     # The configuration names its own paths: point them at the new layout, and
@@ -235,8 +256,9 @@ retire() {
     [ -d "$FROM/ocsp" ] && mv "$FROM/ocsp" "$FROM/ocsp.migrated-$TS"
     mkdir -p "$FROM/public.migrated-$TS"
     local f
-    for f in ca-chain.crt hybrid-ca-chain.crt hybrid-combined-crl.pem combined-crl.pem; do
-        [ -f "$FROM/$f" ] && mv "$FROM/$f" "$FROM/public.migrated-$TS/"
+    for f in ca-chain.crt hybrid-ca-chain.crt hybrid-combined-crl.pem combined-crl.pem \
+             internal-tls-ca.crt internal-tls-ca-mldsa.crt internal-tls-ca-rsa.crt; do
+        if [ -f "$FROM/$f" ]; then mv "$FROM/$f" "$FROM/public.migrated-$TS/"; fi
     done
     echo "    $INT.migrated-$TS holds the old copy of the intermediate key: destroy it when the rollback window ends, and record that."
 }
@@ -286,6 +308,13 @@ reverse() {
     if hex_gt "$(crl_number "$CA_STATE_DIR/crl/root-ca.crl")" "$(crl_number "$FROM/root/crl/root-ca.crl")"; then
         install -m 0644 -o 0 -g 0 "$CA_STATE_DIR/crl/root-ca.crl" "$STAGE/root-ca.crl"
     fi
+    # The trust anchors as they are now (an ADR-022 switch may have changed
+    # them since forward), back where the previous release reads them.
+    mkdir "$STAGE/trust"
+    for f in internal-tls-ca.crt internal-tls-ca-mldsa.crt internal-tls-ca-rsa.crt; do
+        [ -f "$TRUST_DIR/$f" ] || continue
+        install -m 0644 -o 0 -g 0 "$TRUST_DIR/$f" "$STAGE/trust/$f"
+    done
 
     say "checking the staged tree"
     same_key "$S/private/intermediate-ca.key" "$S/certs/intermediate-ca.crt" \
@@ -310,6 +339,13 @@ reverse() {
         || die "the combined CRL the gateway would read does not start with the intermediate CRL"
     missing=$(comm -23 <(crl_serials "$S/crl/intermediate-ca.crl") <(crl_serials "$comb"))
     [ -z "$missing" ] || die "revoked serials missing from the combined CRL the gateway would read: $missing"
+    [ -f "$STAGE/trust/internal-tls-ca.crt" ] || [ -f "$FROM/internal-tls-ca.crt" ] \
+        || [ -f "$(newest "public.migrated-*")/internal-tls-ca.crt" ] \
+        || die "no internal TLS trust file in $TRUST_DIR or $FROM: management-api would start without one"
+    for f in "$STAGE"/trust/*; do
+        [ -f "$f" ] || continue
+        "$OPENSSL" x509 -in "$f" -noout || die "$TRUST_DIR/$(basename "$f") is not a certificate"
+    done
     echo "    last published CRL $published, next $next; nothing un-revoked; every revoked serial is in the combined CRL"
 
     say "every check passed: moving the staged tree into place (the previous one is kept as $INT.pre-reverse-$TS)"
@@ -325,6 +361,12 @@ reverse() {
         cp -p "$FROM/root/crl/root-ca.crl" "$FROM/root/crl/root-ca.crl.pre-reverse-$TS"
         mv -f "$STAGE/root-ca.crl" "$FROM/root/crl/root-ca.crl"
     fi
+    for f in "$STAGE"/trust/*; do
+        [ -f "$f" ] || continue
+        b=$(basename "$f")
+        if [ -f "$FROM/$b" ]; then cp -p "$FROM/$b" "$FROM/$b.pre-reverse-$TS"; fi
+        mv -f "$f" "$FROM/$b"
+    done
     if [ -n "$retired" ]; then   # un-retire the rest of what retire renamed
         f=$(newest "ocsp.migrated-*")
         if [ -n "$f" ] && [ ! -d "$FROM/ocsp" ]; then mv -T "$f" "$FROM/ocsp"; fi
@@ -342,11 +384,11 @@ reverse() {
 
     say "setting the new layout aside (renamed, not deleted)"
     exec 9>&-
-    for f in "$CA_ROOT" "$CA_PUBLIC_DIR" "$CA_STATUS_DIR" "$OCSP_KEY_DIR"; do
+    for f in "$CA_ROOT" "$CA_PUBLIC_DIR" "$CA_STATUS_DIR" "$OCSP_KEY_DIR" "$TRUST_DIR"; do
         if [ -d "$f" ]; then mv "$f" "$f.reversed-$TS"; fi
     done
     echo "    $CA_ROOT.reversed-$TS holds a copy of the intermediate key: destroy it when no longer needed, and record that."
-    say "reverse done. Start the old containers; the renewer's next CRL is number $next."
+    say "reverse done. Recreate the old containers (they mount the trust file by inode); the renewer's next CRL is number $next."
 }
 
 case "$cmd" in
@@ -355,5 +397,5 @@ case "$cmd" in
     retire)  take_writer_lock; retire ;;
     check-next) check_next ;;
     reverse) reverse ;;
-    *) sed -n '2,35p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    *) sed -n '2,37p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

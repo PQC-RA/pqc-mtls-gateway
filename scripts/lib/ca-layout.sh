@@ -32,6 +32,11 @@ CA_INBOX_DIR="$CA_ROOT/inbox"
 CA_PUBLIC_DIR="${CA_PUBLIC_DIR:-/var/lib/pqc-ca-public}"
 CA_STATUS_DIR="${CA_STATUS_DIR:-/var/lib/pqc-ca-status}"
 OCSP_KEY_DIR="${OCSP_KEY_DIR:-/var/lib/pqc-ocsp}"
+# Public trust anchors only (ADR-024 §3, Rumen 2026-11-03): the internal TLS CA
+# certificates that management-api and the gateway pin, root-owned, 0755/0644,
+# mounted read-only as a directory. Not the custodian's; written by
+# scripts/setup-pki.sh and scripts/internal-tls-switch.sh (scripts/lib/internal-tls.sh).
+TRUST_DIR="${TRUST_DIR:-/etc/pki/pqc-trust}"
 
 CA_KEY_FILE="$CA_KEY_DIR/intermediate-ca.key"
 CA_CNF_FILE="$CA_STATE_DIR/openssl-intermediate.cnf"

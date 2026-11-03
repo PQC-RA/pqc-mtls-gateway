@@ -17,7 +17,8 @@
 #                   • docker compose down -v  (all services + named volumes,
 #                     INCLUDING the CA keys, routes, logs and audit data)
 #                   • removes host-installed PQ OpenSSL (/opt/openssl),
-#                     the PKI tree (/etc/pki/pqc-ca), the gateway-edge private-key
+#                     the PKI tree (/etc/pki/pqc-ca), the public trust anchors
+#                     (/etc/pki/pqc-trust), the gateway-edge private-key
 #                     mask dir (/etc/pki/pqc-empty), server/internal-TLS
 #                     certs+keys (/etc/ssl/pqc), the ldconfig drop-in, the CRL
 #                     renew script and the seeded routes file
@@ -128,6 +129,8 @@ if [[ "$MODE" == "all" ]]; then
         "/opt/openssl"
         "/opt/openssl-${OPENSSL_VER}"
         "/etc/pki/pqc-ca"
+        # The public trust anchors (ADR-024 §3).
+        "/etc/pki/pqc-trust"
         # The custodian's layout (ADR-024, scripts/lib/ca-layout.sh).
         "/var/lib/pqc-ca"
         "/var/lib/pqc-ca-public"

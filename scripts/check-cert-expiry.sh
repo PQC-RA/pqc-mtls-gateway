@@ -6,7 +6,8 @@
 # certificates it serves.
 #
 #   scripts/check-cert-expiry.sh [CERT...]
-#   Env: PKI_DIR (/etc/pki/pqc-ca), SSL_DIR (/etc/ssl/pqc), WARN_DAYS (30), OPENSSL_BIN
+#   Env: PKI_DIR (/etc/pki/pqc-ca), SSL_DIR (/etc/ssl/pqc), WARN_DAYS (30), OPENSSL_BIN;
+#        the custodian's layout and TRUST_DIR from scripts/lib/ca-layout.sh
 #
 # Renewal: the :8081 leaf with RENEW_INTERNAL_LEAF=1 scripts/setup-pki.sh and a
 # gateway reload (README, "Admin token and :8081 to ML-DSA-65").
@@ -16,10 +17,14 @@ ROOT_DIR=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 if [ -n "${OPENSSL_BIN:-}" ]; then O=$OPENSSL_BIN; else
 	# shellcheck source=lib/pq-openssl.sh
 	. "$ROOT_DIR/scripts/lib/pq-openssl.sh"; fi
+# shellcheck source=lib/ca-layout.sh
+. "$ROOT_DIR/scripts/lib/ca-layout.sh"
 if [ $# -eq 0 ]; then
+	# Where ADR-024 puts them: the intermediate in the custodian's state, the
+	# OCSP certificate beside its key, the internal CA among the trust anchors.
 	set -- "$SSL_DIR/internal-tls.crt" "$SSL_DIR/internal-tls-mldsa.crt" "$SSL_DIR/server-mldsa65.crt" \
-		"$PKI_DIR/ocsp/ocsp-pq.crt" "$PKI_DIR/internal-tls-ca-mldsa.crt" \
-		"$PKI_DIR/intermediate/certs/intermediate-ca.crt" "$PKI_DIR/root/certs/root-ca.crt"
+		"$OCSP_KEY_DIR/ocsp-pq.crt" "$TRUST_DIR/internal-tls-ca-mldsa.crt" \
+		"$CA_STATE_DIR/certs/intermediate-ca.crt" "$PKI_DIR/root/certs/root-ca.crt"
 fi
 rc=0
 for c in "$@"; do

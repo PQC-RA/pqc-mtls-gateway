@@ -46,7 +46,7 @@ live)
 	PKI=/etc/pki/pqc-ca; SSL=/etc/ssl/pqc; PREFIX=pqc; VOLP=$LIVE_PROJECT
 	# shellcheck source=scripts/lib/ca-layout.sh
 	. "$(cd "$(dirname "$0")/lib" && pwd)/ca-layout.sh"
-	CA="$CA_ROOT"; CAPUB="$CA_PUBLIC_DIR"
+	CA="$CA_ROOT"; CAPUB="$CA_PUBLIC_DIR"; TRUST="$TRUST_DIR"
 	COMPOSE=(docker compose -p "$LIVE_PROJECT" --project-directory "$LIVE_DIR") ;;
 *) echo "target must be live or stand" >&2; exit 2 ;;
 esac
@@ -79,6 +79,11 @@ if [ -n "${CA:-}" ] && [ -d "$CA" ]; then
 	tar -C "$(dirname "$CA")" --numeric-owner "${EXCL[@]}" --exclude="$(basename "$CA")/key" \
 		-czpf "$B/ca.tgz" "$(basename "$CA")"
 	tar -C "$(dirname "$CAPUB")" --numeric-owner "${EXCL[@]}" -czpf "$B/ca-public.tgz" "$(basename "$CAPUB")"
+fi
+# The public trust anchors (ADR-024 §3): which internal CAs management-api pins.
+if [ -n "${TRUST:-}" ] && [ -d "$TRUST" ]; then
+	scan "$TRUST"
+	tar -C "$(dirname "$TRUST")" --numeric-owner "${EXCL[@]}" -czpf "$B/trust.tgz" "$(basename "$TRUST")"
 fi
 
 # 2. Redis, consistent snapshot over the protocol

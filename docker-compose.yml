@@ -106,9 +106,10 @@ services:
    # A directory, never single files (a bind-mounted file pins its inode and
    # would never see the custodian's rename).
    - /var/lib/pqc-ca-public:/etc/pki/pqc-ca:ro
-   # The internal TLS CA (ADR-022) the healthcheck verifies :8081 with. A single
-   # public certificate, rewritten in place by setup-pki.sh (inode kept).
-   - /etc/pki/pqc-ca/internal-tls-ca.crt:/etc/pki/internal-tls-ca.crt:ro
+   # The public trust anchors (ADR-024 §3): the internal TLS CA (ADR-022) the
+   # healthcheck verifies :8081 with. Public certificates only, a directory
+   # mount (files are replaced by rename), nothing from the CA tree.
+   - /etc/pki/pqc-trust:/etc/pki/pqc-trust:ro
    - /etc/ssl/pqc:/etc/ssl/pqc:ro
    - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
    - ./config/nginx/security-headers.conf:/etc/nginx/security-headers.conf:ro
@@ -164,7 +165,7 @@ services:
    # was intact, never that nginx had loaded its config or bound a port.
    # /healthz is the control-plane listener on :8081 (nginx.conf), and the
    # container has no curl or wget, so s_client is the transport.
-   test: ["CMD-SHELL", "printf 'GET /healthz HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' | /opt/openssl/bin/openssl s_client -connect 127.0.0.1:8081 -CAfile /etc/pki/internal-tls-ca.crt -verify_return_error -quiet 2>/dev/null | grep -q '200 OK'"]
+   test: ["CMD-SHELL", "printf 'GET /healthz HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' | /opt/openssl/bin/openssl s_client -connect 127.0.0.1:8081 -CAfile /etc/pki/pqc-trust/internal-tls-ca.crt -verify_return_error -quiet 2>/dev/null | grep -q '200 OK'"]
    interval: 30s
    timeout: 5s
    retries: 3
@@ -509,7 +510,7 @@ services:
    # be switched either way (scripts/internal-tls-switch.sh) without a restart.
    - GATEWAY_JWKS_URI=https://gateway:8081/.well-known/jwks.json
    - GATEWAY_CONTROL_URL=https://gateway:8081/update-routes
-   - NODE_EXTRA_CA_CERTS=/etc/pki/internal-tls-ca.crt
+   - NODE_EXTRA_CA_CERTS=/etc/pki/pqc-trust/internal-tls-ca.crt
    - RENEWAL_ENABLED=${RENEWAL_ENABLED:-}
    # Profile of an enrollment token whose creator names none: client-30d or
    # legacy (365 days, not renewable). client-30d takes effect only with renewal on.
@@ -537,7 +538,9 @@ services:
    # Item 4: attests the mTLS client on the /renew hop (renew_attest.lua /
    # RenewAttestGuard). Same 0640 bind-mount convention as enroll-hmac.
    - ./secrets/renew-hmac.key:/run/secrets/renew-hmac:ro
-   - /etc/pki/pqc-ca/internal-tls-ca.crt:/etc/pki/internal-tls-ca.crt:ro
+   # The public trust anchors (ADR-024 §3), as a directory: NODE_EXTRA_CA_CERTS
+   # above names the file in it.
+   - /etc/pki/pqc-trust:/etc/pki/pqc-trust:ro
   ports:
    - "127.0.0.1:3000:3000"
   security_opt:
