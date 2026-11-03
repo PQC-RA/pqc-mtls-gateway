@@ -139,3 +139,19 @@ ca_regular_tree() {
     echo "not a regular file or directory: $bad" >&2
     return 1
 }
+
+# ca_refuse_unmigrated PKI_DIR: a deployment from before ADR-024 (the
+# intermediate still in the shared tree, no custodian state) is not deployed
+# over: this release's compose would mount empty layout directories, the
+# custodian would crash-loop and the gateway would stop serving. The cut-over
+# is the runbook's ordered steps (README, "The CA custodian becomes the only holder of the CA key"; the
+# tool is scripts/migrate-ca-state.sh), not a deploy. Returns 1 with the
+# reason on such a host.
+ca_refuse_unmigrated() {
+    if [ -d "$1/intermediate" ] && [ ! -d "$CA_STATE_DIR" ]; then
+        echo "ERROR: $1/intermediate exists and $CA_STATE_DIR does not: this deployment predates ADR-024." >&2
+        echo "  This release cannot be deployed over it; nothing was changed. Move it with the" >&2
+        echo "  cut-over runbook (README, \"The CA custodian becomes the only holder of the CA key\")." >&2
+        return 1
+    fi
+}

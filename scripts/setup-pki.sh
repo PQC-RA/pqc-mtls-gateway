@@ -108,6 +108,9 @@ OCSP_GID="${OCSP_GID:-1002}"
 # CA and the classical enrollment CA. Nothing needs an empty-directory mask.
 # shellcheck source=scripts/lib/ca-layout.sh
 . "$ROOT_DIR/scripts/lib/ca-layout.sh"
+# A deployment from before ADR-024 is moved by the cut-over runbook, never by
+# a re-run of this script (nothing is changed on such a host).
+ca_refuse_unmigrated "$PKI_DIR" || exit 1
 
 command -v "$OPENSSL" >/dev/null 2>&1 || { echo "FATAL: openssl not found at $OPENSSL (set OPENSSL_BIN)"; exit 1; }
 "$OPENSSL" list -signature-algorithms 2>/dev/null | grep -qi "ml-dsa" || \
@@ -391,24 +394,14 @@ warn_leaf_profile() {
 if [ -f "$PKI_DIR/root/certs/root-ca.crt" ]; then
     echo "Root CA already exists at $PKI_DIR, leaving the CA untouched."
     echo "==> Catching up any newer artifacts introduced after initial bootstrap..."
-    if [ ! -d "$CA_STATE_DIR" ] && [ -d "$PKI_DIR/intermediate" ]; then
-        # Pre-ADR-024: its management-api still mounts the trust file from
-        # $PKI_DIR. Its internal TLS moves to $TRUST_DIR with the cut-over.
-        echo "NOTE: internal TLS left as it is: this deployment predates ADR-024 (see below)."
-    else
-        generate_internal_tls
-    fi
+    # A deployment from before ADR-024 is refused at the top of this script.
+    generate_internal_tls
     set_ocsp_key_perms
     if [ -d "$CA_STATE_DIR" ]; then
         # The custodian's layout (ADR-024): owners and modes back to the spec.
         ca_layout_create
         ca_layout_check || { echo "ERROR: the CA layout does not match scripts/lib/ca-layout.sh" >&2; exit 1; }
         echo "==> CA layout under $CA_ROOT checked"
-    elif [ -d "$PKI_DIR/intermediate" ]; then
-        echo "NOTE: the intermediate CA is still in the shared tree $PKI_DIR/intermediate."
-        echo "      ADR-024 moves it into the custodian's own layout. On a running"
-        echo "      deployment that is a planned step with a rollback, not something a"
-        echo "      re-run does by itself: follow the runbook in scripts/migrate-ca-state.sh."
     fi
     # Check the CA that is already on disk, not just the one this run would
     # create. A host bootstrapped elsewhere, or with KEY_ALG overridden, is

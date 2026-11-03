@@ -58,6 +58,15 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
+# ── Not over a deployment from before ADR-024 ─────────────────────────────────
+# Its CA is still in the shared tree. Deploying this release over it would
+# start the custodian on empty layout directories (it crash-loops) and the
+# gateway without its CA files (it stops serving 443 and 8443). Checked before
+# anything is installed, written or started.
+# shellcheck source=scripts/lib/ca-layout.sh
+. "$ROOT_DIR/scripts/lib/ca-layout.sh"
+ca_refuse_unmigrated "${PKI_DIR:-/etc/pki/pqc-ca}" || exit 1
+
 # ── Prerequisites ─────────────────────────────────────────────────────────────
 echo "==> Checking prerequisites..."
 if ! command -v docker &>/dev/null; then
