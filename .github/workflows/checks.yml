@@ -113,6 +113,11 @@ jobs:
       - name: Compose policy (ADR-024)
         run: ./scripts/check-compose-policy.sh
 
+      # The policy check itself: each CA-tree and trust-directory violation,
+      # added on top of the compose file by an override, is refused and named.
+      - name: Compose policy check refuses what it must (ADR-024)
+        run: ./bench/adr024/compose-policy-unit.sh
+
       # ADR-024: the gateway entrypoint fails when the custodian's CA files do
       # not come, and its reload watcher reports nginx's own errors. The real
       # functions, sourced, with a fake nginx: no images needed.

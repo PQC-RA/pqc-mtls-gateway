@@ -20,8 +20,10 @@ OSSL=${OSSL:-/opt/openssl/bin/openssl}; [ -x "$OSSL" ] || OSSL=$(command -v open
 export OSSL OPENSSL_CONF=/dev/null
 T=$(mktemp -d)
 P="keyiso-$$"
+STARTED=()
 cleanup() {
-    if [ -n "${STARTED:-}" ]; then docker rm -f "$P-cust" "$P-app" > /dev/null; docker volume rm "$P-key" > /dev/null; fi
+    if [ ${#STARTED[@]} -gt 0 ]; then docker rm -f "${STARTED[@]}" > /dev/null; fi
+    if [ -n "${VOLUME_MADE:-}" ]; then docker volume rm "$P-key" > /dev/null; fi
     rm -rf "$T"
 }
 trap cleanup EXIT
@@ -87,15 +89,16 @@ check "no intermediate key in the custodian: UNVERIFIED (exit 1)" "[ $(rc) = 1 ]
 if [ -z "$IMG" ] || [ "$(id -u)" != 0 ] || ! docker info > /dev/null 2>&1 || [ ! -d /proc/1/root/ ]; then
     echo "SKIP  docker mode (needs an image argument, root, Docker and a Linux /proc)"
 else
-    STARTED=1
-    docker volume create "$P-key" > /dev/null
+    docker volume create "$P-key" > /dev/null; VOLUME_MADE=1
     docker run --rm -i -u 0 -v "$P-key:/k" --entrypoint sh "$IMG" -c 'cat > /k/intermediate-ca.key' < int.key
+    STARTED+=("$P-cust" "$P-app")
     docker run -d --name "$P-cust" --label com.docker.compose.project="$P" -v "$P-key:/var/lib/pqc-ca/key:ro" \
         --entrypoint sleep "$IMG" infinity > /dev/null
     docker run -d --name "$P-app" --label com.docker.compose.project="$P" --tmpfs /scratch \
         --entrypoint sleep "$IMG" infinity > /dev/null
     docker exec -u 0 -i "$P-app" sh -c 'mkdir -p /usr/share/baked && cat > /usr/share/baked/root.pem' < root.key
-    dock() { COMPOSE_PROJECT="$P" CUSTODIAN_CONTAINER="$P-cust" "$CHK" > "$T/out" 2>&1; echo $? > "$T/rc"; }
+    mkdir -p "$T/pkitree"; cp tls.crt "$T/pkitree/internal-tls-ca.crt"
+    dock() { PKI="$T/pkitree" COMPOSE_PROJECT="$P" CUSTODIAN_CONTAINER="$P-cust" "$CHK" > "$T/out" 2>&1; echo $? > "$T/rc"; }
     dock
     check "docker: a CA key in a container's writable layer (no mount) is found" "[ $(rc) = 1 ] && grep -q '$P-app CAN READ THE root PRIVATE KEY (/usr/share/baked/root.pem)' $T/out" || show
     check "  ... and the custodian's key in its volume mount is the canary" "grep -q 'PASS: only $P-cust holds' $T/out"
@@ -106,6 +109,13 @@ else
     docker exec -u 0 "$P-app" rm /scratch/tls.pem
     dock
     check "docker: with both removed, the stack passes (exit 0)" "[ $(rc) = 0 ]" || show
+    # Nothing from the CA tree may be mounted, not even one public
+    # certificate (ADR-024 §3: the trust anchors are in the trust directory).
+    STARTED+=("$P-crt")
+    docker run -d --name "$P-crt" --label com.docker.compose.project="$P" \
+        -v "$T/pkitree/internal-tls-ca.crt:/etc/pki/internal-tls-ca.crt:ro" --entrypoint sleep "$IMG" infinity > /dev/null
+    dock
+    check "docker: a single public certificate mounted from the CA tree is refused" "[ $(rc) = 1 ] && grep -q '$P-crt mounts from the CA tree: $T/pkitree/internal-tls-ca.crt' $T/out" || show
 fi
 
 echo "$PASS/$((PASS + FAIL)) passed"

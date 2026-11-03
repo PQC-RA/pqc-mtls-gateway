@@ -3,8 +3,12 @@
 # ADR-024 (test 4). Fails if:
 #   - a service other than pqc-ca-custodian mounts the custodian's key, state
 #     or inbox directory;
-#   - any service mounts the CA tree /etc/pki/pqc-ca as a directory, an
-#     empty-directory mask (/etc/pki/pqc-empty) or a /signals volume;
+#   - any service mounts anything from the CA tree /etc/pki/pqc-ca (not even a
+#     single public certificate), an empty-directory mask (/etc/pki/pqc-empty)
+#     or a /signals volume;
+#   - any service mounts the trust directory /etc/pki/pqc-trust other than
+#     whole and read-only (ADR-024 §3: public certificates only, replaced by
+#     rename, so never a single file);
 #   - any service sets CUSTODIAN_TEST_FAULT (test-only fault injection);
 #   - a service runs as root, without a read-only rootfs, without cap_drop ALL,
 #     with an added capability or without no-new-privileges, unless it is a
@@ -38,8 +42,13 @@ for name, svc in sorted(cfg.get("services", {}).items()):
         src, dst = v.get("source", ""), v.get("target", "")
         if src.startswith(CUSTODIAN_ONLY) and name != "pqc-ca-custodian":
             bad.append(f"{name}: mounts the custodian\x27s {src}")
-        if src == "/etc/pki/pqc-ca" or (src.startswith("/etc/pki/pqc-ca/") and not src.endswith(".crt")):
-            bad.append(f"{name}: mounts the CA tree {src}")
+        if src == "/etc/pki/pqc-ca" or src.startswith("/etc/pki/pqc-ca/"):
+            bad.append(f"{name}: mounts from the CA tree: {src}")
+        if src == "/etc/pki/pqc-trust" or src.startswith("/etc/pki/pqc-trust/"):
+            if src != "/etc/pki/pqc-trust":
+                bad.append(f"{name}: mounts a single file from the trust directory: {src} (mount the directory)")
+            if not v.get("read_only"):
+                bad.append(f"{name}: mounts the trust directory {src} writable")
         if src.startswith("/etc/pki/pqc-empty"):
             bad.append(f"{name}: empty-directory mask {src} -> {dst}")
         if dst == "/signals" or v.get("source") == "pqc-signals":

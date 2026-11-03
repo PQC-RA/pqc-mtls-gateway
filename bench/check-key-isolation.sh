@@ -32,7 +32,7 @@ PKI=${PKI:-/etc/pki/pqc-ca}
 PROJECT=${COMPOSE_PROJECT:-pqc-gw}
 CUSTODIAN=${CUSTODIAN_CONTAINER:-pqc-ca-custodian}
 CA_INT_CERT=${CA_INT_CERT:-$CA_STATE_DIR/certs/intermediate-ca.crt}
-CA_CERTS=${CA_CERTS:-"$PKI/root/certs/root-ca.crt $CA_INT_CERT $PKI/internal-tls-ca-mldsa.crt $PKI/internal-tls-ca-rsa.crt $PKI/enroll-classical-ca.crt"}
+CA_CERTS=${CA_CERTS:-"$PKI/root/certs/root-ca.crt $CA_INT_CERT $TRUST_DIR/internal-tls-ca-mldsa.crt $TRUST_DIR/internal-tls-ca-rsa.crt $PKI/enroll-classical-ca.crt"}
 # A PEM private-key header line: PRIVATE KEY (PKCS#8), ENCRYPTED, RSA, EC,
 # OPENSSH, ... Only a well-formed block counts (header, base64 body, matching
 # END line): libraries such as libgnutls carry the header text itself.
@@ -116,13 +116,15 @@ else
         fi
         scan "$c" "/proc/$pid/root"
         # Mounts: the custodian's private directories belong to it alone, and no
-        # container mounts the CA tree itself (one public certificate file is fine).
+        # container mounts anything from the CA tree.
         for src in $(docker inspect -f '{{range .Mounts}}{{.Source}} {{end}}' "$c"); do
             case "$src" in
                 "$CA_KEY_DIR"|"$CA_STATE_DIR"|"$CA_INBOX_DIR") [ "$c" = "$CUSTODIAN" ] || fail "$c mounts the custodian's $src" ;;
             esac
-            if [ "$src" = "$PKI" ] || { [ -d "$src" ] && [ "${src#"$PKI"/}" != "$src" ]; }; then
-                fail "$c mounts the CA tree (or a directory in it): $src"
+            # Nothing at all from the CA tree, not even one public certificate:
+            # the public trust anchors are in $TRUST_DIR (ADR-024 §3).
+            if [ "$src" = "$PKI" ] || [ "${src#"$PKI"/}" != "$src" ]; then
+                fail "$c mounts from the CA tree: $src"
             fi
         done
     done
