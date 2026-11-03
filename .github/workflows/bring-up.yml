@@ -390,9 +390,12 @@ jobs:
           new=$(git rev-parse HEAD)
           echo "prev=$prev" >> "$GITHUB_OUTPUT"
           echo "new=$new" >> "$GITHUB_OUTPUT"
-          if git show "$prev:scripts/lib/ca-layout.sh" > /dev/null 2>&1; then
+          # What the previous release RUNS decides, not which files it has:
+          # main carries the migration tool (#8) long before its compose file
+          # mounts the custodian's state.
+          if git show "$prev:docker-compose.yml" | grep -q "/var/lib/pqc-ca/state"; then
             echo "skip=1" >> "$GITHUB_OUTPUT"
-            echo "::notice::${{ github.base_ref }} already has the custodian layout: no cut-over to rehearse"
+            echo "::notice::${{ github.base_ref }} already runs the custodian layout: no cut-over to rehearse"
           else
             echo "skip=0" >> "$GITHUB_OUTPUT"
             echo "previous release ${prev:0:7}, this release ${new:0:7}"
