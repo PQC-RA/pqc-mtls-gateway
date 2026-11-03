@@ -16,17 +16,17 @@
 #      then -updatedb, -gencrl and -revoke all fail
 #   6. one leaf revoked, the expired one marked E by -updatedb: check reports
 #      none; set-yes succeeds (rollback stage 2 to stage 1); -gencrl works
-#   0, 5b, 7 (added after the independent review): the tool refuses without the
-#      stage-1 lock file; set-no repairs the broken state of step 5; the set-yes
+#   0, 5b, 7 (added after the independent review): the tool refuses while the
+#      custodian holds its writer lock (ADR-024); set-no repairs the broken state of step 5; the set-yes
 #      rollback branch (a forced -updatedb failure after the switch) restores no
-#      and keeps the pre-run backups. db/ is owned by 1001 as on live; the files
-#      must stay readable and lockable by uid 1001 after every tool step.
+#      and keeps the pre-run backups. db/ is owned by the custodian's uid; the
+#      files must stay readable by it after every tool step.
 #
 # Usage: unique-subject-rehearsal.sh WORKDIR
 set -uo pipefail
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")/../../scripts/lib" && pwd)/pq-openssl.sh"; export OPENSSL=$O
 W=${1:?workdir}; HERE=$(cd "$(dirname "$0")" && pwd); TOOL="$HERE/../../scripts/ca-unique-subject.sh"
-LIVE=${PROD_CA_DIR:-/etc/pki/pqc-ca/intermediate}; STAND=${STAND_DIR:?source STAND_DIR/stand.env first}/pki/intermediate
+LIVE=${PROD_CA_DIR:-/var/lib/pqc-ca/state}; STAND=${STAND_DIR:?source STAND_DIR/stand.env first}/pki/intermediate
 # The rows to rehearse on: a copy of the production CA's on a host that has one
 # (hashed before and after); on a host built only for the stand, an empty CA
 # database, from which the steps below create every row they check.
@@ -58,18 +58,19 @@ cmp -s $STAND/certs/intermediate-ca.crt "$S/certs/intermediate-ca.crt" && ! cmp 
 	&& ok "scratch signs with the STAND key, not live's" || { bad "key check"; exit 1; }
 
 as1001() { setpriv --reuid 1001 --regid 1001 --clear-groups "$@"; }
-owned() { # owned DIR: index files owned by 1001, lockable and readable by uid 1001
+owned() { # owned DIR: index files owned by 1001 and readable by uid 1001
 	local d=$1 f bad_=""
 	for f in index.txt index.txt.attr index.txt.old index.txt.attr.old; do
 		[ -e "$d/db/$f" ] && [ "$(stat -c %u "$d/db/$f")" != 1001 ] && bad_="$bad_ $f"
 	done
-	as1001 flock -w 2 "$d/db/.ca-db.lock" cat "$d/db/index.txt" >/dev/null 2>&1 || bad_="$bad_ (uid 1001 cannot lock or read)"
-	[ -z "$bad_" ] && ok "db files owned by 1001, lockable and readable by uid 1001" || bad "ownership:$bad_"
+	as1001 cat "$d/db/index.txt" >/dev/null 2>&1 || bad_="$bad_ (uid 1001 cannot read)"
+	[ -z "$bad_" ] && ok "db files owned by 1001 and readable by uid 1001" || bad "ownership:$bad_"
 }
 
-step "0. no stage-1 lock file: the tool refuses"
-bash "$TOOL" "$C" check; rc=$?; [ "$rc" = 2 ] && [ ! -e "$S/db/.ca-db.lock" ] && ok "refused (exit 2), no lock file created" || bad "rc=$rc"
-install -o 1001 -g 1001 -m 664 /dev/null "$S/db/.ca-db.lock"; echo "    lock file created as stage 1 would: 1001:1001 0664"
+step "0. the custodian holds its writer lock: the tool refuses (ADR-024)"
+( flock -x 9; sleep 3 ) 9>>"$S/.writer.lock" & sleep 0.5
+bash "$TOOL" "$C" check; rc=$?; wait
+[ "$rc" = 2 ] && ok "refused (exit 2) while the lock is held" || bad "rc=$rc"
 
 step "1. live state as copied, unique_subject = yes"
 t0=$(date +%s%N); $O ca -config "$C" -gencrl -out "$S/crl/a.crl" 2>&1 | tail -2; rc=${PIPESTATUS[0]}; t1=$(date +%s%N)

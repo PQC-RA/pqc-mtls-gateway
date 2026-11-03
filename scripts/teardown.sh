@@ -128,6 +128,12 @@ if [[ "$MODE" == "all" ]]; then
         "/opt/openssl"
         "/opt/openssl-${OPENSSL_VER}"
         "/etc/pki/pqc-ca"
+        # The custodian's layout (ADR-024, scripts/lib/ca-layout.sh).
+        "/var/lib/pqc-ca"
+        "/var/lib/pqc-ca-public"
+        "/var/lib/pqc-ca-status"
+        "/var/lib/pqc-ocsp"
+        # Pre-ADR-024 hosts: the mask directory and the CRL renewer's script.
         "/etc/pki/pqc-empty"
         "/etc/ssl/pqc"
         "/etc/ld.so.conf.d/00-pqc-openssl.conf"

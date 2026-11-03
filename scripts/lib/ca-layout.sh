@@ -97,3 +97,13 @@ ca_layout_file_perms() {
 # Anything that writes CA state from the host (migration, break-glass) takes
 # it first and refuses if it cannot, so there is one writer at any moment.
 CA_WRITER_LOCK="$CA_STATE_DIR/.writer.lock"
+
+# Takes the writer lock on fd 9 without waiting; returns 1 if the custodian
+# (or another host tool) holds it. The file belongs to the custodian: a host
+# tool running as root that created it would leave a file the custodian (uid
+# 1003) cannot open, and it would refuse to start.
+ca_take_writer_lock() {
+    [ -e "$CA_WRITER_LOCK" ] || install -m 0600 -o "$CA_UID" -g "$CA_GID" /dev/null "$CA_WRITER_LOCK"
+    exec 9>>"$CA_WRITER_LOCK"
+    flock -n 9
+}

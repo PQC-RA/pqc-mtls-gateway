@@ -76,8 +76,7 @@ refuse_if_writers_run() {
 # The custodian holds this lock while it runs; holding it here keeps it out.
 take_writer_lock() {
     [ -d "$CA_STATE_DIR" ] || return 0
-    exec 9>>"$CA_WRITER_LOCK"
-    flock -n 9 || die "the custodian holds $CA_WRITER_LOCK: it is running against $CA_STATE_DIR"
+    ca_take_writer_lock || die "the custodian holds $CA_WRITER_LOCK: it is running against $CA_STATE_DIR"
 }
 
 # --- helpers ------------------------------------------------------------------

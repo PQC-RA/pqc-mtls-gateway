@@ -38,6 +38,16 @@
 #   config of ROLLBACK_COMMIT, for the rollback rehearsal)
 #   stand.env  `source` it, then run bench/item4/*.sh against this stand
 set -euo pipefail
+# TEMPORARY (ADR-024 PR 4b). A stand built here has the pre-ADR-024 design: the
+# shared CA tree, the CRL renewer, /signals and the masks. setup-pki.sh now
+# moves the intermediate into the custodian's layout under /var/lib/pqc-ca,
+# which on a host with a running deployment is that deployment's own. Rather
+# than build a stand that half-works or touches it, this refuses.
+# Exit criterion: stand tooling ported to the custodian layout (each stand its
+# own CA_ROOT, CA_PUBLIC_DIR, CA_STATUS_DIR and OCSP_KEY_DIR, and the matching
+# mounts), in its own PR.
+echo "stand-up.sh: not ported to the ADR-024 CA layout yet; see the comment at the top of $0" >&2
+exit 2
 SD=${1:?STAND_DIR}; P=${2:?PROJECT}; TP=${3:?TLS_PORT}; EP=${4:?ENROLL_PORT}; AP=${5:?API_PORT}
 REPO=$(cd "$(dirname "$0")/.." && pwd); COMMIT=$(git -C "$REPO" rev-parse --short "${COMMIT:-HEAD}")
 FIRST_ITEM4=$(git -C "$REPO" log --format=%h --grep='^custodian: renewal profiles' "$COMMIT" | tail -1)

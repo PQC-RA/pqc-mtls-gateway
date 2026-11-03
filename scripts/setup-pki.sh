@@ -71,7 +71,8 @@ fi
 assert_pq_ca() {
     [ "${PQC_ALLOW_CLASSICAL_CA:-0}" = "1" ] && return 0
     local c alg bad=0
-    for c in "$PKI_DIR/root/certs/root-ca.crt" "$PKI_DIR/intermediate/certs/intermediate-ca.crt"; do
+    for c in "$PKI_DIR/root/certs/root-ca.crt" "$PKI_DIR/intermediate/certs/intermediate-ca.crt" \
+             "$CA_STATE_DIR/certs/intermediate-ca.crt"; do
         [ -f "$c" ] || continue
         alg=$(OPENSSL_CONF=/dev/null "$OPENSSL" x509 -in "$c" -noout -text 2>/dev/null \
               | sed -n 's/^ *Public Key Algorithm: *//p' | head -1)
@@ -98,30 +99,15 @@ TPL_DIR="$ROOT_DIR/pki/templates"
 # docker-compose.yml. Deliberately NOT the custodian's 1001.
 OCSP_GID="${OCSP_GID:-1002}"
 
-# --- Empty dir every CA-tree consumer mounts over key-bearing subdirs -------
-# docker-compose.yml bind-mounts this over the key-bearing subdirectories of
-# every service that mounts the CA tree, so each one holds at most the single
-# private key it actually uses and none of them holds the root CA key or the
-# internal TLS CA key (internal-tls/, ADR-022):
-#   gateway      -> intermediate/private, ocsp/, root/private, internal-tls masked (no key)
-#   ocsp-pq      -> intermediate/private, root/private, internal-tls masked (keeps ocsp/)
-#   crl-renewer  -> ocsp/, root/private, internal-tls masked (keeps intermediate/private)
-#   pqc-ca-custodian -> ocsp/, root/private, internal-tls masked (keeps intermediate/private)
-# The invariant to re-check whenever a service gains this mount: root/private and
-# internal-tls are masked on ALL of them, and this list matches the mount list. Verify against the
-# mount list, never against a comment: a comment like this one can assert a
-# property that a service mounting the tree does not implement, and nothing
-# fails. bench/verify-suite.sh section 6 enumerates the mounters at runtime, so it
-# cannot go stale the way this list can.
-# Created explicitly (not left to Docker's implicit bind-mount auto-create) so
-# ownership/permissions are predictable.
-#
-# Deliberately unconditional and run before the root-CA guard below: it has no
-# dependency on PKI state at all, and mkdir -p is naturally idempotent, so
-# there is no reason to gate it on a fresh bootstrap vs. a re-run against an
-# existing PKI, it always just needs to exist.
-mkdir -p /etc/pki/pqc-empty
-chmod 555 /etc/pki/pqc-empty
+# --- The custodian's layout (ADR-024) -----------------------------------------
+# The intermediate CA's key and state belong to the custodian alone, on host
+# directories no other container mounts; public files go to their own
+# directory. scripts/lib/ca-layout.sh defines paths, owners and modes; this
+# script creates them (bootstrap) and keeps them right (every re-run).
+# $PKI_DIR keeps only what no container mounts: the root CA, the internal TLS
+# CA and the classical enrollment CA. Nothing needs an empty-directory mask.
+# shellcheck source=scripts/lib/ca-layout.sh
+. "$ROOT_DIR/scripts/lib/ca-layout.sh"
 
 command -v "$OPENSSL" >/dev/null 2>&1 || { echo "FATAL: openssl not found at $OPENSSL (set OPENSSL_BIN)"; exit 1; }
 "$OPENSSL" list -signature-algorithms 2>/dev/null | grep -qi "ml-dsa" || \
@@ -139,11 +125,15 @@ command -v "$OPENSSL" >/dev/null 2>&1 || { echo "FATAL: openssl not found at $OP
 # a host whose PKI predates the non-root responder would otherwise keep the key
 # at 600 root:root and ocsp-pq would fail to start after an upgrade.
 set_ocsp_key_perms() {
-    local key="$PKI_DIR/ocsp/ocsp-pq.key"
-    [ -f "$key" ] || return 0
-    chown "root:$OCSP_GID" "$key"
-    chmod 640 "$key"
-    echo "==> OCSP responder key: 640 root:$OCSP_GID (readable by the ocsp-pq container's gid)"
+    local key
+    # Before the migration the key is in the CA tree; after it, in the OCSP
+    # responder's own directory (ADR-024).
+    for key in "$PKI_DIR/ocsp/ocsp-pq.key" "$OCSP_KEY_DIR/ocsp-pq.key"; do
+        [ -f "$key" ] || continue
+        chown "root:$OCSP_GID" "$key"
+        chmod 640 "$key"
+        echo "==> OCSP responder key $key: 640 root:$OCSP_GID (readable by the ocsp-pq container's gid)"
+    done
 }
 
 # Internal TLS CA and :8081 leaf: names and helpers (ITLS_*), shared with
@@ -382,7 +372,8 @@ generate_internal_tls() {
 # property (a CA that copies CSR extensions lets a token holder obtain CA:TRUE
 # or a server SAN), so say so loudly rather than edit an existing CA config here.
 warn_leaf_profile() {
-    local cnf="$PKI_DIR/intermediate/openssl-intermediate.cnf"
+    local cnf="$CA_CNF_FILE"
+    [ -f "$cnf" ] || cnf="$PKI_DIR/intermediate/openssl-intermediate.cnf"
     [ -f "$cnf" ] || return 0
     if grep -Eq '^[[:space:]]*copy_extensions[[:space:]]*=[[:space:]]*copy' "$cnf" \
        || ! grep -Eq '^[[:space:]]*x509_extensions[[:space:]]*=' "$cnf"; then
@@ -398,6 +389,17 @@ if [ -f "$PKI_DIR/root/certs/root-ca.crt" ]; then
     echo "==> Catching up any newer artifacts introduced after initial bootstrap..."
     generate_internal_tls
     set_ocsp_key_perms
+    if [ -d "$CA_STATE_DIR" ]; then
+        # The custodian's layout (ADR-024): owners and modes back to the spec.
+        ca_layout_create
+        ca_layout_check || { echo "ERROR: the CA layout does not match scripts/lib/ca-layout.sh" >&2; exit 1; }
+        echo "==> CA layout under $CA_ROOT checked"
+    elif [ -d "$PKI_DIR/intermediate" ]; then
+        echo "NOTE: the intermediate CA is still in the shared tree $PKI_DIR/intermediate."
+        echo "      ADR-024 moves it into the custodian's own layout. On a running"
+        echo "      deployment that is a planned step with a rollback, not something a"
+        echo "      re-run does by itself: follow the runbook in scripts/migrate-ca-state.sh."
+    fi
     # Check the CA that is already on disk, not just the one this run would
     # create. A host bootstrapped elsewhere, or with KEY_ALG overridden, is
     # caught here rather than
@@ -527,46 +529,28 @@ cat "$PKI_DIR/root/crl/root-ca.crl" \
 cp "$PKI_DIR/hybrid-ca-chain.crt"     "$PKI_DIR/ca-chain.crt"
 cp "$PKI_DIR/hybrid-combined-crl.pem" "$PKI_DIR/combined-crl.pem"
 
-# --- Least-privilege ownership for the unprivileged management-api runtime ----
-# The API container runs as a dedicated non-root account (uid:gid 1001:1001,
-# baked into the published pqc-mtls-management-api image). Grant it exactly what
-# certificate issuance
-# and revocation need, and nothing more:
-#   * READ, never write, the intermediate signing key   (sign CSRs / revoke)
-#   * READ-WRITE the CA database (db/) and issued/         (update index, new certs)
-# Everything else under $PKI_DIR, the root CA, every private key, the CRLs,
-# stays owned by root. The Docker bind-mount additionally pins the key read-only.
-APP_UID="${APP_UID:-1001}"
-APP_GID="${APP_GID:-1001}"
-if [ "${SKIP_APP_PERMS:-0}" != "1" ]; then
-    echo "==> Applying least-privilege permissions for app uid:gid $APP_UID:$APP_GID"
-    INT_KEY="$PKI_DIR/intermediate/private/intermediate-ca.key"
-    INT_PRIV="$PKI_DIR/intermediate/private"
-    if chown "root:$APP_GID" "$INT_KEY" 2>/dev/null && chmod 640 "$INT_KEY" 2>/dev/null; then
-        # 'private' dir: owner rwx, group --x (traverse to the key, no listing).
-        chgrp "$APP_GID" "$INT_PRIV" 2>/dev/null || true
-        chmod 710 "$INT_PRIV" 2>/dev/null || true
-        echo "    intermediate signing key -> root:$APP_GID mode 640 (app reads, cannot write)"
-    else
-        echo "    WARN: could not set key ownership (run as root for /etc/pki). Ensure uid $APP_UID" >&2
-        echo "          can READ $INT_KEY (read-only) before starting the API container." >&2
-    fi
-    for d in db issued; do
-        if chown -R "$APP_UID:$APP_GID" "$PKI_DIR/intermediate/$d" 2>/dev/null; then
-            chmod -R u+rwX,g+rwX "$PKI_DIR/intermediate/$d" 2>/dev/null || true
-            echo "    intermediate/$d -> $APP_UID:$APP_GID (app read-write)"
-        else
-            echo "    WARN: could not chown intermediate/$d to $APP_UID:$APP_GID (run as root)" >&2
-        fi
-    done
-fi
+# --- Into the custodian's layout (ADR-024) ------------------------------------
+# Everything above that needs the intermediate key ran here, before any
+# container exists. From now on the custodian is its only user and the only
+# writer of CA state: move it there (copy, verify, then retire the tree's
+# copies so nothing reads a stale one). The custodian publishes the CA
+# certificates and the first CRLs when it starts.
+echo "==> Moving the intermediate CA into the custodian's layout ($CA_ROOT)"
+OPENSSL_BIN="$OPENSSL" "$ROOT_DIR/scripts/migrate-ca-state.sh" forward --from "$PKI_DIR"
+OPENSSL_BIN="$OPENSSL" "$ROOT_DIR/scripts/migrate-ca-state.sh" retire --from "$PKI_DIR"
+# A fresh bootstrap has no rollback to keep: the retired copy of the key is
+# the only other copy, so it goes now. (On a migrated deployment it stays for
+# the rollback window; see the runbook.)
+for _k in "$PKI_DIR"/intermediate.migrated-*/private/intermediate-ca.key; do
+    [ -f "$_k" ] && shred -u "$_k"
+done
 
 assert_pq_ca
 
 echo ""
 echo "==> PKI bootstrap complete."
 echo "    Root CA      : $($OPENSSL x509 -in "$PKI_DIR/root/certs/root-ca.crt" -noout -subject | sed 's/subject=//')"
-echo "    Intermediate : $($OPENSSL x509 -in "$PKI_DIR/intermediate/certs/intermediate-ca.crt" -noout -subject | sed 's/subject=//')"
+echo "    Intermediate : $($OPENSSL x509 -in "$CA_STATE_DIR/certs/intermediate-ca.crt" -noout -subject | sed 's/subject=//')"
 echo "    Server cert  : $($OPENSSL x509 -in "$SSL_DIR/server-mldsa65.crt" -noout -subject | sed 's/subject=//')"
 echo ""
 echo "Next: scripts/generate-gateway-secrets.sh  (JWT signing key + control-plane HMAC)"

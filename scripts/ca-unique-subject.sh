@@ -10,9 +10,8 @@
 #       -updatedb, the duplicate check must report none, then unique_subject = yes;
 #       switched back to no if -updatedb then fails
 #
-# Optional env: CUSTODIAN_CONTAINER and RENEWER_CONTAINER (for example
-# pqc-ca-custodian, pqc-crl-renewer): the tool then refuses unless both run
-# lock-aware code, and set-yes refuses while the custodian's RENEWAL_ENABLED=1.
+# Optional env: CUSTODIAN_CONTAINER (for example pqc-ca-custodian): set-yes
+# then refuses while that container's RENEWAL_ENABLED=1.
 #
 # Why this way (ADR-019 review, objection 1):
 #   * OpenSSL's name index covers every row with status V, by the EXACT subject
@@ -24,12 +23,11 @@
 #     and set-yes is refused while any duplicate is left.
 #   * index.txt.attr overrides the cnf (apps.c), so the switch edits index.txt.attr;
 #     the cnf line is changed too so the two never disagree.
-# Everything runs under the CA database lock shared with the custodian and the
-# CRL renewer (db/.ca-db.lock), held once for the whole step. The lock file must
-# already exist: it is created by item 4's stage 1, whose custodian and renewer
-# take it. Before stage 1 nothing else takes the lock and this tool must not run.
-# Files the tool or openssl rewrite get the owner of db/ back (the custodian runs
-# as a non-root user and must still read and lock them).
+# The custodian is the only writer of CA state (ADR-024) and holds its writer
+# lock ($dir/.writer.lock) while it runs. This tool takes that lock without
+# waiting, for the whole step, and refuses if it cannot: stop the custodian
+# first. Files the tool or openssl rewrite get the owner of db/ back (the
+# custodian runs as a non-root user and must still read them).
 #
 # Exit: 0 ok, 1 duplicates (check, set-yes refused), 2 usage or a precondition,
 # 3 an openssl ca step failed (state restored where possible), 4 unexpected error.
@@ -45,7 +43,7 @@ DIR=$(sed -n 's/^[[:space:]]*dir[[:space:]]*=[[:space:]]*\([^[:space:]#]*\).*/\1
 DB=$(sed -n 's/^[[:space:]]*database[[:space:]]*=[[:space:]]*\([^[:space:]#]*\).*/\1/p' "$CNF" | head -1)
 DB=${DB//\$dir/$DIR}
 [ -f "$DB" ] || { echo "index not found: $DB" >&2; exit 2; }
-DBDIR=$(dirname "$DB"); ATTR="$DB.attr"; LOCK="$DBDIR/.ca-db.lock"
+DBDIR=$(dirname "$DB"); ATTR="$DB.attr"; LOCK="$DIR/.writer.lock"
 TS=$(date -u +%Y%m%dT%H%M%SZ)
 
 log() { printf '%s %s\n' "$(date -u +%H:%M:%SZ)" "$*"; }
@@ -53,20 +51,19 @@ current() { sed -n 's/^unique_subject[[:space:]]*=[[:space:]]*//p' "$ATTR" 2>/de
 trap 'rc=$?; log "UNEXPECTED ERROR (line $LINENO, rc $rc): attr says $(current || true), cnf says $(grep -E "^[[:space:]]*unique_subject" "$CNF" | head -1 || true)"; exit 4' ERR
 
 # Preconditions.
-[ -f "$LOCK" ] || { log "REFUSED: $LOCK does not exist. It is created by item 4 stage 1, whose custodian and renewer take it; before that nothing else locks the CA database."; exit 2; }
 CNFVAL=$(sed -nE 's/^[[:space:]]*unique_subject[[:space:]]*=[[:space:]]*([^[:space:]#]*).*/\1/p' "$CNF" | head -1)
 if [ -n "$CNFVAL" ] && [[ ! "$CNFVAL" =~ ^(yes|no)$ ]]; then log "REFUSED: the cnf says unique_subject = $CNFVAL; only a literal yes or no is handled"; exit 2; fi
-for c in ${CUSTODIAN_CONTAINER:-} ${RENEWER_CONTAINER:-}; do
-	docker exec "$c" sh -c 'grep -rqs "ca-db.lock\|CA_LOCK_FILE" /usr/src/app /usr/local/bin /opt 2>/dev/null' \
-		|| { log "REFUSED: container $c does not run lock-aware code"; exit 2; }
-done
+# docker inspect reads the environment of a stopped container too.
 if [ "$ACTION" = set-yes ] && [ -n "${CUSTODIAN_CONTAINER:-}" ] \
-	&& [ "$(docker exec "$CUSTODIAN_CONTAINER" printenv RENEWAL_ENABLED 2>/dev/null || true)" = 1 ]; then
+	&& docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$CUSTODIAN_CONTAINER" 2>/dev/null | grep -qx RENEWAL_ENABLED=1; then
 	log "REFUSED: RENEWAL_ENABLED=1 in $CUSTODIAN_CONTAINER; switch renewal off first (ADR-019 decision 5)"; exit 2
 fi
 
-exec 9<"$LOCK"
-flock -w 20 9 || { log "could not take $LOCK within 20 s"; exit 3; }
+# Created, if missing, owned like the directory it is in (the custodian's), or
+# the custodian could not open it afterwards.
+[ -e "$LOCK" ] || install -m 0600 -o "$(stat -c %u "$DIR")" -g "$(stat -c %g "$DIR")" /dev/null "$LOCK"
+exec 9>>"$LOCK"
+flock -n 9 || { log "REFUSED: the custodian holds $LOCK; stop it first"; exit 2; }
 
 OWNER=$(stat -c %u:%g "$DBDIR")
 fixowner() { # openssl and this tool write as root; give db files back to db/'s owner

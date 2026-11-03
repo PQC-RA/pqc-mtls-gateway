@@ -6,13 +6,20 @@
 # migrated configuration), and the migration runs forward, back and forward
 # again. Nothing outside the container is touched.
 #
+# The deployment migrated FROM is built the way it really was: with the
+# pre-ADR-024 setup-pki.sh (the tree at PRE_ADR024, main before the cut-over),
+# since today's setup-pki.sh already ends in the custodian's layout.
+#
 # Usage: run-migrate-ca-state-unit.sh <custodian-image>
 #   Any image with bash, flock, setpriv and OpenSSL 3.5+ at /opt/openssl will
 #   do; the custodian image has all of them.
 set -euo pipefail
 IMG=${1:?usage: run-migrate-ca-state-unit.sh <custodian-image>}
 repo=$(cd "$(dirname "$0")/../.." && pwd)
-docker run --rm --network none --user 0:0 -v "$repo:/repo:ro" --entrypoint bash "$IMG" -c '
+PRE_ADR024=${PRE_ADR024:-ec423fa}
+old=$(mktemp -d); trap 'rm -rf "$old"' EXIT
+git -C "$repo" archive "$PRE_ADR024" | tar -x -C "$old"
+docker run --rm --network none --user 0:0 -v "$repo:/repo:ro" -v "$old:/old:ro" --entrypoint bash "$IMG" -c '
 set -uo pipefail
 export OPENSSL_CONF=/dev/null
 O=/opt/openssl/bin/openssl; M=/tmp/r/scripts/migrate-ca-state.sh
@@ -26,8 +33,8 @@ serials(){ $O crl -in "$1" -noout -text | sed -n "s/^ *Serial Number: *//p" | so
 treehash(){ (cd "$1" && find . -type f ! -name "*.lock" -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -c1-16); }
 as_ca(){ setpriv --reuid=1003 --regid=1003 --clear-groups "$@"; }
 
-cp -r /repo /tmp/r
-( cd /tmp/r && PKI_DIR=$P SSL_DIR=/etc/ssl/pqc SERVER_IP=127.0.0.1 ./scripts/setup-pki.sh ) > /tmp/setup.log 2>&1 \
+cp -r /repo /tmp/r; cp -r /old /tmp/old
+( cd /tmp/old && PKI_DIR=$P SSL_DIR=/etc/ssl/pqc SERVER_IP=127.0.0.1 ./scripts/setup-pki.sh ) > /tmp/setup.log 2>&1 \
   || { tail -20 /tmp/setup.log; exit 1; }
 
 # --- the old design at work: sign three, revoke one, the renewer publishes ---
@@ -81,6 +88,7 @@ check "the old tree did not see it" "! serials $P/hybrid-combined-crl.pem | grep
 # --- retire ---------------------------------------------------------------------
 $M retire > /tmp/ret.log 2>&1; rc=$?
 check "retire renames the old intermediate, ocsp and public files" "[ $rc = 0 ] && [ ! -d $INT ] && [ ! -d $P/ocsp ] && [ ! -f $P/hybrid-combined-crl.pem ] && ls -d $INT.migrated-* $P/ocsp.migrated-* $P/public.migrated-* >/dev/null"
+check "the writer lock a host tool created belongs to the custodian (uid 1003), so it can still start" "[ \"$(stat -c %u $CA_WRITER_LOCK)\" = 1003 ]"
 check "retire keeps the host-only CAs where they are" "[ -f $P/root/private/root-ca.key ] && [ -f $P/internal-tls-ca.crt ]"
 
 # --- the writer lock keeps a host writer out ------------------------------------

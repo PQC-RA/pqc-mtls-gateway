@@ -130,14 +130,15 @@ OSSL="/opt/openssl/bin/openssl"
 # that move is a separate, ordered step (REISSUE_INTERNAL_CA=1 setup-pki.sh,
 # restart management-api, scripts/internal-tls-switch.sh mldsa; see README).
 echo "==> [3/9] Bootstrapping / catching up PQC PKI (ML-DSA-65)..."
-PKI_DIR=/etc/pki/pqc-ca
 OPENSSL_BIN="$OSSL" SERVER_IP="$SERVER_IP" ./scripts/setup-pki.sh
 
 # ── Step 4: Bootstrap admin certificate ──────────────────────────────────────
 ADMIN_DIR="$ROOT_DIR/admin-cert"
 ADMIN_KEY="$ADMIN_DIR/$ADMIN_CN.key"
 ADMIN_CRT="$ADMIN_DIR/$ADMIN_CN.crt"
-INT_CNF="$PKI_DIR/intermediate/openssl-intermediate.cnf"
+# The intermediate CA lives in the custodian's layout (ADR-024).
+# shellcheck source=scripts/lib/ca-layout.sh
+. "$ROOT_DIR/scripts/lib/ca-layout.sh"
 export OPENSSL_CONF=/etc/ssl/openssl.cnf
 
 if [[ -f "$ADMIN_CRT" ]]; then
@@ -151,10 +152,17 @@ else
     "$OSSL" req -new -key "$ADMIN_KEY" \
         -subj "/C=BG/O=${PKI_ORG}/OU=Admin/CN=$ADMIN_CN" \
         -out "$ADMIN_DIR/$ADMIN_CN.csr" 2>/dev/null
-    "$OSSL" ca -config "$INT_CNF" -batch -notext -days 365 \
+    # Signed here, on the host, only because no custodian runs yet: it is the
+    # bootstrap admin that will talk to it. The writer lock makes sure of that
+    # (the custodian holds it while it runs), so CA state still has one writer
+    # at any moment. With a running custodian, issue it through the API instead.
+    ca_take_writer_lock || { echo "ERROR: the custodian is running; stop it, or issue the admin certificate through the management API" >&2; exit 1; }
+    "$OSSL" ca -config "$CA_CNF_FILE" -batch -notext -days 365 \
         -extensions v3_client \
         -in  "$ADMIN_DIR/$ADMIN_CN.csr" \
         -out "$ADMIN_CRT" 2>/dev/null
+    ca_layout_file_perms   # openssl ran as root: the state goes back to the custodian
+    exec 9>&-
     rm -f "$ADMIN_DIR/$ADMIN_CN.csr"
     echo "    Admin cert issued."
 fi
@@ -188,12 +196,9 @@ if ! grep -qE '^CORS_ALLOWED_ORIGINS=.+' .env; then
     echo "            CORS_ALLOWED_ORIGINS=https://admin.example.com"
 fi
 
-# ── Step 6: Install CRL renewal script ───────────────────────────────────────
-echo "==> [6/9] Installing CRL renewal script..."
-# Use cp (not install) to preserve the inode so live bind mounts in containers
-# see the updated file without requiring a container restart.
-cp scripts/pqc-crl-renew.sh /usr/local/bin/pqc-crl-renew.sh
-chmod 0755 /usr/local/bin/pqc-crl-renew.sh
+# ── Step 6: CRLs ─────────────────────────────────────────────────────────────
+# Issued by the CA custodian itself, on revocation and on a schedule (ADR-024).
+echo "==> [6/9] CRLs: issued by the CA custodian (nothing to install)."
 
 # ── Step 7: Gateway secrets ──────────────────────────────────────────────────
 echo "==> [7/9] Generating gateway secrets (JWT key + HMAC)..."
@@ -227,7 +232,7 @@ for i in $(seq 1 30); do
 done
 
 # ── Done ──────────────────────────────────────────────────────────────────────
-CA_CHAIN="$PKI_DIR/ca-chain.crt"
+CA_CHAIN="$CA_PUBLIC_DIR/ca-chain.crt"
 
 echo ""
 echo "════════════════════════════════════════════════════════════════"
