@@ -9,6 +9,14 @@
 #                                              manifest. Copies, never moves.
 #   migrate-ca-state.sh verify                 re-check the copies against the
 #                                              manifest
+#   migrate-ca-state.sh check-next [--from DIR]
+#                                              after the new custodian's first
+#                                              CRL and BEFORE any reader moves
+#                                              (ADR-024 switch step 4): CRL N+1
+#                                              verifies, is numbered N+1, carries
+#                                              every serial of N, is first in
+#                                              the combined CRL and runs 6+ days.
+#                                              Read-only; exits 1 on any failure.
 #   migrate-ca-state.sh retire [--from DIR]    after the readers have moved:
 #                                              rename the old intermediate/, ocsp/
 #                                              and top-level CRL and chain files
@@ -26,9 +34,10 @@
 # subcommand that touches the new state takes the custodian's writer lock.
 # Nothing is deleted. What is replaced is renamed with a timestamp.
 #
-# The ADR-024 runbook: stop management-api, the renewer and the custodian;
-# forward; start the new custodian (it issues CRL N+1); check N+1; move the
-# readers; retire. Rollback at any point after forward: stop the new
+# The ADR-024 runbook: issue a fresh CRL N with the old system; stop
+# management-api, the renewer and the custodian; forward; start ONLY the new
+# custodian (it issues CRL N+1); check-next; only then move the readers;
+# retire. Rollback at any point after forward: stop the new
 # containers; reverse; start the old ones.
 set -euo pipefail
 
@@ -178,6 +187,39 @@ forward() {
     say "forward done; $FROM is unchanged. Next: start the custodian on the new layout and check CRL N+1."
 }
 
+# --- check-next ---------------------------------------------------------------
+check_next() {
+    local nfile="$INT/crl/intermediate-ca.crl" pub="$CA_PUBLIC_DIR/hybrid-combined-crl.pem"
+    local cert="$CA_STATE_DIR/certs/intermediate-ca.crt" d n n1 bad=0 missing nu
+    if [ ! -f "$nfile" ]; then   # already retired: the newest retired copy holds N
+        d=$(find "$FROM" -maxdepth 1 -name "intermediate.migrated-*" -type d | sort | tail -1)
+        nfile="$d/crl/intermediate-ca.crl"
+    fi
+    [ -f "$nfile" ] || die "no CRL N found under $INT or a retired copy of it"
+    [ -f "$pub" ] || die "no CRL N+1 published at $pub; start the custodian first"
+    say "CRL N   : $nfile"
+    say "CRL N+1 : $pub (first block)"
+    ok()  { echo "    PASS  $*"; }
+    nok() { echo "    FAIL  $*"; bad=1; }
+    if crl_verify "$pub" "$cert"; then ok "N+1 verifies against the intermediate certificate"
+    else nok "N+1 does not verify against $cert"; fi
+    if [ "$("$OPENSSL" crl -in "$pub" -noout -issuer | sed 's/^issuer=//')" = "$("$OPENSSL" x509 -in "$cert" -noout -subject | sed 's/^subject=//')" ]; then
+        ok "the intermediate CRL is FIRST in the combined CRL"
+    else nok "the first CRL in $pub is not the intermediate's"; fi
+    [ "$(grep -c 'BEGIN X509 CRL' "$pub")" = 2 ] && ok "the combined CRL holds two CRLs" || nok "the combined CRL does not hold exactly two CRLs"
+    n=$(crl_number "$nfile"); n1=$(crl_number "$pub")
+    if [ $((16#$n1)) -eq $((16#$n + 1)) ]; then ok "numbered N+1 (0x$n -> 0x$n1)"
+    else nok "numbered 0x$n1, expected 0x$n + 1"; fi
+    missing=$(comm -23 <(crl_serials "$nfile") <(crl_serials "$pub"))
+    if [ -z "$missing" ]; then ok "every serial revoked in N ($(crl_serials "$nfile" | wc -l)) is in N+1 ($(crl_serials "$pub" | wc -l))"
+    else nok "revoked in N but missing from N+1: $(echo "$missing" | tr '\n' ' ')"; fi
+    nu=$("$OPENSSL" crl -in "$pub" -noout -nextupdate -dateopt iso_8601 | sed 's/^nextUpdate=//; s/Z$//')
+    if [ "$(date -u -d "$nu" +%s)" -gt $(( $(date -u +%s) + 6 * 86400 )) ]; then ok "nextUpdate $nu, more than 6 days ahead"
+    else nok "nextUpdate $nu is not more than 6 days ahead"; fi
+    [ "$bad" = 0 ] || die "CRL N+1 failed its checks: do NOT move the readers; roll back (reverse)"
+    say "CRL N+1 is good: the readers may move."
+}
+
 # --- retire -------------------------------------------------------------------
 retire() {
     [ -f "$MANIFEST" ] || die "no forward has been done (no $MANIFEST)"
@@ -263,6 +305,7 @@ case "$cmd" in
     forward) forward ;;
     verify)  take_writer_lock; say "verifying the copies"; verify_manifest || die "the copies do not match the manifest" ;;
     retire)  take_writer_lock; retire ;;
+    check-next) check_next ;;
     reverse) reverse ;;
     *) sed -n '2,32p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

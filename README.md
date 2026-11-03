@@ -449,6 +449,13 @@ reload**, over the HMAC-authenticated control channel.
 
 ## Reproducing the whole product on an isolated stand
 
+> **Not available in this release.** `scripts/stand-up.sh` refuses to run: a stand built by it
+> has the pre-ADR-024 design, and since ADR-024 `setup-pki.sh` moves the intermediate into the
+> custodian's layout under `/var/lib/pqc-ca`, which on a host with a running deployment is that
+> deployment's. TEMPORARY, until the stand tooling gets its own layout paths (a follow-up PR).
+> The offline suites under `bench/adr024/` and `bench/lua/` do not need a stand. The description
+> below is how it worked before.
+
 Everything this repository ships can be stood up and tested from a clean clone, beside any
 running deployment and without touching it:
 
@@ -682,18 +689,37 @@ this release keeps its intermediate CA in the shared tree until it is migrated; 
 says so and does nothing by itself. The migration is a planned step with a rollback, and only the
 admin path (enrollment, renewal, revocation) is down during it, for minutes:
 
+**Before** (each one, or stop):
+
 1. Deploy `management-api` from ADR-024 PR 3 first (it accepts the custodian's 202 and its CRL
-   status). Make a backup (`scripts/backup-state.sh live`, and the encrypted key set).
-2. Stop `management-api`, `crl-renewer` and `pqc-ca-custodian`.
-3. `scripts/migrate-ca-state.sh forward`: copies the key and state into the custodian's layout and
+   status).
+2. Rehearse the whole switch, including the rollback, on a stand built like the deployment.
+3. Back up: `scripts/backup-state.sh live`, and the encrypted key set.
+4. Check out this release and run `scripts/generate-gateway-secrets.sh`: it gives the custodian
+   HMAC secret to the custodian's own uid (1003:1001 0440). Without it the new custodian cannot
+   read its secret and refuses to start.
+5. Issue a fresh CRL N with the old system (`docker exec pqc-crl-renewer touch
+   /signals/renew-crl`), and check its `nextUpdate` is at least 6 days ahead.
+
+**The switch** (enrollment, renewal and revocation are down while it runs; the data plane is
+not, until step 5):
+
+1. Stop `management-api`, `crl-renewer` and `pqc-ca-custodian`.
+2. `scripts/migrate-ca-state.sh forward`: copies the key and state into the custodian's layout and
    verifies every copy. Nothing in `/etc/pki/pqc-ca` changes.
-4. Bring the stack up from this release (`docker compose up -d`). The custodian publishes CRL N+1.
-   Check it is a superset of N, numbered N+1, intermediate first, before anything else.
-5. `scripts/migrate-ca-state.sh retire`, then remove the old `crl-renewer` container and the
-   `pqc-signals`, `pqc-www-pki` and `pqc-logs-crl` volumes.
-6. Rollback at any point: stop the new containers, `scripts/migrate-ca-state.sh reverse` (it copies
-   the state back, including the CRL number and the latest CRLs, and checks nothing is un-revoked),
-   check out the previous release, `docker compose up -d`.
+3. Start **only** the custodian: `docker compose up -d --no-deps pqc-ca-custodian`. It publishes
+   CRL N+1.
+4. `scripts/migrate-ca-state.sh check-next`: N+1 verifies, is numbered N+1, carries every serial of
+   N, is first in the combined CRL and runs 6 or more days. **If it fails, do not go on: roll
+   back.** A gateway started on a bad N+1 would un-revoke certificates (its revoked set starts
+   empty).
+5. Only now move the readers and the rest: `docker compose up -d` (recreates the gateway,
+   `ocsp-pq`, `pki-dist` and `management-api`).
+6. `scripts/migrate-ca-state.sh retire`, then remove the old `crl-renewer` container and the
+   `pqc-signals`, `pqc-www-pki` and `pqc-logs-crl` volumes once the rollback window is over.
+7. Rollback at any point: stop the new containers, `scripts/migrate-ca-state.sh reverse` (it copies
+   the state back, including the CRL number and the latest CRLs, and checks nothing is
+   un-revoked), check out the previous release, `docker compose up -d`.
 
 Keep the retired copy of the intermediate key for the rollback window, then destroy it and record
 that.

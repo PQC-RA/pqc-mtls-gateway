@@ -76,6 +76,23 @@ cp -p /tmp/keep $F
 as_ca $O ca -config $CA_CNF_FILE -gencrl -out $CA_STATE_DIR/crl/intermediate-ca.crl 2>/dev/null
 check "as uid 1003 the migrated configuration signs CRL N+1" "[ $((16#$(crlno $CA_STATE_DIR/crl/intermediate-ca.crl))) = $((16#$N + 1)) ]"
 check "CRL N+1 is a superset of CRL N" "[ -z \"$(comm -23 <(serials $INT/crl/intermediate-ca.crl) <(serials $CA_STATE_DIR/crl/intermediate-ca.crl))\" ]"
+
+# --- check-next: the ADR switch step 4 gate, before any reader moves -------------
+cat $CA_STATE_DIR/crl/intermediate-ca.crl $CA_STATE_DIR/crl/root-ca.crl > $CA_PUBLIC_DIR/hybrid-combined-crl.pem
+$M check-next > /tmp/cn.log 2>&1; rc=$?
+check "check-next passes a good N+1 (verifies, N+1, superset, intermediate first, 6+ days)" "[ $rc = 0 ]" || cat /tmp/cn.log
+cat $CA_STATE_DIR/crl/root-ca.crl $CA_STATE_DIR/crl/intermediate-ca.crl > $CA_PUBLIC_DIR/hybrid-combined-crl.pem
+$M check-next > /tmp/cn.log 2>&1; rc=$?
+check "check-next refuses a root-first combined CRL (exit 1)" "[ $rc != 0 ] && grep -q \"not the intermediate\" /tmp/cn.log"
+cat $CA_STATE_DIR/crl/intermediate-ca.crl $CA_STATE_DIR/crl/root-ca.crl > $CA_PUBLIC_DIR/hybrid-combined-crl.pem
+# An N with one more revocation than N+1 carries: a copy of the old tree in
+# which a third certificate is revoked (the live tree stays as it is).
+cp -a $P /tmp/fakeP
+sed -i "s#^dir[[:space:]]*=.*#dir               = /tmp/fakeP/intermediate#" /tmp/fakeP/intermediate/openssl-intermediate.cnf
+$O ca -config /tmp/fakeP/intermediate/openssl-intermediate.cnf -revoke /tmp/old-c.crt > /tmp/fake.log 2>&1
+$O ca -config /tmp/fakeP/intermediate/openssl-intermediate.cnf -gencrl -out /tmp/fakeP/intermediate/crl/intermediate-ca.crl >> /tmp/fake.log 2>&1
+$M check-next --from /tmp/fakeP > /tmp/cn.log 2>&1; rc=$?
+check "check-next refuses an N+1 that misses a serial revoked in N (exit 1, names it)" "[ $rc != 0 ] && grep -q \"missing from N+1: $S3\" /tmp/cn.log"
 cp /tmp/old-b.crt /tmp/b.crt; chmod 644 /tmp/b.crt
 as_ca $O ca -config $CA_CNF_FILE -revoke /tmp/b.crt 2>/dev/null
 as_ca $O ca -config $CA_CNF_FILE -gencrl -out $CA_STATE_DIR/crl/intermediate-ca.crl 2>/dev/null
@@ -84,6 +101,8 @@ cat $CA_STATE_DIR/crl/intermediate-ca.crl $CA_STATE_DIR/crl/root-ca.crl > $CA_PU
 cp $CA_PUBLIC_DIR/hybrid-combined-crl.pem $CA_PUBLIC_DIR/combined-crl.pem
 check "the custodian revoked $S2 in the new layout (CRL $NC)" "serials $CA_STATE_DIR/crl/intermediate-ca.crl | grep -qx $S2"
 check "the old tree did not see it" "! serials $P/hybrid-combined-crl.pem | grep -qx $S2"
+$M check-next > /tmp/cn.log 2>&1; rc=$?
+check "check-next refuses N+2 (it must be the first CRL of the custodian, N+1)" "[ $rc != 0 ] && grep -q \"expected 0x\" /tmp/cn.log"
 
 # --- retire ---------------------------------------------------------------------
 $M retire > /tmp/ret.log 2>&1; rc=$?
