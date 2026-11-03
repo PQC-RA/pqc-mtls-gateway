@@ -20,7 +20,13 @@ const crypto = require("crypto");
 const { execFile } = require("child_process");
 const { promisify } = require("util");
 
-const execFileAsync = promisify(execFile);
+// Every child process has a deadline, so a hung openssl can never hold the CA
+// mutex for ever (ADR-024 review). It covers the lock wait below (10 s) plus
+// the call itself.
+const EXEC_TIMEOUT_MS = Number(process.env.EXEC_TIMEOUT_MS || 12_000);
+const execFileRaw = promisify(execFile);
+const execFileAsync = (cmd, args, opts = {}) =>
+	execFileRaw(cmd, args, { timeout: EXEC_TIMEOUT_MS, killSignal: "SIGKILL", ...opts });
 
 const OPENSSL = process.env.OPENSSL_BIN || "/opt/openssl/bin/openssl";
 const CA_DIR = process.env.CA_DIR || "/etc/pki/pqc-ca/intermediate";
@@ -265,12 +271,15 @@ function withCaMutex(fn) {
 // place that names it.
 const CA_KEY_URI = process.env.CA_KEY_URI || "";
 
-// `openssl ca` under the CA-wide file lock shared with the CRL renewer. The
-// lock stays while the renewer and the shared CA tree exist; ADR-024 PR 4
-// removes both, and with them the lock.
+// `openssl ca` under the CA-wide file lock shared with the CRL renewer.
+// TEMPORARY: the renewer still writes the same CA database from another
+// container, so writes are serialised across containers. Exit: ADR-024 PR 4b
+// removes the renewer and the shared tree, and this lock with them.
+// Owner: Rumen.
+// CA_KEY_URI applies only with the CRL issuer on; off, nothing changes.
 function opensslCaLocked(args) {
-	const keyArgs = CA_KEY_URI ? ["-keyfile", CA_KEY_URI] : [];
-	return execFileAsync("flock", ["-w", "20", CA_LOCK_FILE, OPENSSL, ...args, ...keyArgs], { cwd: CA_DIR });
+	const keyArgs = CRL_ISSUER && CA_KEY_URI ? ["-keyfile", CA_KEY_URI] : [];
+	return execFileAsync("flock", ["-w", "10", CA_LOCK_FILE, OPENSSL, ...args, ...keyArgs], { cwd: CA_DIR });
 }
 
 async function subjectRfc2253(kind, file) {
@@ -727,6 +736,9 @@ async function handleRevoke(res, payload) {
 
 	log("INFO", `Revoked certificate serial=${serial} reason=${reason || "unspecified"}`);
 	if (!CRL_ISSUER) return sendJson(res, 200, { ok: true });
+	// The OCSP snapshot follows every index change at once (ADR-024 section 3),
+	// so OCSP says "revoked" even while the CRL is still pending.
+	publishStatusSnapshotLogged();
 	return true;
 	});
 	if (recorded !== true) return recorded;
@@ -735,14 +747,29 @@ async function handleRevoke(res, payload) {
 	// it is published. Every pass starts after this point, so it includes this
 	// serial. If the pass fails the revocation still stands (it cannot be
 	// undone): 202 with the CRL pending, and the retry loop keeps trying.
+	// The answer comes within REVOKE_CRL_DEADLINE_MS, well under management-api's
+	// 15 s timeout: a slow CRL is a 202 there, never a timeout (502).
 	testFault("crash-after-revoke");
 	try {
-		const pass = await requestCrlPass("revocation");
+		const pass = await withDeadline(requestCrlPass("revocation"), REVOKE_CRL_DEADLINE_MS);
 		return sendJson(res, 200, { ok: true, crl: "published", crlNumber: pass.crlNumber });
 	} catch (err) {
 		log("ERROR", `Revoked serial=${serial} but its CRL was not published: ${err.message}; retrying`);
 		return sendJson(res, 202, { ok: true, crl: "pending" });
 	}
+}
+
+// Resolves or rejects like `promise`, or rejects after `ms`. The promise keeps
+// running either way (a CRL pass is not cancelled); its outcome is handled by
+// the pass machinery, never left unhandled here.
+function withDeadline(promise, ms) {
+	promise.catch(() => {});
+	let timer;
+	const deadline = new Promise((_, reject) => {
+		timer = setTimeout(() => reject(new Error(`no CRL within ${ms} ms`)), ms);
+		timer.unref();
+	});
+	return Promise.race([promise, deadline]).finally(() => clearTimeout(timer));
 }
 
 // ---------------------------------------------------------------------------
@@ -754,13 +781,19 @@ async function handleRevoke(res, payload) {
 // the OCSP index snapshot to CRL_STATUS_DIR (read only by ocsp-pq). With the
 // flag off nothing below runs, and the CRL renewer keeps doing this job.
 // ---------------------------------------------------------------------------
+// TEMPORARY: off by default so this merges without changing runtime while the
+// CRL renewer and the shared CA tree exist. Exit: ADR-024 PR 4b switches it on
+// with the new layout and removes the flag. Owner: Rumen.
 const CRL_ISSUER = process.env.CUSTODIAN_ISSUES_CRL === "1";
 const CRL_REISSUE_AFTER_S = Number(process.env.CRL_REISSUE_AFTER_S || 86400);
 // A CRL this much later than its schedule means the issuer is wedged. Docker
 // restarts a container that exits, not one that is merely unhealthy, so exit.
 const CRL_OVERDUE_EXIT_S = Number(process.env.CRL_OVERDUE_EXIT_S || 6 * 3600);
 const CRL_RETRY_MIN_MS = 1000;
-const CRL_RETRY_MAX_MS = 60_000;
+const CRL_RETRY_MAX_MS = Number(process.env.CRL_RETRY_MAX_MS || 60_000);
+// How long a revoke (and POST /crl/issue) waits for its CRL before answering
+// 202 / 503: well under management-api's 15 s timeout for a custodian call.
+const REVOKE_CRL_DEADLINE_MS = Number(process.env.REVOKE_CRL_DEADLINE_MS || 8000);
 const INT_CERT = path.join(CA_DIR, "certs", "intermediate-ca.crt");
 const INT_CRL = path.join(CA_DIR, "crl", "intermediate-ca.crl");
 // The root CRL the custodian currently publishes. It is signed offline with
@@ -770,8 +803,10 @@ const CRL_PUBLIC_DIR = process.env.CRL_PUBLIC_DIR || "";
 const CRL_STATUS_DIR = process.env.CRL_STATUS_DIR || "";
 const ROOT_CRL_INBOX = process.env.ROOT_CRL_INBOX || "";
 const ROOT_CA_CERT = process.env.ROOT_CA_CERT || "";
-// Test-only fault injection for bench/adr024 (never set in a deployment;
-// ADR-024's compose policy check asserts that).
+// TEST-ONLY (not a temporary step, permanent test infrastructure): fault
+// injection for bench/adr024. Never set in a deployment; from ADR-024 PR 4b,
+// scripts/check-compose-policy.sh fails CI if any service sets it, and the
+// custodian logs a WARN at start when it is set.
 const TEST_FAULT = process.env.CUSTODIAN_TEST_FAULT || "";
 
 const crlState = {
@@ -781,6 +816,7 @@ const crlState = {
 	nextUpdate: 0,         // ms, nextUpdate of that CRL
 	rootNextUpdate: 0,     // ms, nextUpdate of the published root CRL
 	failures: 0,           // passes that failed
+	updatedbFailures: 0,   // -updatedb runs that failed (the pass went on)
 	rootRejected: 0,       // inbox root CRLs refused
 	pending: false,        // a revocation is recorded but no CRL carries it yet
 };
@@ -794,7 +830,8 @@ function testFault(name) {
 		process.kill(process.pid, "SIGKILL");
 	}
 	// crl-fail:<file>: every pass fails while <file> exists.
-	return name === "crl-fail" && Boolean(arg) && fs.existsSync(arg);
+	// crl-delay:<file>: every pass stalls while <file> exists (a slow openssl).
+	return (name === "crl-fail" || name === "crl-delay") && Boolean(arg) && fs.existsSync(arg);
 }
 
 async function ossl(args) {
@@ -821,15 +858,27 @@ async function inspectCrl(file, issuerCert) {
 // its inode and never sees the rename).
 function publishFile(dir, name, data, mode) {
 	const tmp = path.join(dir, `.${name}.tmp-${process.pid}-${crypto.randomBytes(4).toString("hex")}`);
-	const fd = fs.openSync(tmp, "w", mode);
 	try {
-		fs.writeSync(fd, data);
-		fs.fsyncSync(fd);
-	} finally {
-		fs.closeSync(fd);
+		const fd = fs.openSync(tmp, "w", mode);
+		try {
+			fs.writeSync(fd, data);
+			fs.fsyncSync(fd);
+		} finally {
+			fs.closeSync(fd);
+		}
+		fs.chmodSync(tmp, mode); // the umask must not narrow what readers need
+		fs.renameSync(tmp, path.join(dir, name));
+	} catch (err) {
+		fs.rmSync(tmp, { force: true }); // never leave a half-written temporary file
+		throw err;
 	}
-	fs.chmodSync(tmp, mode); // the umask must not narrow what readers need
-	fs.renameSync(tmp, path.join(dir, name));
+	// The rename itself must survive a crash too.
+	const dfd = fs.openSync(dir, "r");
+	try {
+		fs.fsyncSync(dfd);
+	} finally {
+		fs.closeSync(dfd);
+	}
 }
 
 async function derOf(kind, file) {
@@ -884,10 +933,12 @@ async function adoptInboxRootCrl() {
 // and revoke: whatever was recorded before it started is in the CRL it signs.
 async function issueCrlNow(withUpdatedb) {
 	if (testFault("crl-fail")) throw new Error("CUSTODIAN_TEST_FAULT crl-fail");
+	while (testFault("crl-delay")) await new Promise(r => setTimeout(r, 200));
 	if (withUpdatedb) {
 		try {
 			await opensslCaLocked(["ca", "-config", CA_CNF, "-updatedb"]);
 		} catch (err) {
+			crlState.updatedbFailures++;
 			log("WARN", `openssl ca -updatedb failed: ${err.stderr || err.message}; continuing with the CRL`);
 		}
 	}
@@ -978,9 +1029,11 @@ function scheduleRetry() {
 			log("INFO", "CRL retry succeeded; no revocation is pending");
 		}, () => {
 			retryDelay = Math.min(retryDelay * 2, CRL_RETRY_MAX_MS);
+			log("WARN", `CRL retry in ${retryDelay} ms`);
 			setTimeout(attempt, retryDelay).unref();
 		});
 	};
+	log("WARN", `CRL retry in ${retryDelay} ms`);
 	setTimeout(attempt, retryDelay).unref();
 }
 
@@ -990,13 +1043,16 @@ function crlOverdueSeconds() {
 
 function handleGetMetrics(res) {
 	const s = n => (n / 1000).toFixed(3);
+	// Until the first pass has published, the time-based gauges have no value:
+	// they are left out rather than reported as 0 (which reads as "just now").
+	const sample = (name, ms) => (crlState.lastIssuedAt ? [`${name} ${s(ms)}`] : []);
 	const lines = [
 		"# HELP pqc_ca_crl_last_issued_timestamp_seconds When the custodian last published an intermediate CRL.",
 		"# TYPE pqc_ca_crl_last_issued_timestamp_seconds gauge",
-		`pqc_ca_crl_last_issued_timestamp_seconds ${s(crlState.lastIssuedAt)}`,
+		...sample("pqc_ca_crl_last_issued_timestamp_seconds", crlState.lastIssuedAt),
 		"# HELP pqc_ca_crl_next_update_seconds Seconds until the nextUpdate of the last published intermediate CRL.",
 		"# TYPE pqc_ca_crl_next_update_seconds gauge",
-		`pqc_ca_crl_next_update_seconds ${s(crlState.nextUpdate - Date.now())}`,
+		...sample("pqc_ca_crl_next_update_seconds", crlState.nextUpdate - Date.now()),
 		"# HELP pqc_ca_crl_issue_failures_total CRL passes that failed.",
 		"# TYPE pqc_ca_crl_issue_failures_total counter",
 		`pqc_ca_crl_issue_failures_total ${crlState.failures}`,
@@ -1005,10 +1061,13 @@ function handleGetMetrics(res) {
 		`pqc_ca_crl_pending ${crlState.pending ? 1 : 0}`,
 		"# HELP pqc_ca_root_crl_next_update_seconds Seconds until the nextUpdate of the published root CRL.",
 		"# TYPE pqc_ca_root_crl_next_update_seconds gauge",
-		`pqc_ca_root_crl_next_update_seconds ${s(crlState.rootNextUpdate - Date.now())}`,
+		...sample("pqc_ca_root_crl_next_update_seconds", crlState.rootNextUpdate - Date.now()),
 		"# HELP pqc_ca_root_crl_rejected_total Root CRLs from the inbox that were refused.",
 		"# TYPE pqc_ca_root_crl_rejected_total counter",
 		`pqc_ca_root_crl_rejected_total ${crlState.rootRejected}`,
+		"# HELP pqc_ca_crl_updatedb_failures_total Runs of openssl ca -updatedb that failed (the CRL pass went on).",
+		"# TYPE pqc_ca_crl_updatedb_failures_total counter",
+		`pqc_ca_crl_updatedb_failures_total ${crlState.updatedbFailures}`,
 	];
 	const body = `${lines.join("\n")}\n`;
 	res.writeHead(200, { "Content-Type": "text/plain; version=0.0.4", "Content-Length": Buffer.byteLength(body) });
@@ -1158,11 +1217,13 @@ const server = http.createServer(async (req, res) => {
 		if (req.method === "POST" && url === "/crl/issue") {
 			if (!CRL_ISSUER) return sendError(res, 404, "not_crl_issuer", "This custodian does not issue CRLs");
 			if (!crlState.ready) return sendError(res, 503, "not_ready", "Custodian has not published its first CRL yet; retry");
+			// 503 on failure or past the deadline: retryable, and nothing was
+			// lost (the next pass, or the retry loop, publishes it).
 			try {
-				const pass = await requestCrlPass("manual", { updatedb: true });
+				const pass = await withDeadline(requestCrlPass("manual", { updatedb: true }), REVOKE_CRL_DEADLINE_MS);
 				return sendJson(res, 200, { ok: true, crl: "published", crlNumber: pass.crlNumber });
 			} catch (err) {
-				return sendError(res, 500, "crl_failed", `CRL not published: ${err.message}`);
+				return sendError(res, 503, "crl_failed", `CRL not published: ${err.message}; retry`);
 			}
 		}
 

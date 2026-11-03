@@ -21,7 +21,7 @@ cp -r /repo /tmp/r
   || { tail -20 /tmp/setup-pki.log; exit 1; }
 chown 1001:1001 /tmp/pki/intermediate/crl
 install -d -o 1001 -g 1001 -m 0755 /pub
-install -d -o 1001 -g 1002 -m 0750 /status
+install -d -o 1001 -g 1002 -m 2750 /status   # setgid: files keep group 1002 (ocsp-pq)
 install -d -o 0 -g 1001 -m 0750 /inbox
 install -d -o 0 -g 1001 -m 0750 /t
 head -c 32 /dev/urandom | od -An -tx1 | tr -d " \n" > /t/hmac; chmod 0640 /t/hmac; chgrp 1001 /t/hmac

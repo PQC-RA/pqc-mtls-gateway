@@ -94,6 +94,19 @@ const crlNumber = (file, inform = "PEM") => BigInt(`0x${/crlNumber=0x([0-9A-Fa-f
 const firstIssuer = file => ossl(["crl", "-in", file, "-noout", "-issuer"]);
 const statusRow = serial => (fs.readFileSync(`${STATUS}/index.txt`, "utf8").split("\n").find(l => l.split("\t")[3] === serial) || "").charAt(0);
 const mode = f => (fs.statSync(f).mode & 0o777).toString(8);
+// What an OCSP responder answers from the custodian's snapshot, run as ocsp-pq
+// runs (uid 1002), one request, no network (-reqin / -respout).
+function ocspStatus(serial) {
+	const cert = `${INT}/issued/${serial}.pem`, issuer = `${INT}/certs/intermediate-ca.crt`;
+	ossl(["ocsp", "-issuer", issuer, "-cert", cert, "-no_nonce", "-reqout", "/tmp/ocsp.req"]);
+	try { fs.rmSync("/tmp/ocsp.resp"); } catch { /* first call */ }
+	execFileSync("setpriv", ["--reuid=1002", "--regid=1002", "--clear-groups", O, "ocsp", "-index", `${STATUS}/index.txt`,
+		"-CA", `${PUB}/ca-chain.crt`, "-rsigner", `${PKI}/ocsp/ocsp-pq.crt`, "-rkey", `${PKI}/ocsp/ocsp-pq.key`,
+		"-reqin", "/tmp/ocsp.req", "-respout", "/tmp/ocsp.resp"], { ...osslEnv, stdio: "pipe" });
+	const out = execFileSync(O, ["ocsp", "-respin", "/tmp/ocsp.resp", "-issuer", issuer, "-CAfile", `${PUB}/ca-chain.crt`, "-cert", cert], { ...osslEnv, stdio: "pipe" }).toString();
+	return (/: (good|revoked|unknown)/.exec(out) || [, out.trim().slice(0, 60)])[1];
+}
+const ocspSafe = serial => { try { return ocspStatus(serial); } catch (e) { return String(e.stderr || e.message).slice(0, 100); } };
 function rootCrl(out, extra = []) {
 	execFileSync(O, ["ca", "-config", `${ROOT}/openssl-root.cnf`, "-gencrl", "-out", out, ...extra], { stdio: "ignore" });
 }
@@ -207,6 +220,20 @@ function itemUnitPasses() {
 	const newDer = execFileSync(O, ["crl", "-in", "/tmp/root-crl-new.pem", "-outform", "DER"]);
 	check("inbox: a newer valid root CRL is adopted and published", fs.readFileSync(`${PUB}/root-ca.crl`).equals(newDer));
 	check("  ... and the combined CRL carries it second", fs.readFileSync(`${PUB}/hybrid-combined-crl.pem`, "utf8").endsWith(fs.readFileSync("/tmp/root-crl-new.pem", "utf8")));
+	// Each of the two "newer" rules on its own.
+	const rootNum = fs.readFileSync(`${ROOT}/db/crlnumber`, "utf8");
+	fs.writeFileSync(`${ROOT}/db/crlnumber`, "1000\n");      // number rolled back, lastUpdate now (later)
+	rootCrl("/tmp/root-crl-lower-number.pem");
+	fs.writeFileSync(`${ROOT}/db/crlnumber`, rootNum);
+	toInbox("/tmp/root-crl-lower-number.pem"); rej0 = (await metrics()).m.pqc_ca_root_crl_rejected_total;
+	await req("POST", "/revoke", { serialNumber: await issue("r5") });
+	m = (await metrics()).m;
+	check("inbox: a later lastUpdate does not help a LOWER CRL number: refused", m.pqc_ca_root_crl_rejected_total > rej0 && fs.readFileSync(`${PUB}/root-ca.crl`).equals(newDer) && /not above/.test(logs), m.pqc_ca_root_crl_rejected_total);
+	rootCrl("/tmp/root-crl-old-lastupdate.pem", ["-crl_lastupdate", "20200101000000Z", "-crl_nextupdate", "20991231000000Z"]);
+	toInbox("/tmp/root-crl-old-lastupdate.pem"); rej0 = (await metrics()).m.pqc_ca_root_crl_rejected_total;
+	await req("POST", "/revoke", { serialNumber: await issue("r6") });
+	m = (await metrics()).m;
+	check("inbox: a higher number does not help an OLDER lastUpdate: refused", m.pqc_ca_root_crl_rejected_total > rej0 && fs.readFileSync(`${PUB}/root-ca.crl`).equals(newDer) && /lastUpdate is not later/.test(logs), m.pqc_ca_root_crl_rejected_total);
 	toInbox("/tmp/root-crl-initial.pem"); rej0 = (await metrics()).m.pqc_ca_root_crl_rejected_total;
 	await req("POST", "/revoke", { serialNumber: await issue("r4") });
 	m = (await metrics()).m;
@@ -232,6 +259,9 @@ function itemUnitPasses() {
 	check("CRL fails after the revocation is recorded: 202, crl pending", r.status === 202 && r.j.crl === "pending" && r.j.ok === true, `${r.status} ${r.raw}`);
 	check("  ... pending metric 1, failure counted", m.pqc_ca_crl_pending === 1 && m.pqc_ca_crl_issue_failures_total >= 1, JSON.stringify(m));
 	check("  ... and the serial is in no published CRL yet", !serialsIn(`${PUB}/hybrid-combined-crl.pem`).has(serial));
+	check("  ... but the OCSP snapshot already says R and OCSP answers revoked (snapshot after every index change)", statusRow(serial) === "R" && ocspSafe(serial) === "revoked", `${statusRow(serial)} ${ocspSafe(serial)}`);
+	r = await req("POST", "/crl/issue");
+	check("  ... POST /crl/issue while the CRL fails: 503 crl_failed (retryable), not 500", r.status === 503 && r.j.error === "crl_failed", `${r.status} ${r.j.error}`);
 	fs.rmSync(FAILFLAG);
 	let published = false;
 	for (let i = 0; i < 40 && !published; i++) { await sleep(250); published = serialsIn(`${PUB}/hybrid-combined-crl.pem`).has(serial); }
@@ -254,6 +284,56 @@ function itemUnitPasses() {
 	const ns = crlNumber(`${PUB}/hybrid-combined-crl.pem`);
 	await sleep(5500);
 	check("schedule: a new CRL without any revocation once it falls due", crlNumber(`${PUB}/hybrid-combined-crl.pem`) > ns, `${ns} -> ${crlNumber(`${PUB}/hybrid-combined-crl.pem`)}`);
+	await stop();
+
+	// --------------------------------------------- revoke deadline (review 3)
+	s = await start({ ...CRL_ENV, CUSTODIAN_TEST_FAULT: `crl-delay:${FAILFLAG}`, REVOKE_CRL_DEADLINE_MS: "1500" });
+	serial = await issue("slow");
+	fs.writeFileSync(FAILFLAG, "");
+	let t1 = Date.now();
+	r = await req("POST", "/revoke", { serialNumber: serial });
+	const took = Date.now() - t1;
+	check("a CRL pass that hangs: revoke answers 202 pending at its deadline, not a timeout", r.status === 202 && r.j.crl === "pending" && took >= 1400 && took < 4000, `${r.status} ${took} ms`);
+	check("  ... OCSP already answers revoked", ocspSafe(serial) === "revoked", ocspSafe(serial));
+	fs.rmSync(FAILFLAG);
+	let late = false;
+	for (let i = 0; i < 40 && !late; i++) { await sleep(250); late = serialsIn(`${PUB}/hybrid-combined-crl.pem`).has(serial); }
+	check("  ... the pass that was running publishes it once it completes", late);
+	await stop();
+
+	// ------------------------------------------ backoff cap (review 7)
+	s = await start({ ...CRL_ENV, CUSTODIAN_TEST_FAULT: `crl-fail:${FAILFLAG}`, CRL_RETRY_MAX_MS: "2000" });
+	serial = await issue("backoff");
+	fs.writeFileSync(FAILFLAG, "");
+	await req("POST", "/revoke", { serialNumber: serial });
+	await sleep(8000);
+	const delays = [...logs.matchAll(/CRL retry in (\d+) ms/g)].map(x => Number(x[1]));
+	check("retry backoff doubles from 1 s and stops at its cap (here 2 s; 60 s by default)", delays[0] === 1000 && delays.includes(2000) && Math.max(...delays) === 2000 && delays.length >= 4, delays.join(","));
+	fs.rmSync(FAILFLAG);
+	await stop();
+
+	// ------------------------------------ overdue exit (review 7)
+	s = await start({ ...CRL_ENV, CUSTODIAN_TEST_FAULT: `crl-fail:${FAILFLAG}`, CRL_REISSUE_AFTER_S: "2", CRL_OVERDUE_EXIT_S: "2" });
+	fs.writeFileSync(FAILFLAG, "");
+	const exitCode = await new Promise(resolve => { const p0 = proc; p0.on("exit", code => resolve(code)); setTimeout(() => resolve("still running"), 15000); });
+	proc = null;
+	check("no CRL for longer than CRL_OVERDUE_EXIT_S past schedule: the custodian exits 1 (the restart policy acts)", exitCode === 1 && /exiting so the restart policy acts/.test(logs), exitCode);
+	fs.rmSync(FAILFLAG);
+
+	// ------------------------------- CRL number never goes back (review 7)
+	const cn = fs.readFileSync(`${INT}/db/crlnumber`, "utf8");
+	fs.writeFileSync(`${INT}/db/crlnumber`, "1000\n");   // rolled back below what was published
+	s = await start(CRL_ENV, { expectExit: true });
+	check("crlnumber rolled back below the published CRL: the pass refuses it, the custodian exits 1", s.exitCode === 1 && /is not above the last published/.test(logs), s.exitCode);
+	fs.writeFileSync(`${INT}/db/crlnumber`, cn);
+
+	// ------------------------------- /metrics before the first pass (LOW)
+	fs.writeFileSync(FAILFLAG, "");
+	proc = spawn("setpriv", ["--reuid=1001", "--regid=1001", "--clear-groups", "node", CUST], { env: { ...BASE_ENV, ...CRL_ENV, CUSTODIAN_TEST_FAULT: `crl-delay:${FAILFLAG}` } });
+	let early = null;
+	for (let i = 0; i < 50 && !early; i++) { await sleep(100); try { const x = await metrics(); if (x.status === 200) early = x.m; } catch { /* not listening yet */ } }
+	check("/metrics before the first CRL: no time gauges (never a misleading 0)", early && early.pqc_ca_crl_last_issued_timestamp_seconds === undefined && early.pqc_ca_crl_next_update_seconds === undefined && early.pqc_ca_crl_issue_failures_total === 0, JSON.stringify(early));
+	fs.rmSync(FAILFLAG);
 	await stop();
 
 	// ----------------------------------------- start-up failure fails closed
