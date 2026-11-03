@@ -809,7 +809,11 @@ async function handleRevoke(res, payload) {
 		// retry finishes the job (OCSP snapshot, CRL pass) like a new revoke.
 		let published = false;
 		try {
-			published = (fs.existsSync(INT_CRL) && (await crlSerials(INT_CRL)).has(serial.toUpperCase()));
+			// The PUBLISHED combined CRL (its first block is the intermediate's):
+			// INT_CRL is written before the publish steps, so it can list a
+			// serial no reader has seen yet.
+			const pub = path.join(CRL_PUBLIC_DIR, "hybrid-combined-crl.pem");
+			published = fs.existsSync(pub) && (await crlSerials(pub)).has(serial.toUpperCase());
 		} catch (err) {
 			log("ERROR", `Cannot read ${INT_CRL} to tell whether ${serial} is published: ${err.message}`);
 		}
@@ -926,7 +930,15 @@ async function ossl(args) {
 // {number: BigInt, lastUpdate: ms, nextUpdate: ms} of a PEM CRL, after checking
 // its signature against issuerCert. Throws on any failure.
 async function inspectCrl(file, issuerCert) {
-	const v = await ossl(["crl", "-in", file, "-noout", "-CAfile", issuerCert]);
+	let v;
+	try {
+		v = await ossl(["crl", "-in", file, "-noout", "-CAfile", issuerCert]);
+	} catch (err) {
+		// OpenSSL 3 exits 1 when the signature does not verify: the file is at
+		// fault and will not get better (final), unlike an openssl run that failed.
+		if (/verify fail/i.test(`${err.stdout || ""}\n${err.stderr || ""}`)) throw refusal(`${path.basename(file)}: signature not verified`, true);
+		throw err;
+	}
 	if (!/verify OK/.test(`${v.stdout}\n${v.stderr}`)) throw refusal(`${path.basename(file)}: signature not verified`, true);
 	const { stdout } = await ossl(["crl", "-in", file, "-noout", "-crlnumber", "-lastupdate", "-nextupdate", "-dateopt", "iso_8601"]);
 	const num = /crlNumber=0x([0-9A-Fa-f]+)/.exec(stdout);
@@ -937,8 +949,12 @@ async function inspectCrl(file, issuerCert) {
 	return { number: BigInt(`0x${num[1]}`), lastUpdate: t(last[1]), nextUpdate: t(next[1]) };
 }
 
-// The revoked serials of a PEM CRL (upper-case hex). A CRL must never drop one
-// its predecessor listed (RFC 5280 5.2.3, 3.3: a revocation is final).
+// The revoked serials of a PEM CRL (upper-case hex). The custodian refuses a
+// CRL that drops one its predecessor listed. RFC 5280 (3.3, 5.3) would allow
+// removing an entry once the certificate has expired and one regularly
+// scheduled CRL after that has still listed it; this CA never prunes (openssl
+// ca keeps every R row), so any drop is an error, and a root CRL that prunes
+// is refused too (ADR-024 §2).
 async function crlSerials(file) {
 	const { stdout } = await ossl(["crl", "-in", file, "-noout", "-text"]);
 	return new Set([...stdout.matchAll(/^\s*Serial Number:\s*([0-9A-Fa-f]+)\s*$/gm)].map(m => m[1].toUpperCase()));
@@ -1078,8 +1094,13 @@ async function adoptInboxRootCrl() {
 					if (o.number <= c.number) throw refusal(`CRL number ${o.number} is not above the published ${c.number}`, true);
 					// The CRL number orders CRLs (RFC 5280 5.2.3). lastUpdate has one-second
 					// resolution, so two root CRLs issued in the same second tie; only an
-					// EARLIER lastUpdate is refused.
-					if (o.lastUpdate < c.lastUpdate) throw refusal(`its lastUpdate ${new Date(o.lastUpdate).toISOString()} is earlier than the published one's ${new Date(c.lastUpdate).toISOString()}`, true);
+					// EARLIER lastUpdate is refused. Except against a published root CRL
+					// dated in the future (published before that was refused, or by hand):
+					// it is not valid, nginx refuses every client while it is published, and
+					// its correction necessarily has an earlier lastUpdate.
+					const currentFuture = c.lastUpdate > now;
+					if (currentFuture) log("WARN", `The published root CRL is dated in the future (${new Date(c.lastUpdate).toISOString()}): a valid, higher-numbered one replaces it`);
+					if (!currentFuture && o.lastUpdate < c.lastUpdate) throw refusal(`its lastUpdate ${new Date(o.lastUpdate).toISOString()} is earlier than the published one's ${new Date(c.lastUpdate).toISOString()}`, true);
 					const gone = droppedSerials(await crlSerials(copy), await crlSerials(cur));
 					if (gone.length) throw refusal(`it drops revoked serial(s) ${gone.join(" ")} that the published root CRL lists`, true);
 				});

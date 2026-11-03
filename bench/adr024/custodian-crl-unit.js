@@ -205,6 +205,7 @@ function itemUnitPasses() {
 	await req("POST", "/revoke", { serialNumber: await issue("r1") });
 	m = (await metrics()).m;
 	check("inbox: a CRL not signed by the root is refused, published root CRL unchanged", m.pqc_ca_root_crl_rejected_total > rej0 && fs.readFileSync(`${PUB}/root-ca.crl`).equals(rootNow), m.pqc_ca_root_crl_rejected_total);
+	check("L4: ... and refused as final (signature not verified), not logged as a transient openssl failure", /Refused root CRL in \S+: \S+: signature not verified/.test(logs));
 	rootCrl("/tmp/root-crl-expired.pem", ["-crl_lastupdate", "20200101000000Z", "-crl_nextupdate", "20200102000000Z"]);
 	toInbox("/tmp/root-crl-expired.pem"); rej0 = m.pqc_ca_root_crl_rejected_total;
 	await req("POST", "/revoke", { serialNumber: await issue("r2") });
@@ -479,7 +480,7 @@ exec ${O} "$@"
 case " $* " in
   *" -revoke "*) if [ -e /tmp/revoke-hang ]; then ${O} "$@"; exec sleep 600; fi ;;
   *" -gencrl "*) [ -e /tmp/future-crl ] && exec ${O} "$@" -crl_lastupdate 20991231000000Z -crl_nextupdate 21000107000000Z ;;
-  *" -CAfile ${STATE}/certs/root-ca.crt "*) [ -e /tmp/root-verify-fail ] && { echo "forced root CRL verify failure" >&2; exit 1; } ;;
+  *" -CAfile ${STATE}/certs/root-ca.crt "*) [ -e /tmp/root-verify-fail ] && { echo "forced transient openssl failure (could not load)" >&2; exit 1; } ;;
 esac
 exec ${O} "$@"
 `, { mode: 0o755 });
@@ -580,6 +581,14 @@ exec ${O} "$@"
 
 	check("7-5: the intermediate CRL file left replaced by 7-4 is not taken as the baseline of revoked serials (said), the pass publishes", s.exitCode === null && /not a verifiable intermediate CRL/.test(logs) && r.status === 200);
 
+	// L3: a 409 is decided from the PUBLISHED combined CRL, not from INT_CRL
+	const pubBefore3 = fs.readFileSync(HYB2);
+	const l3 = await issue("l3");
+	await req("POST", "/revoke", { serialNumber: l3 });
+	fs.writeFileSync(HYB2, pubBefore3);   // as if publishing had stopped after INT_CRL was written
+	r = await req("POST", "/revoke", { serialNumber: l3 });
+	check("L3: revoked in the index and in INT_CRL but not in the published combined CRL: the retry publishes it, no 409", (r.status === 200 || r.status === 202) && serialsIn(HYB2).has(l3), `${r.status} ${JSON.stringify(r.j)}`);
+
 	// 9-8: ocsp-pq answers only for what the intermediate issued
 	// (Only the status is read: a response by the intermediate's responder about
 	// a root-issued certificate cannot verify, and that is not the point here.)
@@ -641,6 +650,16 @@ exec ${O} "$@"
 	const wantSig = b.body ? "sha256=" + mac(`v2r\n${b.status}\n${B.nonce}\n${sha(b.body)}`) : "none";
 	check("9-9: a request read while the custodian stops: 503 stopping, signed and bound to its nonce", b.status === 503 && /"stopping"/.test(String(b.body)) && b.sig === wantSig, `${parsed.length} answers; B ${b.status} sig=${b.sig ? (b.sig === wantSig ? "valid" : "WRONG") : "none"}`);
 	await waitExit();
+
+	// L5: a published root CRL dated in the future is replaced by a valid, higher-numbered one
+	rootCrl("/tmp/root-crl-future2.pem", ["-crl_lastupdate", "20991231000000Z", "-crl_nextupdate", "21000107000000Z"]);
+	fs.copyFileSync("/tmp/root-crl-future2.pem", `${STATE}/crl/root-ca.crl`);   // published by hand, or before 7-1
+	fs.chownSync(`${STATE}/crl/root-ca.crl`, 1003, 1003);
+	rootCrl("/tmp/root-crl-fixed2.pem");
+	toInbox("/tmp/root-crl-fixed2.pem");
+	s = await start(CRL_ENV);
+	check("L5: a published root CRL dated in the future: the corrected one in the inbox replaces it at start, the custodian starts", s.exitCode === null && fs.readFileSync(`${STATE}/crl/root-ca.crl`).equals(fs.readFileSync("/tmp/root-crl-fixed2.pem")), s.exitCode);
+	if (s.exitCode === null) await stop();
 
 	// ----------------------------------------- start-up failure fails closed
 	fs.writeFileSync(FAILFLAG, "");
