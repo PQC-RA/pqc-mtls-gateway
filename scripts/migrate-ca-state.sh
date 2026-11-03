@@ -32,18 +32,26 @@
 #                                              nothing is un-revoked and no CRL
 #                                              number reused, and only then
 #                                              rename it into place and set the
-#                                              new layout aside
+#                                              new layout aside. Refused if the
+#                                              old tree changed since forward
+#                                              (then: abort)
+#   migrate-ca-state.sh abort [--from DIR]     before the readers moved: set the
+#                                              new layout aside, $FROM untouched,
+#                                              and go on with the old system
 #
 # DIR defaults to /etc/pki/pqc-ca. Run as root on the host, with the custodian
-# and the CRL renewer stopped: forward and reverse refuse otherwise, and every
-# subcommand that touches the new state takes the custodian's writer lock.
+# and the CRL renewer stopped: forward, reverse and abort refuse otherwise (and
+# when docker cannot be asked), and hold the old system's db/.ca-db.lock and
+# the custodian's writer lock. retire only renames under DIR and takes neither.
+# No symbolic link is followed out of a tree an unprivileged writer owns.
 # Nothing is deleted. What is replaced is renamed with a timestamp.
 #
 # The ADR-024 runbook: issue a fresh CRL N with the old system; stop
 # management-api, the renewer and the custodian; forward; start ONLY the new
 # custodian (it issues CRL N+1); check-next; only then move the readers;
-# retire. Rollback at any point after forward: stop the new
-# containers; reverse; start the old ones.
+# retire. If check-next fails: stop the custodian; abort; start the old
+# system. Rollback after the readers moved: stop the new containers; reverse;
+# start the old ones.
 set -euo pipefail
 
 HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -76,9 +84,19 @@ INT="$FROM/intermediate"
 [ "$(id -u)" = 0 ] || die "run as root"
 
 # --- guards -------------------------------------------------------------------
+# Fails closed: a docker that cannot be asked (daemon down, no permission) is
+# not "not running". Only a host with no docker client at all has no
+# containers to ask about.
 container_running() {
+    local out
     command -v docker >/dev/null 2>&1 || return 1
-    [ "$(docker inspect -f '{{.State.Running}}' "$1" 2>/dev/null)" = true ]
+    if out=$(docker inspect -f '{{.State.Running}}' "$1" 2>&1); then
+        [ "$out" = true ]
+    elif printf '%s' "$out" | grep -qi 'no such object\|no such container'; then
+        return 1
+    else
+        die "cannot ask docker whether $1 is running ($out); refusing"
+    fi
 }
 refuse_if_writers_run() {
     local c
@@ -91,6 +109,31 @@ refuse_if_writers_run() {
 take_writer_lock() {
     [ -d "$CA_STATE_DIR" ] || return 0
     ca_take_writer_lock || die "the custodian holds $CA_WRITER_LOCK: it is running against $CA_STATE_DIR"
+}
+# The OLD system's lock (pre-ADR-024: the custodian and the CRL renewer flock
+# db/.ca-db.lock around every openssl ca): held here, on fd 8, so nothing of
+# the old system writes the old tree while it is copied or restored.
+take_old_lock() { # take_old_lock DBDIR
+    local f="$1/.ca-db.lock"
+    [ -d "$1" ] || return 0
+    [ ! -L "$f" ] || die "$f is a symbolic link; refusing"
+    [ -e "$f" ] || install -m 0644 -o "$APP_UID" -g "$APP_GID" /dev/null "$f"
+    exec 8>>"$f"
+    flock -n 8 || die "the old system holds $f (a custodian or CRL renewer of the previous release is running)"
+}
+# Root reads trees an unprivileged custodian could write: links there are
+# refused before anything is read (ca_regular_tree, scripts/lib/ca-layout.sh).
+require_regular() {
+    ca_regular_tree "$@" || die "refusing to copy across the trust boundary (see above)"
+}
+# After a forward: no private key anywhere in the new layout but where keys
+# belong (the custodian's key directory, the OCSP key directory).
+assert_no_stray_keys() {
+    local hits
+    hits=$(find "$CA_STATE_DIR" "$CA_INBOX_DIR" "$CA_PUBLIC_DIR" "$CA_STATUS_DIR" "$TRUST_DIR" -type f -print0 \
+        | xargs -0 -r sh -c 'grep -lE "^-----BEGIN ([A-Z0-9-]+ )*PRIVATE KEY-----" -- "$@"; [ $? -le 1 ]' sh) \
+        || die "could not scan the new layout for private keys"
+    [ -z "$hits" ] || die "a private key outside $CA_KEY_DIR and $OCSP_KEY_DIR: $(echo "$hits" | tr '\n' ' ')(set this layout aside with abort, and find out how it got into $FROM)"
 }
 
 # --- helpers ------------------------------------------------------------------
@@ -128,7 +171,10 @@ verify_manifest() {
 # --- forward ------------------------------------------------------------------
 forward() {
     refuse_if_writers_run
+    take_old_lock "$INT/db"
     say "checking the source tree $FROM"
+    require_regular "$INT" "$FROM/root/certs" "$FROM/root/crl" "$FROM/ocsp" \
+        "$FROM/internal-tls-ca.crt" "$FROM/internal-tls-ca-mldsa.crt" "$FROM/internal-tls-ca-rsa.crt"
     local f
     for f in "$INT/openssl-intermediate.cnf" "$INT/db/index.txt" "$INT/db/index.txt.attr" \
              "$INT/db/serial" "$INT/db/crlnumber" "$INT/certs/intermediate-ca.crt" \
@@ -141,7 +187,7 @@ forward() {
     crl_verify "$INT/crl/intermediate-ca.crl" "$INT/certs/intermediate-ca.crt" || die "intermediate CRL does not verify"
     crl_verify "$FROM/root/crl/root-ca.crl" "$FROM/root/certs/root-ca.crt" || die "root CRL does not verify"
     for f in "$CA_KEY_DIR" "$CA_STATE_DIR" "$CA_INBOX_DIR" "$CA_PUBLIC_DIR" "$CA_STATUS_DIR" "$OCSP_KEY_DIR"; do
-        [ ! -d "$f" ] || [ -z "$(ls -A "$f")" ] || die "$f is not empty; a forward has been done already (reverse first)"
+        [ ! -d "$f" ] || [ -z "$(ls -A "$f")" ] || die "$f is not empty; a forward has been done already (reverse, or abort if the readers never moved)"
     done
     # The internal TLS trust file: in the old tree on a running deployment
     # (copied below), or already in $TRUST_DIR on a bootstrap by this release.
@@ -200,6 +246,7 @@ forward() {
 
     say "verifying"
     verify_manifest || die "a copy does not match its source"
+    assert_no_stray_keys
     local a b
     for f in index.txt serial crlnumber; do
         a=$(wc -l < "$INT/db/$f"); b=$(wc -l < "$CA_STATE_DIR/db/$f")
@@ -269,6 +316,40 @@ retire() {
 # the same filesystem: a failed check leaves $FROM exactly as it was.
 newest() { find "$FROM" -maxdepth 1 -name "$1" -type d | sort | tail -1; }
 revoked_in_index() { awk -F'\t' '$1 == "R" { print $4 }' "$1" | sort -u; }
+serials_in_index() { awk -F'\t' 'NF >= 4 { print $4 }' "$1" | sort -u; }
+# hex_max HEX...: the largest, upper case, an even number of digits (the form
+# openssl ca writes serial and crlnumber in). Compared as strings, so no limit
+# on length.
+hex_max() {
+    local h best="" n
+    for h in "$@"; do
+        [ -n "$h" ] || continue
+        n=$(printf '%s' "$h" | tr 'a-f' 'A-F' | sed 's/^0*//'); n=${n:-0}
+        if [ -z "$best" ] || [ "${#n}" -gt "${#best}" ] || { [ "${#n}" -eq "${#best}" ] && [[ "$n" > "$best" ]]; }; then best=$n; fi
+    done
+    [ $(( ${#best} % 2 )) = 0 ] || best="0$best"
+    printf '%s' "$best"
+}
+hex_inc() { printf '%X' $(( 16#$1 + 1 )); }
+# sources_unchanged [RETIRED]: every file forward copied is, in the old tree,
+# still the file it copied (looked for where retire renamed it, if it did).
+sources_unchanged() {
+    local want dst src f bad=0
+    while read -r want dst src; do
+        case "$src" in *"(paths rewritten)"*) continue ;; esac
+        f=$src
+        if [ ! -e "$f" ]; then
+            case "$f" in
+                "$INT"/*) [ -n "$1" ] && f="$1/${f#"$INT"/}" ;;
+                "$FROM"/ocsp/*) f="$(newest "ocsp.migrated-*")/${f#"$FROM"/ocsp/}" ;;
+                "$FROM"/*) f="$(newest "public.migrated-*")/${f#"$FROM"/}" ;;
+            esac
+        fi
+        if [ ! -f "$f" ]; then echo "  GONE    $src"; bad=1
+        elif [ "$(sha256sum < "$f" | cut -d' ' -f1)" != "$want" ]; then echo "  CHANGED $src"; bad=1; fi
+    done < "$MANIFEST"
+    [ "$bad" = 0 ]
+}
 reverse() {
     refuse_if_writers_run
     take_writer_lock
@@ -281,6 +362,12 @@ reverse() {
         [ -n "$retired" ] || die "$INT is missing and no retired copy exists"
         src=$retired
     fi
+    take_old_lock "$src/db"
+    require_regular "$src" "$CA_STATE_DIR" "$CA_PUBLIC_DIR" "$TRUST_DIR" "$FROM/root/crl"
+    # The old tree must be as forward left it. If the old system ran on after
+    # forward (an abort that went back to it), this layout is stale: restoring
+    # it would reuse a CRL number, move serial back and lose issued rows.
+    sources_unchanged "$retired" || die "the old tree changed since forward (above): the old system has moved on, so this layout is stale. Set it aside with '$0 abort' (nothing in $FROM changes), not reverse"
     STAGE=$(mktemp -d "$FROM/.reverse-staging-XXXXXX")
     trap 'rm -rf -- "$STAGE"' EXIT
     local S="$STAGE/intermediate"
@@ -296,6 +383,12 @@ reverse() {
         install -m 0644 -o "$APP_UID" -g "$APP_GID" "$f" "$S/issued/$(basename "$f")"
     done
     install -m 0644 -o 0 -g 0 "$CA_STATE_DIR/crl/intermediate-ca.crl" "$S/crl/intermediate-ca.crl"
+    # No counter moves backwards: the larger of the custodian's and the old
+    # tree's, and the CRL number above every CRL either side has published.
+    printf '%s\n' "$(hex_max "$(tr -d '\n' < "$S/db/crlnumber")" "$(tr -d '\n' < "$src/db/crlnumber")" \
+        "$(hex_inc "$(crl_number "$src/crl/intermediate-ca.crl")")" \
+        "$(hex_inc "$(crl_number "$CA_STATE_DIR/crl/intermediate-ca.crl")")")" > "$S/db/crlnumber"
+    printf '%s\n' "$(hex_max "$(tr -d '\n' < "$S/db/serial")" "$(tr -d '\n' < "$src/db/serial")")" > "$S/db/serial"
     # The gateway's CRL files: the latest the custodian published, so a
     # gateway started on the old tree has every revocation from its first read.
     mkdir "$STAGE/public"
@@ -329,6 +422,8 @@ reverse() {
     hex_gt "$next" "$published" || die "crlnumber $next is not above the last published $published: the next CRL would reuse a number"
     missing=$(comm -23 <(revoked_in_index "$src/db/index.txt") <(revoked_in_index "$S/db/index.txt"))
     [ -z "$missing" ] || die "revoked in the old index but not in the custodian's: $missing (rolling back would un-revoke them)"
+    missing=$(comm -23 <(serials_in_index "$src/db/index.txt") <(serials_in_index "$S/db/index.txt"))
+    [ -z "$missing" ] || die "in the old index but not in the custodian's: $(echo "$missing" | tr '\n' ' ')(rolling back would lose them, and a serial could be issued twice)"
     # The combined CRL the gateway reads after the rollback.
     comb="$STAGE/public/hybrid-combined-crl.pem"
     [ -f "$comb" ] || comb="$FROM/hybrid-combined-crl.pem"
@@ -391,11 +486,48 @@ reverse() {
     say "reverse done. Recreate the old containers (they mount the trust file by inode); the renewer's next CRL is number $next."
 }
 
+# --- abort --------------------------------------------------------------------
+# Before the readers moved (switch step 5): go back to the old system and set
+# the new layout aside, without touching $FROM. The old system then keeps
+# operating; a later forward starts from scratch. Refused once the readers may
+# have moved ($INT retired) or once the custodian has issued or revoked in the
+# new layout (those rows exist nowhere else: reverse carries them back).
+abort() {
+    refuse_if_writers_run
+    take_writer_lock
+    [ -d "$CA_STATE_DIR" ] || die "no new layout at $CA_STATE_DIR"
+    [ -d "$INT" ] || die "$INT is retired, so the readers may have moved: roll back with reverse, not abort"
+    [ -f "$MANIFEST" ] || die "no manifest at $MANIFEST; this layout was not made by forward"
+    local f want
+    for f in index.txt serial; do
+        want=$(awk -v d="$CA_STATE_DIR/db/$f" '$2 == d { print $1 }' "$MANIFEST")
+        [ "$(sha256sum < "$CA_STATE_DIR/db/$f" | cut -d' ' -f1)" = "$want" ] \
+            || die "the custodian has issued or revoked in the new layout ($CA_STATE_DIR/db/$f changed since forward): abort would lose that; roll back with reverse"
+    done
+    say "setting the unused new layout aside (renamed, not deleted); nothing in $FROM changes"
+    if [ -f "$CA_STATE_DIR/crl/intermediate-ca.crl" ]; then
+        echo "    its last intermediate CRL, number $(crl_number "$CA_STATE_DIR/crl/intermediate-ca.crl"), was never read by the gateway (it reads $FROM until the switch)"
+    fi
+    exec 9>&-
+    for f in "$CA_ROOT" "$CA_PUBLIC_DIR" "$CA_STATUS_DIR" "$OCSP_KEY_DIR"; do
+        if [ -d "$f" ]; then mv "$f" "$f.aborted-$TS"; fi
+    done
+    # The trust directory only if forward filled it (on a bootstrap it was there already).
+    if [ -d "$TRUST_DIR" ] && grep -q "  $TRUST_DIR/" "$CA_ROOT.aborted-$TS/migration.manifest"; then
+        mv "$TRUST_DIR" "$TRUST_DIR.aborted-$TS"
+    fi
+    echo "    $CA_ROOT.aborted-$TS holds a copy of the intermediate key: destroy it when no longer needed, and record that."
+    say "abort done. Start the old containers; the old system goes on from where it is."
+}
+
 case "$cmd" in
     forward) forward ;;
     verify)  take_writer_lock; say "verifying the copies"; verify_manifest || die "the copies do not match the manifest" ;;
-    retire)  take_writer_lock; retire ;;
+    # Only renames under $FROM, and runs while the custodian runs (it holds
+    # the writer lock for its whole life), so it takes no lock.
+    retire)  retire ;;
     check-next) check_next ;;
     reverse) reverse ;;
-    *) sed -n '2,37p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+    abort)   abort ;;
+    *) sed -n '2,47p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
 esac

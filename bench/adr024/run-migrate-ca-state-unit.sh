@@ -54,6 +54,30 @@ TRUST=/etc/pki/pqc-trust
 ( cd /tmp/r && PKI_DIR=$P SSL_DIR=/etc/ssl/pqc SERVER_IP=127.0.0.1 ./scripts/setup-pki.sh ) > /tmp/rerun.log 2>&1; rc=$?
 check "setup-pki.sh re-run on a pre-ADR-024 deployment: exit 0, the tree unchanged, no trust directory made" "[ $rc = 0 ] && [ \"$(treehash $P)\" = \"$BEFORE\" ] && [ ! -e $TRUST ] && grep -q \"internal TLS left as it is\" /tmp/rerun.log" || tail -8 /tmp/rerun.log
 
+# --- 8-5: the guards fail closed --------------------------------------------------
+mkdir -p /tmp/fakebin
+printf "#!/bin/sh\necho \"Cannot connect to the Docker daemon at unix:///var/run/docker.sock\" >&2\nexit 1\n" > /tmp/fakebin/docker
+chmod +x /tmp/fakebin/docker
+PATH=/tmp/fakebin:$PATH $M forward > /tmp/dock.log 2>&1; rc=$?
+check "8-5: forward refuses when docker cannot be asked whether the writers run" "[ $rc != 0 ] && grep -q \"cannot ask docker\" /tmp/dock.log"
+( flock -x 9; sleep 4 ) 9>>$INT/db/.ca-db.lock & sleep 0.5
+$M forward > /tmp/oldlock.log 2>&1; rc=$?
+check "8-5: forward refuses while the old system holds its db/.ca-db.lock" "[ $rc != 0 ] && grep -q \"the old system holds\" /tmp/oldlock.log"
+wait
+
+# --- 8-1: nothing is followed out of the old tree ---------------------------------
+. /tmp/r/scripts/lib/ca-layout.sh
+ln -s $P/root/private/root-ca.key $INT/issued/evil.pem
+$M forward > /tmp/sym.log 2>&1; rc=$?
+check "8-1: forward refuses a symbolic link in the old tree (issued/evil.pem to the root key) and copies nothing" "[ $rc != 0 ] && grep -q \"not a regular file or directory: $INT/issued/evil.pem\" /tmp/sym.log && { [ ! -e $CA_ROOT ] || [ -z \"\$(find $CA_ROOT -type f)\" ]; }" || tail -3 /tmp/sym.log
+rm $INT/issued/evil.pem
+cp $P/root/private/root-ca.key $INT/issued/evil.pem
+$M forward > /tmp/key.log 2>&1; rc=$?
+check "8-1: forward stops when a private key would land outside the key directories, and names it" "[ $rc != 0 ] && grep -q \"a private key outside\" /tmp/key.log && grep -q $CA_STATE_DIR/issued/evil.pem /tmp/key.log" || tail -3 /tmp/key.log
+$M abort > /tmp/abort0.log 2>&1; rc=$?
+rm $INT/issued/evil.pem
+check "8-2: abort sets that layout aside (the trust directory too) and the old tree is as it was" "[ $rc = 0 ] && [ ! -e $CA_ROOT ] && ls -d $CA_ROOT.aborted-* >/dev/null && [ ! -e $TRUST ] && [ \"$(treehash $P)\" = \"$BEFORE\" ]" || tail -5 /tmp/abort0.log
+
 # --- forward -----------------------------------------------------------------
 $M forward > /tmp/fwd.log 2>&1; rc=$?
 check "forward succeeds" "[ $rc = 0 ]" || tail -5 /tmp/fwd.log
@@ -77,6 +101,15 @@ F=$(ls $CA_STATE_DIR/issued/* | head -1); cp -p $F /tmp/keep; echo tamper >> $F
 $M verify > /tmp/v2.log 2>&1; rc=$?
 check "verify fails on a changed copy and names it" "[ $rc != 0 ] && grep -q \"CHANGED $F\" /tmp/v2.log"
 cp -p /tmp/keep $F
+
+# --- 8-4 and 8-1: the writer lock file ----------------------------------------------
+chown 0:0 $CA_WRITER_LOCK; chmod 644 $CA_WRITER_LOCK
+$M verify > /dev/null 2>&1
+check "8-4: a writer lock left root-owned 0644 is given back to the custodian (1003, 0600)" "[ \"$(stat -c %u:%a $CA_WRITER_LOCK)\" = 1003:600 ]"
+mv $CA_WRITER_LOCK /tmp/lock.keep; ln -s /tmp/lock-target $CA_WRITER_LOCK
+$M verify > /tmp/lsym.log 2>&1; rc=$?
+check "8-1: a symbolic link as the writer lock is refused, and what it points at is not created" "[ $rc != 0 ] && grep -q \"not a regular file\" /tmp/lsym.log && [ ! -e /tmp/lock-target ]"
+rm $CA_WRITER_LOCK; mv /tmp/lock.keep $CA_WRITER_LOCK
 
 # --- the custodian at work on the new layout, as uid 1003 -----------------------
 as_ca $O ca -config $CA_CNF_FILE -gencrl -out $CA_STATE_DIR/crl/intermediate-ca.crl 2>/dev/null
@@ -111,8 +144,11 @@ $M check-next > /tmp/cn.log 2>&1; rc=$?
 check "check-next refuses N+2 (it must be the first CRL of the custodian, N+1)" "[ $rc != 0 ] && grep -q \"expected 0x\" /tmp/cn.log"
 
 # --- retire ---------------------------------------------------------------------
+# The custodian holds the writer lock for its whole life; retire runs beside it.
+( flock -x 9; sleep 4 ) 9>>$CA_WRITER_LOCK & sleep 0.5
 $M retire > /tmp/ret.log 2>&1; rc=$?
-check "retire renames the old intermediate, ocsp and public files" "[ $rc = 0 ] && [ ! -d $INT ] && [ ! -d $P/ocsp ] && [ ! -f $P/hybrid-combined-crl.pem ] && ls -d $INT.migrated-* $P/ocsp.migrated-* $P/public.migrated-* >/dev/null"
+wait
+check "8-3: retire works while the custodian holds the writer lock, and renames the old intermediate, ocsp and public files" "[ $rc = 0 ] && [ ! -d $INT ] && [ ! -d $P/ocsp ] && [ ! -f $P/hybrid-combined-crl.pem ] && ls -d $INT.migrated-* $P/ocsp.migrated-* $P/public.migrated-* >/dev/null"
 check "the writer lock a host tool created belongs to the custodian (uid 1003), so it can still start" "[ \"$(stat -c %u $CA_WRITER_LOCK)\" = 1003 ]"
 check "retire keeps the host-only CAs where they are" "[ -f $P/root/private/root-ca.key ] && [ -f $P/internal-tls/internal-tls-ca.key ]"
 check "retire renames the old trust-file copies (the trust directory holds them now)" "[ ! -e $P/internal-tls-ca.crt ] && ls $P/public.migrated-*/internal-tls-ca.crt >/dev/null && [ -f $TRUST/internal-tls-ca.crt ]"
@@ -137,18 +173,30 @@ awk -F"\t" -v OFS="\t" -v s=$S1 "\$4==s{\$1=\"V\";\$3=\"\"}1" /tmp/keepidx > $CA
 $M reverse > /tmp/revu.log 2>&1; rc=$?
 check "reverse refuses a state index that would un-revoke $S1, and changes nothing" "[ $rc != 0 ] && grep -q \"un-revoke\" /tmp/revu.log && grep -q $S1 /tmp/revu.log && [ \"$(treehash $P)\" = \"$PB\" ]"
 cp -p /tmp/keepidx $CA_STATE_DIR/db/index.txt
+ln -s /etc/shadow $CA_STATE_DIR/issued/leak.pem
+$M reverse > /tmp/revs.log 2>&1; rc=$?
+rm $CA_STATE_DIR/issued/leak.pem
+check "8-1: reverse refuses a symbolic link in the custodian state, and changes nothing" "[ $rc != 0 ] && grep -q \"not a regular file or directory: $CA_STATE_DIR/issued/leak.pem\" /tmp/revs.log && [ \"$(treehash $P)\" = \"$PB\" ]" || tail -3 /tmp/revs.log
+awk -F"\t" -v s=$S3 "\$4!=s" /tmp/keepidx > $CA_STATE_DIR/db/index.txt
+$M reverse > /tmp/revr.log 2>&1; rc=$?
+cp -p /tmp/keepidx $CA_STATE_DIR/db/index.txt
+check "8-2: reverse refuses a state index that lost a row of the old one ($S3, valid), and changes nothing" "[ $rc != 0 ] && grep -q \"in the old index but not in the custodian\" /tmp/revr.log && [ \"$(treehash $P)\" = \"$PB\" ]" || tail -3 /tmp/revr.log
 
 # --- reverse --------------------------------------------------------------------
 # An ADR-022 switch after the cut-over changed the trust file: the ML-DSA-65 CA only.
 cp $TRUST/internal-tls-ca-mldsa.crt /tmp/trust-new.crt
 cat /tmp/trust-new.crt /tmp/trust-new.crt > $TRUST/internal-tls-ca.crt
 TRUST_NOW=$(sha256sum < $TRUST/internal-tls-ca.crt)
+# Counters lower than the old tree in the custodian state: reverse takes the larger.
+OS=$(cat "$(ls -d $INT.migrated-* | tail -1)/db/serial")
+echo 01 > $CA_STATE_DIR/db/serial; echo 01 > $CA_STATE_DIR/db/crlnumber
 $M reverse > /tmp/rev.log 2>&1; rc=$?
 check "reverse succeeds" "[ $rc = 0 ]" || tail -8 /tmp/rev.log
 check "the old tree is back in place" "[ -d $INT ] && [ -f $P/hybrid-combined-crl.pem ] && [ -d $P/ocsp ]"
 check "the revocation made in the new layout is in the old index" "grep -q \"^R.*	$S2	\" $INT/db/index.txt"
 check "the old combined CRL is the latest one: $S1 and $S2 revoked, intermediate first" "serials $P/hybrid-combined-crl.pem | grep -qx $S1 && serials $P/hybrid-combined-crl.pem | grep -qx $S2 && $O crl -in $P/hybrid-combined-crl.pem -noout -issuer | grep -q Intermediate"
 check "crlnumber was copied back: the next CRL is above $NC" "[ $((16#$(cat $INT/db/crlnumber))) -gt $((16#$NC)) ]"
+check "8-2: no counter moves backwards: serial at least the old tree own ($OS) although the custodian state said 01" "[ $((16#$(cat $INT/db/serial))) -ge $((16#$OS)) ]"
 check "the previous old tree is kept, renamed, and no staging is left" "ls -d $INT.pre-reverse-* >/dev/null && [ -z \"$(find $P -maxdepth 1 -name \".reverse-staging-*\")\" ]"
 check "the trust file as it is now is back where the previous release reads it; the trust directory set aside" "[ \"$(sha256sum < $P/internal-tls-ca.crt)\" = \"$TRUST_NOW\" ] && [ -f $P/internal-tls-ca-mldsa.crt ] && [ ! -e $TRUST ] && ls -d $TRUST.reversed-* >/dev/null"
 check "the new layout is set aside, not deleted" "[ ! -d $CA_ROOT ] && ls -d $CA_ROOT.reversed-* $CA_PUBLIC_DIR.reversed-* >/dev/null"
@@ -164,6 +212,19 @@ check "forward again after a reverse" "[ $rc = 0 ]" || tail -5 /tmp/fwd3.log
 as_ca $O ca -config $CA_CNF_FILE -gencrl -out $CA_STATE_DIR/crl/intermediate-ca.crl 2>/dev/null
 check "and the custodian'"'"'s next CRL is above the renewer'"'"'s $NR" "[ $((16#$(crlno $CA_STATE_DIR/crl/intermediate-ca.crl))) -gt $((16#$NR)) ]"
 check "every revocation survived the round trip" "serials $CA_STATE_DIR/crl/intermediate-ca.crl | grep -qx $S1 && serials $CA_STATE_DIR/crl/intermediate-ca.crl | grep -qx $S2"
+
+# --- 8-2: the old system ran on after forward: reverse refuses, abort works --------
+renewer
+$M reverse > /tmp/stale.log 2>&1; rc=$?
+check "8-2: after the old system ran on, reverse refuses the stale layout and points to abort" "[ $rc != 0 ] && grep -q \"changed since forward\" /tmp/stale.log && grep -q abort /tmp/stale.log" || tail -5 /tmp/stale.log
+cp -p $CA_STATE_DIR/db/index.txt /tmp/keepidx2
+printf "V\t301231000000Z\t\tFFFF01\tunknown\t/CN=unit-new\n" >> $CA_STATE_DIR/db/index.txt
+$M abort > /tmp/abort1.log 2>&1; rc=$?
+cp -p /tmp/keepidx2 $CA_STATE_DIR/db/index.txt
+check "8-2: abort refuses once the custodian issued in the new layout (that row exists nowhere else)" "[ $rc != 0 ] && grep -q \"has issued or revoked\" /tmp/abort1.log"
+PA=$(treehash $P)
+$M abort > /tmp/abort2.log 2>&1; rc=$?
+check "8-2: abort sets the unused layout aside and leaves the old tree as the old system left it" "[ $rc = 0 ] && [ ! -d $CA_ROOT ] && [ \"$(treehash $P)\" = \"$PA\" ]" || tail -5 /tmp/abort2.log
 
 echo "$PASS/$((PASS+FAIL)) passed"
 [ "$FAIL" = 0 ]'

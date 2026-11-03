@@ -105,10 +105,37 @@ CA_WRITER_LOCK="$CA_STATE_DIR/.writer.lock"
 
 # Takes the writer lock on fd 9 without waiting; returns 1 if the custodian
 # (or another host tool) holds it. The file belongs to the custodian: a host
-# tool running as root that created it would leave a file the custodian (uid
-# 1003) cannot open, and it would refuse to start.
+# tool running as root that created it, or a file left root-owned 0644, would
+# be one the custodian (uid 1003) cannot open, and it would refuse to start;
+# so the owner and mode are set whether the file is new or not. The state
+# directory is the custodian's, so a symbolic link here is refused outright:
+# root would otherwise open, create or chown whatever it points at.
 ca_take_writer_lock() {
+    if [ -L "$CA_WRITER_LOCK" ] || { [ -e "$CA_WRITER_LOCK" ] && [ ! -f "$CA_WRITER_LOCK" ]; }; then
+        echo "ERROR: $CA_WRITER_LOCK is not a regular file (a symbolic link?); refusing to use it" >&2
+        exit 1
+    fi
     [ -e "$CA_WRITER_LOCK" ] || install -m 0600 -o "$CA_UID" -g "$CA_GID" /dev/null "$CA_WRITER_LOCK"
+    chown "$CA_UID:$CA_GID" "$CA_WRITER_LOCK"
+    chmod 0600 "$CA_WRITER_LOCK"
     exec 9>>"$CA_WRITER_LOCK"
     flock -n 9
+}
+
+# ca_regular_tree PATH...: every entry under each PATH (and PATH itself) is a
+# regular file or a directory, never a symbolic link, device or socket.
+# Prints the offenders and returns 1 otherwise. Root reads CA state written
+# by an unprivileged custodian: following a link there would copy whatever it
+# points at (a CA key, any host file) across the trust boundary.
+ca_regular_tree() {
+    local p bad=""
+    for p in "$@"; do
+        [ -e "$p" ] || [ -L "$p" ] || continue
+        if [ -L "$p" ]; then bad="$bad $p"; continue; fi
+        bad="$bad $(find "$p" ! -type f ! -type d -print | tr '\n' ' ')"
+    done
+    bad=$(echo "$bad" | xargs)
+    [ -z "$bad" ] && return 0
+    echo "not a regular file or directory: $bad" >&2
+    return 1
 }

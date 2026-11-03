@@ -718,18 +718,21 @@ not, until step 5):
 3. Start **only** the custodian: `docker compose up -d --no-deps pqc-ca-custodian`. It publishes
    CRL N+1.
 4. `scripts/migrate-ca-state.sh check-next`: N+1 verifies, is numbered N+1, carries every serial of
-   N, is first in the combined CRL and runs 6 or more days. **If it fails, do not go on: roll
-   back.** A gateway started on a bad N+1 would un-revoke certificates (its revoked set starts
-   empty).
+   N, is first in the combined CRL and runs 6 or more days. **If it fails, do not go on:** stop
+   the custodian, `scripts/migrate-ca-state.sh abort` (it sets the unused new layout aside and
+   leaves `/etc/pki/pqc-ca` untouched), check out the previous release and start it. A gateway
+   started on a bad N+1 would un-revoke certificates (its revoked set starts empty).
 5. Only now move the readers and the rest: `docker compose up -d` (recreates the gateway,
    `ocsp-pq`, `pki-dist` and `management-api`).
 6. `scripts/migrate-ca-state.sh retire` (it also renames the old copies of the trust files in
    `/etc/pki/pqc-ca`), then remove the old `crl-renewer` container and the
    `pqc-signals`, `pqc-www-pki` and `pqc-logs-crl` volumes once the rollback window is over.
-7. Rollback at any point: stop the new containers, `scripts/migrate-ca-state.sh reverse` (it copies
+7. Rollback after step 5: stop the new containers, `scripts/migrate-ca-state.sh reverse` (it copies
    the state back, including the CRL number, the latest CRLs and the trust files as they are now,
-   checks nothing is un-revoked, and sets `/etc/pki/pqc-trust` aside), check out the previous
-   release, `docker compose up -d`.
+   takes the larger serial and CRL number, checks nothing is un-revoked and no row is lost, and
+   sets `/etc/pki/pqc-trust` aside), check out the previous release, `docker compose up -d`.
+   `reverse` refuses a layout the old system has moved on from since forward (after an abort
+   that went back to it): that one is set aside with `abort`, never restored.
 
 Keep the retired copy of the intermediate key for the rollback window, then destroy it and record
 that.
