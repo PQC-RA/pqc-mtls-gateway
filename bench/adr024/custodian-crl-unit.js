@@ -420,6 +420,100 @@ exec ${O} "$@"
 	check("index.txt missing after an interrupted rename: recovered from .new at start, custodian serves", s.exitCode === null && fs.existsSync(`${INT}/db/index.txt`) && /Recovered .*index\.txt from index\.txt\.new/.test(logs) && fs.readFileSync(`${INT}/db/index.txt`).length >= want.length, s.exitCode);
 	await stop();
 
+	// ------------------------------ pre-merge review of 2026-11-03 (#7 items)
+	fs.writeFileSync("/tmp/fake-openssl", `#!/bin/sh
+case " $* " in
+  *" -revoke "*) if [ -e /tmp/revoke-hang ]; then ${O} "$@"; exec sleep 600; fi ;;
+  *" -gencrl "*) [ -e /tmp/future-crl ] && exec ${O} "$@" -crl_lastupdate 20991231000000Z -crl_nextupdate 21000107000000Z ;;
+  *" -CAfile ${ROOT}/certs/root-ca.crt "*) [ -e /tmp/root-verify-fail ] && { echo "forced root CRL verify failure" >&2; exit 1; } ;;
+esac
+exec ${O} "$@"
+`, { mode: 0o755 });
+	const ROOT_CRL_FILE = `${INT}/crl/root-ca.crl`;
+	s = await start({ ...CRL_ENV, OPENSSL_BIN: "/tmp/fake-openssl", EXEC_TIMEOUT_MS: "1500", INBOX_RELOG_MS: "1000", CUSTODIAN_TEST_FAULT: `crl-fail:${FAILFLAG}` });
+
+	// 7-2: openssl killed after it recorded the revocation
+	const k1 = await issue("killed");
+	fs.writeFileSync("/tmp/revoke-hang", "");
+	r = await req("POST", "/revoke", { serialNumber: k1 });
+	fs.rmSync("/tmp/revoke-hang");
+	check("7-2: revoke killed after openssl recorded it: answered as recorded (200 published), CRL and OCSP carry it", r.status === 200 && r.j.crl === "published" && serialsIn(HYB2).has(k1) && statusRow(k1) === "R", `${r.status} ${JSON.stringify(r.j)}`);
+	const k2 = await issue("retry");
+	fs.writeFileSync(FAILFLAG, "");
+	fs.writeFileSync("/tmp/revoke-hang", "");
+	r = await req("POST", "/revoke", { serialNumber: k2 });
+	fs.rmSync("/tmp/revoke-hang");
+	check("  ... with the CRL failing too: 202 pending, OCSP already R", r.status === 202 && r.j.crl === "pending" && statusRow(k2) === "R", `${r.status} ${JSON.stringify(r.j)}`);
+	r = await req("POST", "/revoke", { serialNumber: k2 });
+	check("7-2: retrying a revoke that is recorded but in no published CRL is not a bare 409: it requests the CRL (202 pending)", r.status === 202 && r.j.crl === "pending", `${r.status} ${JSON.stringify(r.j)}`);
+	fs.rmSync(FAILFLAG);
+	let k2pub = false;
+	for (let i = 0; i < 60 && !k2pub; i++) { await sleep(250); k2pub = serialsIn(HYB2).has(k2); }
+	r = await req("POST", "/revoke", { serialNumber: k2 });
+	check("  ... once a CRL lists it, a retry is 409 already_revoked", k2pub && r.status === 409, `${k2pub} ${r.status}`);
+
+	// 7-1: lastUpdate in the future, the root's and our own
+	const rootBefore = fs.readFileSync(ROOT_CRL_FILE);
+	let rj = (await metrics()).m.pqc_ca_root_crl_rejected_total;
+	rootCrl("/tmp/root-crl-future.pem", ["-crl_lastupdate", "20991231000000Z", "-crl_nextupdate", "21000107000000Z"]);
+	toInbox("/tmp/root-crl-future.pem");
+	await req("POST", "/crl/issue");
+	check("7-1: a root CRL with lastUpdate in the future is not adopted, counted", fs.readFileSync(ROOT_CRL_FILE).equals(rootBefore) && (await metrics()).m.pqc_ca_root_crl_rejected_total === rj + 1 && /in the future/.test(logs), (await metrics()).m.pqc_ca_root_crl_rejected_total - rj);
+	await sleep(1200);
+	await req("POST", "/crl/issue");
+	check("7-3: ... not cached as refused: tried again, reported again at the low rate, counted once", /still not adopted: its lastUpdate/.test(logs) && (await metrics()).m.pqc_ca_root_crl_rejected_total === rj + 1);
+	rootCrl("/tmp/root-crl-fixed.pem");
+	toInbox("/tmp/root-crl-fixed.pem");
+	await req("POST", "/crl/issue");
+	check("7-1: ... and the corrected root CRL after it is adopted (no outage until the bogus date)", fs.readFileSync(ROOT_CRL_FILE).equals(fs.readFileSync("/tmp/root-crl-fixed.pem")));
+	const pubBefore = fs.readFileSync(HYB2);
+	fs.writeFileSync("/tmp/future-crl", "");
+	r = await req("POST", "/crl/issue");
+	fs.rmSync("/tmp/future-crl");
+	check("7-1: the custodian's own CRL with lastUpdate in the future is not published (503)", r.status === 503 && /in the future/.test(r.raw) && fs.readFileSync(HYB2).equals(pubBefore), `${r.status} ${r.raw.slice(0, 120)}`);
+
+	// 7-3: a transient refusal (openssl failed) is not cached
+	rootCrl("/tmp/root-crl-transient.pem");
+	fs.writeFileSync("/tmp/root-verify-fail", "");
+	toInbox("/tmp/root-crl-transient.pem");
+	await req("POST", "/crl/issue");
+	const stillOld = fs.readFileSync(ROOT_CRL_FILE).equals(fs.readFileSync("/tmp/root-crl-fixed.pem"));
+	fs.rmSync("/tmp/root-verify-fail");
+	await req("POST", "/crl/issue");
+	check("7-3: an inbox file refused for a transient reason is adopted once it can be (not cached)", stillOld && fs.readFileSync(ROOT_CRL_FILE).equals(fs.readFileSync("/tmp/root-crl-transient.pem")));
+
+	// 7-5: no CRL may drop a revoked serial
+	const idxFile = `${INT}/db/index.txt`, idx = fs.readFileSync(idxFile, "utf8");
+	fs.writeFileSync(idxFile, idx.split("\n").map(l => { const f = l.split("\t"); if (f[3] === k1) { f[0] = "V"; f[2] = ""; } return f.join("\t"); }).join("\n"));
+	const pubB = fs.readFileSync(HYB2);
+	r = await req("POST", "/crl/issue");
+	fs.writeFileSync(idxFile, idx);
+	check("7-5: an intermediate CRL that would drop a revoked serial is not published", r.status === 503 && /drops revoked serial/.test(r.raw) && fs.readFileSync(HYB2).equals(pubB), `${r.status} ${r.raw.slice(0, 140)}`);
+	const rootIdx = `${ROOT}/db/index.txt`, rootIdxOrig = fs.readFileSync(rootIdx, "utf8");
+	fs.writeFileSync(rootIdx, rootIdxOrig + "R\t301231000000Z\t251103000000Z\tDEADBEEF01\tunknown\t/CN=unit-fake\n");
+	rootCrl("/tmp/root-crl-with.pem");
+	toInbox("/tmp/root-crl-with.pem");
+	await req("POST", "/crl/issue");
+	const adoptedWith = fs.readFileSync(ROOT_CRL_FILE).equals(fs.readFileSync("/tmp/root-crl-with.pem"));
+	fs.writeFileSync(rootIdx, rootIdxOrig);
+	rootCrl("/tmp/root-crl-without.pem");
+	toInbox("/tmp/root-crl-without.pem");
+	await req("POST", "/crl/issue");
+	check("7-5: a newer root CRL that drops a serial the published one lists is refused", adoptedWith && fs.readFileSync(ROOT_CRL_FILE).equals(fs.readFileSync("/tmp/root-crl-with.pem")) && /drops revoked serial\(s\) DEADBEEF01/.test(logs));
+
+	// 7-6: the -updatedb metric says what happens
+	r = await get("/metrics");
+	check("7-6: the -updatedb failure metric's HELP says the pass fails", /pqc_ca_crl_updatedb_failures_total Runs of openssl ca -updatedb that failed; each failed its CRL pass/.test(r.raw));
+	await stop();
+
+	// 7-4: what is published is what was checked
+	s = await start({ ...CRL_ENV, CUSTODIAN_TEST_FAULT: "crl-tamper:/tmp/tamper" });
+	fs.writeFileSync("/tmp/tamper", "");
+	r = await req("POST", "/crl/issue");
+	fs.rmSync("/tmp/tamper");
+	check("7-4: the file replaced right after it is written: the checked CRL is still what is published (DER and combined)", r.status === 200 && /Intermediate/.test(ossl(["crl", "-inform", "DER", "-in", `${PUB}/intermediate-ca.crl`, "-noout", "-issuer"])) && /Intermediate/.test(firstIssuer(HYB2)) && crlNumber(HYB2) === BigInt(r.j.crlNumber), `${r.status} ${r.raw.slice(0, 120)}`);
+	await stop();
+
 	// ----------------------------------------- start-up failure fails closed
 	fs.writeFileSync(FAILFLAG, "");
 	s = await start({ ...CRL_ENV, CUSTODIAN_TEST_FAULT: `crl-fail:${FAILFLAG}` }, { expectExit: true });

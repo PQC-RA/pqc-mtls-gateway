@@ -780,23 +780,46 @@ async function handleRevoke(res, payload) {
 
 	const budgetEnd = Date.now() + REQUEST_BUDGET_MS;
 	const recorded = await withCaMutexBounded(async () => {
+	let outcome, detail = "";
 	try {
 		const { stdout, stderr } = await opensslCaLocked(args.slice(0));
 		const output = `${stdout}\n${stderr}`;
-		if (/already revoked/i.test(output)) {
-			return sendError(res, 409, "already_revoked", `Certificate ${serial} is already revoked`);
-		}
-		if (/\berror:/i.test(stderr) && !/Data Base Updated/i.test(output)) {
-			log("ERROR", `openssl ca revoke reported an error: ${stderr}`);
-			return sendError(res, 500, "revoke_failed", "CA revocation failed");
-		}
+		if (/already revoked/i.test(output)) outcome = "already";
+		else if (/\berror:/i.test(stderr) && !/Data Base Updated/i.test(output)) { outcome = "failed"; detail = stderr; }
+		else outcome = "recorded";
 	} catch (err) {
 		const output = `${err.stdout || ""}\n${err.stderr || ""}`;
-		if (/already revoked/i.test(output)) {
-			return sendError(res, 409, "already_revoked", `Certificate ${serial} is already revoked`);
+		if (/already revoked/i.test(output)) outcome = "already";
+		else { outcome = "failed"; detail = err.stderr || err.message; }
+	}
+	// A failed or killed run may still have recorded the revocation (openssl
+	// writes the index before it exits): the index decides, not the exit status.
+	if (outcome === "failed") {
+		let status;
+		try {
+			status = indexStatus(serial);
+		} catch (err) {
+			log("ERROR", `openssl ca revoke for ${serial} failed (${String(detail).trim()}) and the index cannot be read (${err.message})`);
+			return sendError(res, 500, "revoke_failed", "CA revocation failed; it may have been recorded: retry");
 		}
-		log("ERROR", `openssl ca revoke failed: ${err.stderr || err.message}`);
-		return sendError(res, 500, "revoke_failed", "CA revocation failed");
+		if (status !== "R") {
+			log("ERROR", `openssl ca revoke failed, nothing recorded: ${String(detail).trim()}`);
+			return sendError(res, 500, "revoke_failed", "CA revocation failed; nothing was recorded");
+		}
+		log("WARN", `openssl ca revoke for ${serial} failed (${String(detail).trim()}), but the index records the revocation: treated as revoked`);
+	}
+	if (outcome === "already") {
+		// Revoked in the index. If a published CRL carries it, it is done (409).
+		// If not, an earlier attempt recorded it and died before its CRL: this
+		// retry finishes the job (OCSP snapshot, CRL pass) like a new revoke.
+		let published = false;
+		try {
+			published = !CRL_ISSUER || (fs.existsSync(INT_CRL) && (await crlSerials(INT_CRL)).has(serial.toUpperCase()));
+		} catch (err) {
+			log("ERROR", `Cannot read ${INT_CRL} to tell whether ${serial} is published: ${err.message}`);
+		}
+		if (published) return sendError(res, 409, "already_revoked", `Certificate ${serial} is already revoked`);
+		log("WARN", `Serial ${serial} is revoked in the index but no published CRL lists it yet: publishing`);
 	}
 
 	log("INFO", `Revoked certificate serial=${serial} reason=${reason || "unspecified"}`);
@@ -882,10 +905,11 @@ const crlState = {
 	nextUpdate: 0,         // ms, nextUpdate of that CRL
 	rootNextUpdate: 0,     // ms, nextUpdate of the published root CRL
 	failures: 0,           // passes that failed
-	updatedbFailures: 0,   // -updatedb runs that failed (the pass went on)
+	updatedbFailures: 0,   // -updatedb runs that failed (each failed its CRL pass)
 	rootRejected: 0,       // inbox root CRLs refused
 	pending: false,        // a revocation is recorded but no CRL carries it yet
-	lastRejectedRootCrl: null, // sha256 of the inbox file last refused (refused once)
+	lastRejectedRootCrl: null, // sha256 of the inbox file last refused definitively (refused once)
+	inboxPending: null,    // { hash, loggedAt } of an inbox file not adopted yet, but not refused for good
 };
 
 function testFault(name) {
@@ -900,7 +924,9 @@ function testFault(name) {
 	// crl-delay:<file>: every pass stalls while <file> exists (a slow openssl).
 	// combined-root-first:<file>: the combined CRL is assembled root first while
 	// <file> exists, so the publisher's own order check can be seen to refuse it.
-	return ["crl-fail", "crl-delay", "combined-root-first"].includes(name) && Boolean(arg) && fs.existsSync(arg);
+	// crl-tamper:<file>: right after the intermediate CRL file is written, it is
+	// replaced (another writer), so a second read of it would publish the wrong one.
+	return ["crl-fail", "crl-delay", "combined-root-first", "crl-tamper"].includes(name) && Boolean(arg) && fs.existsSync(arg);
 }
 
 async function ossl(args) {
@@ -911,7 +937,7 @@ async function ossl(args) {
 // its signature against issuerCert. Throws on any failure.
 async function inspectCrl(file, issuerCert) {
 	const v = await ossl(["crl", "-in", file, "-noout", "-CAfile", issuerCert]);
-	if (!/verify OK/.test(`${v.stdout}\n${v.stderr}`)) throw new Error(`${path.basename(file)}: signature not verified`);
+	if (!/verify OK/.test(`${v.stdout}\n${v.stderr}`)) throw refusal(`${path.basename(file)}: signature not verified`, true);
 	const { stdout } = await ossl(["crl", "-in", file, "-noout", "-crlnumber", "-lastupdate", "-nextupdate", "-dateopt", "iso_8601"]);
 	const num = /crlNumber=0x([0-9A-Fa-f]+)/.exec(stdout);
 	const last = /lastUpdate=(\S+ \S+)/.exec(stdout);
@@ -919,6 +945,45 @@ async function inspectCrl(file, issuerCert) {
 	if (!num || !last || !next) throw new Error(`${path.basename(file)}: no CRL number, lastUpdate or nextUpdate`);
 	const t = s => Date.parse(s.replace(" ", "T"));
 	return { number: BigInt(`0x${num[1]}`), lastUpdate: t(last[1]), nextUpdate: t(next[1]) };
+}
+
+// The revoked serials of a PEM CRL (upper-case hex). A CRL must never drop one
+// its predecessor listed (RFC 5280 5.2.3, 3.3: a revocation is final).
+async function crlSerials(file) {
+	const { stdout } = await ossl(["crl", "-in", file, "-noout", "-text"]);
+	return new Set([...stdout.matchAll(/^\s*Serial Number:\s*([0-9A-Fa-f]+)\s*$/gm)].map(m => m[1].toUpperCase()));
+}
+const droppedSerials = (newer, older) => [...older].filter(x => !newer.has(x));
+
+// PEM bytes in hand, checked and converted from a private copy: what is
+// published is exactly what was checked, never a second read of a file that
+// another writer may have replaced in between.
+async function withPrivateCopy(pem, fn) {
+	const f = path.join(path.dirname(INT_CRL), `.check-${process.pid}-${crypto.randomBytes(4).toString("hex")}`);
+	fs.writeFileSync(f, pem, { mode: 0o600 });
+	try {
+		return await fn(f);
+	} finally {
+		fs.rmSync(f, { force: true });
+	}
+}
+
+// A refusal of an inbox root CRL. definitive: the file can never become
+// acceptable (refused once, then ignored while it stays). Otherwise it may
+// (a lastUpdate still in the future, a failed openssl run): retried on every
+// pass, and reported again every INBOX_RELOG_MS while it stays.
+function refusal(message, definitive) {
+	return Object.assign(new Error(message), { definitive });
+}
+const INBOX_RELOG_MS = Number(process.env.INBOX_RELOG_MS || 600_000);
+
+// The status letter of a serial's row in the index (V, R, E), "" if none.
+function indexStatus(serial) {
+	for (const line of fs.readFileSync(INDEX_FILE, "utf8").split("\n")) {
+		const f = line.split("\t");
+		if (f[3] && f[3].toUpperCase() === serial.toUpperCase()) return f[0];
+	}
+	return "";
 }
 
 // Atomic publication: a temporary file in the target directory, fsync, then
@@ -974,36 +1039,62 @@ function publishStatusSnapshotLogged() {
 }
 
 // A root CRL from the inbox replaces the published one only if it verifies
-// against the root certificate, has not expired, has a HIGHER CRL number and a
-// lastUpdate that is not earlier: an older root CRL must never un-revoke an
-// intermediate.
+// against the root certificate, is valid now (lastUpdate not in the future,
+// nextUpdate not passed), has a HIGHER CRL number, a lastUpdate that is not
+// earlier, and every serial the published one lists: an older root CRL must
+// never un-revoke an intermediate, and a future-dated one would make nginx
+// refuse every client ("CRL is not yet valid") and block the correction.
 async function adoptInboxRootCrl() {
 	const inbox = path.join(ROOT_CRL_INBOX, "root-ca.crl");
 	if (!fs.existsSync(inbox)) return;
 	const current = fs.existsSync(ROOT_CRL) ? fs.readFileSync(ROOT_CRL) : null;
 	const offered = fs.readFileSync(inbox);
 	if (current && current.equals(offered)) return;
-	// A refused file is refused once: counted and logged once, not on every
-	// pass while it stays in the inbox.
+	// A definitively refused file is refused once: counted and logged once, not
+	// on every pass while it stays in the inbox.
 	const offeredHash = crypto.createHash("sha256").update(offered).digest("hex");
 	if (offeredHash === crlState.lastRejectedRootCrl) return;
 	try {
-		const o = await inspectCrl(inbox, ROOT_CA_CERT);
-		if (o.nextUpdate <= Date.now()) throw new Error("its nextUpdate has passed");
-		if (current) {
-			const c = await inspectCrl(ROOT_CRL, ROOT_CA_CERT);
-			if (o.number <= c.number) throw new Error(`CRL number ${o.number} is not above the published ${c.number}`);
-			// The CRL number orders CRLs (RFC 5280 5.2.3). lastUpdate has one-second
-			// resolution, so two root CRLs issued in the same second tie; only an
-			// EARLIER lastUpdate is refused.
-			if (o.lastUpdate < c.lastUpdate) throw new Error(`its lastUpdate ${new Date(o.lastUpdate).toISOString()} is earlier than the published one's ${new Date(c.lastUpdate).toISOString()}`);
-		}
-		publishFile(path.dirname(ROOT_CRL), path.basename(ROOT_CRL), offered, 0o644);
-		log("INFO", `Adopted root CRL number ${o.number} from ${inbox}`);
+		// Checked from a private copy, and that same copy is what is published.
+		await withPrivateCopy(offered, async copy => {
+			const o = await inspectCrl(copy, ROOT_CA_CERT);
+			const now = Date.now();
+			if (o.lastUpdate > now) throw refusal(`its lastUpdate ${new Date(o.lastUpdate).toISOString()} is in the future (the root's clock?): not valid yet`, false);
+			if (o.nextUpdate <= now) throw refusal("its nextUpdate has passed", true);
+			if (current) {
+				await withPrivateCopy(current, async cur => {
+					const c = await inspectCrl(cur, ROOT_CA_CERT);
+					if (o.number <= c.number) throw refusal(`CRL number ${o.number} is not above the published ${c.number}`, true);
+					// The CRL number orders CRLs (RFC 5280 5.2.3). lastUpdate has one-second
+					// resolution, so two root CRLs issued in the same second tie; only an
+					// EARLIER lastUpdate is refused.
+					if (o.lastUpdate < c.lastUpdate) throw refusal(`its lastUpdate ${new Date(o.lastUpdate).toISOString()} is earlier than the published one's ${new Date(c.lastUpdate).toISOString()}`, true);
+					const gone = droppedSerials(await crlSerials(copy), await crlSerials(cur));
+					if (gone.length) throw refusal(`it drops revoked serial(s) ${gone.join(" ")} that the published root CRL lists`, true);
+				});
+			}
+			publishFile(path.dirname(ROOT_CRL), path.basename(ROOT_CRL), offered, 0o644);
+			crlState.inboxPending = null;
+			log("INFO", `Adopted root CRL number ${o.number} from ${inbox}`);
+		});
 	} catch (err) {
-		crlState.rootRejected++;
-		crlState.lastRejectedRootCrl = offeredHash;
-		log("ERROR", `Refused root CRL in ${inbox}: ${err.message}; keeping the published one`);
+		if (err.definitive) {
+			crlState.rootRejected++;
+			crlState.lastRejectedRootCrl = offeredHash;
+			log("ERROR", `Refused root CRL in ${inbox}: ${err.message}; keeping the published one`);
+			return;
+		}
+		// Not definitive: never cached, so the same file is adopted once it can
+		// be. Counted once per file; reported again at a low rate while it stays.
+		const p = crlState.inboxPending, now = Date.now();
+		if (!p || p.hash !== offeredHash) {
+			crlState.rootRejected++;
+			crlState.inboxPending = { hash: offeredHash, loggedAt: now };
+			log("ERROR", `Root CRL in ${inbox} not adopted yet: ${err.message}; tried again on every pass`);
+		} else if (now - p.loggedAt >= INBOX_RELOG_MS) {
+			p.loggedAt = now;
+			log("WARN", `Root CRL in ${inbox} still not adopted: ${err.message}`);
+		}
 	}
 }
 
@@ -1025,28 +1116,43 @@ async function issueCrlNow(withUpdatedb) {
 	const tmp = `${INT_CRL}.tmp-${process.pid}`;
 	try {
 		await opensslCaLocked(["ca", "-config", CA_CNF, "-gencrl", "-out", tmp]);
-		const crl = await inspectCrl(tmp, INT_CERT);
-		if (crlState.crlNumber !== null && crl.number <= crlState.crlNumber) {
-			throw new Error(`CRL number ${crl.number} is not above the last published ${crlState.crlNumber}`);
-		}
-		fs.chmodSync(tmp, 0o644);
-		fs.renameSync(tmp, INT_CRL);
+		// From here on only these bytes are used: checked, then published as
+		// they are (never a second read of a file another writer may replace).
+		const intPem = fs.readFileSync(tmp);
+		const { crl, intDer } = await withPrivateCopy(intPem, async copy => {
+			const c = await inspectCrl(copy, INT_CERT);
+			if (c.lastUpdate > Date.now()) throw new Error(`the new CRL's lastUpdate ${new Date(c.lastUpdate).toISOString()} is in the future (clock?); not published`);
+			if (crlState.crlNumber !== null && c.number <= crlState.crlNumber) {
+				throw new Error(`CRL number ${c.number} is not above the last published ${crlState.crlNumber}`);
+			}
+			if (fs.existsSync(INT_CRL)) {
+				const gone = droppedSerials(await crlSerials(copy), await crlSerials(INT_CRL));
+				if (gone.length) throw new Error(`the new CRL drops revoked serial(s) ${gone.join(" ")} that the last one lists; not published`);
+			}
+			return { crl: c, intDer: await derOf("crl", copy) };
+		});
+		publishFile(path.dirname(INT_CRL), path.basename(INT_CRL), intPem, 0o644);
+		if (testFault("crl-tamper")) fs.copyFileSync(ROOT_CRL, INT_CRL); // TEST-ONLY: another writer replaces it
 		await adoptInboxRootCrl();
 		if (!fs.existsSync(ROOT_CRL)) throw new Error(`no root CRL to publish (${ROOT_CRL}; drop one into ${ROOT_CRL_INBOX})`);
-		const root = await inspectCrl(ROOT_CRL, ROOT_CA_CERT);
+		const rootPem = fs.readFileSync(ROOT_CRL);
+		const { root, rootDer } = await withPrivateCopy(rootPem, async copy => {
+			const r = await inspectCrl(copy, ROOT_CA_CERT);
+			if (r.lastUpdate > Date.now()) throw new Error(`the root CRL's lastUpdate ${new Date(r.lastUpdate).toISOString()} is in the future; not published`);
+			return { root: r, rootDer: await derOf("crl", copy) };
+		});
 
 		// Files named by URLs in issued certificates are DER (RFC 5280
 		// 4.2.1.13, 4.2.2.1); the files the gateway reads stay PEM. The
 		// combined CRL is intermediate FIRST (crl_worker.lua reads only the
 		// first block) and written last, after everything it summarises.
-		const intPem = fs.readFileSync(INT_CRL), rootPem = fs.readFileSync(ROOT_CRL);
 		const chain = Buffer.concat([fs.readFileSync(INT_CERT), fs.readFileSync(ROOT_CA_CERT)]);
 		publishFile(CRL_PUBLIC_DIR, "root-ca.crt", fs.readFileSync(ROOT_CA_CERT), 0o644);
 		publishFile(CRL_PUBLIC_DIR, "intermediate-ca.crt", await derOf("x509", INT_CERT), 0o644);
 		publishFile(CRL_PUBLIC_DIR, "ca-chain.crt", chain, 0o644);
 		publishFile(CRL_PUBLIC_DIR, "hybrid-ca-chain.crt", chain, 0o644);
-		publishFile(CRL_PUBLIC_DIR, "intermediate-ca.crl", await derOf("crl", INT_CRL), 0o644);
-		publishFile(CRL_PUBLIC_DIR, "root-ca.crl", await derOf("crl", ROOT_CRL), 0o644);
+		publishFile(CRL_PUBLIC_DIR, "intermediate-ca.crl", intDer, 0o644);
+		publishFile(CRL_PUBLIC_DIR, "root-ca.crl", rootDer, 0o644);
 		publishStatusSnapshot();
 		const combined = testFault("combined-root-first") ? Buffer.concat([rootPem, intPem]) : Buffer.concat([intPem, rootPem]);
 		// Check the order of what is about to be published, not just how it was
@@ -1156,7 +1262,7 @@ function handleGetMetrics(res) {
 		"# HELP pqc_ca_root_crl_rejected_total Root CRLs from the inbox that were refused.",
 		"# TYPE pqc_ca_root_crl_rejected_total counter",
 		`pqc_ca_root_crl_rejected_total ${crlState.rootRejected}`,
-		"# HELP pqc_ca_crl_updatedb_failures_total Runs of openssl ca -updatedb that failed (the CRL pass went on).",
+		"# HELP pqc_ca_crl_updatedb_failures_total Runs of openssl ca -updatedb that failed; each failed its CRL pass, which is retried.",
 		"# TYPE pqc_ca_crl_updatedb_failures_total counter",
 		`pqc_ca_crl_updatedb_failures_total ${crlState.updatedbFailures}`,
 	];
