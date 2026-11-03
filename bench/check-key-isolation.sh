@@ -65,7 +65,10 @@ scan() {
     : > "$T/files"
     # grep exits 1 when a batch has no match, which is not an error; 2 is.
     # (r is "" for the root directory itself, so the prunes read /proc, ...)
-    if ! find "${r:-/}" \( -path "$r/proc" -o -path "$r/sys" -o -path "$r/dev" \) -prune -o -type f -print0 \
+    # -H: the starting point is followed when it is a symlink, as
+    # /proc/<pid>/root is (without it find lists the link and stops); links
+    # inside the tree are still not followed.
+    if ! find -H "${r:-/}" \( -path "$r/proc" -o -path "$r/sys" -o -path "$r/dev" \) -prune -o -type f -print0 \
          | xargs -0 -r sh -c 'grep -lZE "$0" -- "$@"; [ $? -le 1 ]' "$KEY_RE" > "$T/files"; then
         fail "$name: the filesystem scan reported errors (above), key isolation UNVERIFIED"
     fi

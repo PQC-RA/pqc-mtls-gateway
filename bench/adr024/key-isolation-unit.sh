@@ -26,7 +26,9 @@ cleanup() {
 }
 trap cleanup EXIT
 PASS=0; FAIL=0
-check() { if eval "$2"; then echo "PASS  $1"; PASS=$((PASS+1)); else echo "FAIL  $1"; FAIL=$((FAIL+1)); fi; }
+check() { if eval "$2"; then echo "PASS  $1"; PASS=$((PASS+1)); else echo "FAIL  $1"; FAIL=$((FAIL+1)); return 1; fi; }
+# After a failed check: what the scanner said, and its exit code.
+show() { echo "      check-key-isolation.sh exited $(cat "$T/rc"); its output:"; sed 's/^/      | /' "$T/out"; }
 q() { "$@" > "$T/q.log" 2>&1 || { echo "FAILED: $*"; cat "$T/q.log"; exit 1; }; }
 
 # --- a root CA, an intermediate it signed, another CA, a leaf key -------------------
@@ -53,28 +55,33 @@ ln -s "$T/pki/root.key" "$T/app/etc-root-link.pem"  # a symlink is not followed
 # A library that carries the header text, as libgnutls does: not a key.
 printf '\177ELF\0\0\n-----BEGIN RSA PRIVATE KEY-----\n\0\001\002not base64\n-----END RSA PRIVATE KEY-----\n' | put app/usr/lib/libfake.so
 run cust="$T/cust" app="$T/app/"
-check "clean: only the custodian holds a CA key, the intermediate's (exit 0)" "[ $(rc) = 0 ] && grep -q 'PASS: only cust holds' $T/out" || cat "$T/out"
-check "  ... the app's own (non-CA) key is found but is not a CA key" "grep -Eq 'app +private keys found: 1 ' $T/out"
+check "clean: only the custodian holds a CA key, the intermediate's (exit 0)" "[ $(rc) = 0 ] && grep -q 'PASS: only cust holds' $T/out" || show
+check "  ... the app's own (non-CA) key is found but is not a CA key" "grep -Eq 'app +private keys found: 1 ' $T/out" || show
 
 tree baked; put baked/usr/lib/node_modules/x/test/fixture.pem < root.key
 run cust="$T/cust" baked="$T/baked"
-check "a CA key baked deep in an image tree is found and named" "[ $(rc) = 1 ] && grep -q 'baked CAN READ THE root PRIVATE KEY (/usr/lib/node_modules/x/test/fixture.pem)' $T/out"
+check "a CA key baked deep in an image tree is found and named" "[ $(rc) = 1 ] && grep -q 'baked CAN READ THE root PRIVATE KEY (/usr/lib/node_modules/x/test/fixture.pem)' $T/out" || show
+# Docker mode reads each container through /proc/<pid>/root, which is a
+# symlink: the scan must go through a root given as a link.
+ln -s "$T/baked" "$T/baked-link"
+run cust="$T/cust" baked="$T/baked-link"
+check "a root given as a symlink (as /proc/<pid>/root is) is scanned through" "[ $(rc) = 1 ] && grep -q 'baked CAN READ THE root PRIVATE KEY (/usr/lib/node_modules/x/test/fixture.pem)' $T/out" || show
 
 tree multi; cat leaf.key tls.key | put multi/etc/ssl/bundle.pem
 run cust="$T/cust" multi="$T/multi"
-check "a CA key as the SECOND block of a file is found" "[ $(rc) = 1 ] && grep -q 'multi CAN READ THE tls PRIVATE KEY (/etc/ssl/bundle.pem)' $T/out"
+check "a CA key as the SECOND block of a file is found" "[ $(rc) = 1 ] && grep -q 'multi CAN READ THE tls PRIVATE KEY (/etc/ssl/bundle.pem)' $T/out" || show
 
 tree enc; put enc/opt/x/key.pem < int-enc.key
 run cust="$T/cust" enc="$T/enc"
-check "an encrypted private key counts as a failure, not a pass" "[ $(rc) = 1 ] && grep -q 'enc: /opt/x/key.pem holds a private key whose public key cannot be derived' $T/out"
+check "an encrypted private key counts as a failure, not a pass" "[ $(rc) = 1 ] && grep -q 'enc: /opt/x/key.pem holds a private key whose public key cannot be derived' $T/out" || show
 
 tree wrong; put wrong/var/lib/pqc-ca/key/root.key < root.key
 run cust="$T/wrong"
-check "the custodian holding the ROOT key fails, and the canary is missing" "[ $(rc) = 1 ] && grep -q 'cust CAN READ THE root PRIVATE KEY' $T/out && grep -q 'UNVERIFIED' $T/out"
+check "the custodian holding the ROOT key fails, and the canary is missing" "[ $(rc) = 1 ] && grep -q 'cust CAN READ THE root PRIVATE KEY' $T/out && grep -q 'UNVERIFIED' $T/out" || show
 
 tree none
 run cust="$T/none" app="$T/app"
-check "no intermediate key in the custodian: UNVERIFIED (exit 1)" "[ $(rc) = 1 ] && grep -q 'did not find the intermediate key in cust' $T/out"
+check "no intermediate key in the custodian: UNVERIFIED (exit 1)" "[ $(rc) = 1 ] && grep -q 'did not find the intermediate key in cust' $T/out" || show
 
 # --- 2. docker mode --------------------------------------------------------------------
 if [ -z "$IMG" ] || [ "$(id -u)" != 0 ] || ! docker info > /dev/null 2>&1 || [ ! -d /proc/1/root/ ]; then
@@ -90,15 +97,15 @@ else
     docker exec -u 0 -i "$P-app" sh -c 'mkdir -p /usr/share/baked && cat > /usr/share/baked/root.pem' < root.key
     dock() { COMPOSE_PROJECT="$P" CUSTODIAN_CONTAINER="$P-cust" "$CHK" > "$T/out" 2>&1; echo $? > "$T/rc"; }
     dock
-    check "docker: a CA key in a container's writable layer (no mount) is found" "[ $(rc) = 1 ] && grep -q '$P-app CAN READ THE root PRIVATE KEY (/usr/share/baked/root.pem)' $T/out" || cat "$T/out"
+    check "docker: a CA key in a container's writable layer (no mount) is found" "[ $(rc) = 1 ] && grep -q '$P-app CAN READ THE root PRIVATE KEY (/usr/share/baked/root.pem)' $T/out" || show
     check "  ... and the custodian's key in its volume mount is the canary" "grep -q 'PASS: only $P-cust holds' $T/out"
     docker exec -u 0 "$P-app" rm /usr/share/baked/root.pem
     docker exec -u 0 -i "$P-app" sh -c 'cat > /scratch/tls.pem' < tls.key
     dock
-    check "docker: a CA key in a tmpfs is found" "[ $(rc) = 1 ] && grep -q '$P-app CAN READ THE tls PRIVATE KEY (/scratch/tls.pem)' $T/out" || cat "$T/out"
+    check "docker: a CA key in a tmpfs is found" "[ $(rc) = 1 ] && grep -q '$P-app CAN READ THE tls PRIVATE KEY (/scratch/tls.pem)' $T/out" || show
     docker exec -u 0 "$P-app" rm /scratch/tls.pem
     dock
-    check "docker: with both removed, the stack passes (exit 0)" "[ $(rc) = 0 ]" || cat "$T/out"
+    check "docker: with both removed, the stack passes (exit 0)" "[ $(rc) = 0 ]" || show
 fi
 
 echo "$PASS/$((PASS + FAIL)) passed"
