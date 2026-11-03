@@ -80,13 +80,13 @@ flowchart LR
   end
 
   subgraph PK["PKI plane"]
-    CU["pqc-ca-custodian<br/>sole holder of the<br/>intermediate CA key"]
+    CU["pqc-ca-custodian<br/>only holder of the intermediate key,<br/>only writer of CA state, issues CRLs"]
     OC["ocsp-pq"]
-    CR["crl-renewer"]
     PD["pki-dist<br/>serves CA certs and CRLs<br/>to relying parties"]
   end
 
-  TREE[("CA tree, shared mount<br/>chain · CRLs<br/>key subdirectories masked from the edge")]
+  KS[("custodian's own key and state<br/>mounted into no other container")]
+  PUB[("public CA files<br/>chains · CRLs · no keys")]
 
   C -->|"X25519MLKEM768 · ML-DSA-65<br/>TLS 1.3 mutual auth"| GW
   GW -->|"RS256 JWT: CN · fingerprint · 60 s"| BE
@@ -94,31 +94,34 @@ flowchart LR
   MA --> RD
   MA -->|"HMAC · sign · revoke"| CU
   GW -->|"staple fetch :9080"| OC
-  CU -->|"writes"| TREE
-  CR -->|"regenerates CRLs"| TREE
-  TREE -.->|"trust bundle and CRL,<br/>read from the mount"| GW
-  TREE -.-> PD
+  CU --- KS
+  CU -->|"publishes"| PUB
+  PUB -.->|"trust bundle and CRL,<br/>read-only mount"| GW
+  PUB -.-> PD
+  PUB -.-> OC
 
   style GW fill:#37414E,stroke:#37414E,color:#ffffff
 ```
 
-Eight services across four bridge networks. The management API holds **zero filesystem access to the
-CA tree**; every signing and revocation operation goes through the custodian sidecar over an
-HMAC-authenticated internal API. The gateway mounts the CA tree with the private-key subdirectories
-masked, so the internet-facing component never sees a CA private key either. Note what the diagram
-shows as a store rather than a service: the gateway does not fetch its trust bundle or its CRLs over
-the network. It reads them from the shared CA mount, which `crl-renewer` writes and `pki-dist`
-publishes onward to relying parties.
+Seven services across four bridge networks. **One container, `pqc-ca-custodian`, holds the
+intermediate CA key and is the only writer of CA state** (index, serial, CRL number, issued
+certificates), on host directories mounted into no other container (ADR-024). It signs, records
+revocations and issues every intermediate CRL itself: inside each revocation, daily, and at start.
+It publishes the CA certificates and CRLs to a separate public directory that the gateway,
+`ocsp-pq` and `pki-dist` mount read-only; nothing private is in it, so nothing needs masking. The
+management API has no CA filesystem access at all; it goes through the custodian over an
+HMAC-authenticated internal API. Note what the diagram shows as a store rather than a service: the
+gateway does not fetch its trust bundle or its CRLs over the network, it reads them from that
+public directory.
 
 | Service | Role |
 |---|---|
 | `gateway` | OpenResty edge: PQC TLS termination, mTLS, CRL check, routing, JWT minting |
 | `management-api` | NestJS control plane: certificate lifecycle, routing policy, CRL, audit |
-| `pqc-ca-custodian` | Intermediate-CA signing sidecar, the **only** component with access to the intermediate private key |
+| `pqc-ca-custodian` | The **only** holder of the intermediate CA key and the only writer of CA state; signs, revokes, issues every intermediate CRL and publishes the public CA files |
 | `redis` | Durable routing-policy and enrollment-token store; refuses to start under `NODE_ENV=production` if absent |
-| `ocsp-pq` | OCSP responder over the ML-DSA-65 chain |
-| `crl-renewer` | Periodic CRL regeneration |
-| `pki-dist` | Serves CA certificates and CRLs over HTTP |
+| `ocsp-pq` | OCSP responder over the ML-DSA-65 chain, from the custodian's index snapshot |
+| `pki-dist` | Serves CA certificates and CRLs over HTTP, unprivileged |
 | `shadow-mock` | Bundled test backend, **dev only**, removed by `./scripts/teardown.sh --test-only` |
 
 The management API is a separate repository, consumed here as a digest-pinned image:
@@ -569,10 +572,15 @@ actionlint and an OpenSSL version-consistency gate.
   binaries are all
   **gitignored and never committed**. Each deployment generates its own CA and secrets; do not share
   key material between environments.
-- `management-api` runs as a non-root service account with **no mount of the CA tree at all**.
-  Signing, revocation and reads of the CA index go through the `pqc-ca-custodian` sidecar over an
-  HMAC-authenticated internal API. The gateway mounts the CA tree with the private-key
-  subdirectories masked, so the internet-facing component never sees a CA private key.
+- **One holder of the CA key, one writer of CA state (ADR-024).** The intermediate key and the CA
+  database belong to `pqc-ca-custodian` alone (its own uid 1003, host directories under
+  `/var/lib/pqc-ca` that no other container mounts; layout in `scripts/lib/ca-layout.sh`). The
+  gateway, `ocsp-pq` and `pki-dist` mount only the public directory `/var/lib/pqc-ca-public`,
+  read-only; `ocsp-pq` also reads its own key and the custodian's index snapshot. `management-api`
+  has no CA mount at all and goes through the custodian over an HMAC-authenticated internal API.
+  `bench/verify-suite.sh` section 6 checks from inside every container, as uid 0 and by public key,
+  that no container but the custodian can read any CA key; `scripts/check-compose-policy.sh` checks
+  the compose file in CI.
 - **Classical elements remain only on internal hops, and naming them is part of the result:** the
   RS256/RSA-2048 JWTs that ride every proxied request (Token 1, backend identity, and Token 2,
   cert lookup). That is a deliberate trade: an ML-DSA-65 signature adds 4,412 characters to a
@@ -607,30 +615,52 @@ a real certificate.
 
 ## Renewing the root CRL
 
-The root CA key is not available to any container: every service that mounts the CA tree masks
-`root/private`, including `crl-renewer`. The renewer therefore regenerates the **intermediate** CRL
-on its own (daily and on every revocation) but cannot sign the **root** CRL. That is an operator
-task, done where the root key lives (by default the gateway host, `/etc/pki/pqc-ca/root/private`).
+The root CA key is not available to any container; it stays on the host in `/etc/pki/pqc-ca/root`,
+which no container mounts. The custodian issues the **intermediate** CRL on its own (daily, on every
+revocation and at start) but cannot sign the **root** CRL. That is an operator task, done where the
+root key lives.
 
 The root CRL is issued for 180 days (`default_crl_days` in `openssl-root.cnf`). Renew it at least
 every 90 days. An expired root CRL inside the combined CRL fails chain validation at the handshake,
 and every client is refused. On the host, as root:
 
 ```bash
-O=/opt/openssl/bin/openssl; R=/etc/pki/pqc-ca/root
+O=/opt/openssl/bin/openssl; R=/etc/pki/pqc-ca/root; IN=/var/lib/pqc-ca/inbox
 $O ca -gencrl -config $R/openssl-root.cnf -out $R/crl/root-ca.crl.new \
   && $O crl -in $R/crl/root-ca.crl.new -noout -verify -CAfile $R/certs/root-ca.crt \
-  && chmod 644 $R/crl/root-ca.crl.new && mv -f $R/crl/root-ca.crl.new $R/crl/root-ca.crl
-docker exec pqc-crl-renewer touch /signals/renew-crl   # republish the combined CRL now
+  && mv -f $R/crl/root-ca.crl.new $R/crl/root-ca.crl \
+  && install -m 0640 -o 0 -g 1003 $R/crl/root-ca.crl $IN/.root-ca.crl.new \
+  && mv -f $IN/.root-ca.crl.new $IN/root-ca.crl          # the custodian's inbox
+curl -sk --cacert /var/lib/pqc-ca-public/ca-chain.crt --cert admin.crt --key admin.key \
+  -H "X-PQC-CSRF:1" -X POST https://127.0.0.1/admin/crl/renew   # publish it now
 ```
 
-The renewer reports the state on every run, in `docker logs pqc-crl-renewer` and in
-`crl-renewal.log` on the `pqc-logs-crl` volume. Alert on:
+The custodian adopts a root CRL from its inbox on its next CRL (at the latest the next day) only if
+it verifies against the root certificate, has not expired, and is newer by both CRL number and
+lastUpdate; an older one can never replace a newer one. It reports
+`pqc_ca_root_crl_next_update_seconds` and `pqc_ca_root_crl_rejected_total` on its `/metrics`, and
+logs each adoption or refusal. Alert below 90 days left (schedule the renewal) and below 14 days
+(renew now).
 
-- `[WARN] PQ Root CRL is due for renewal but the root CA key is not readable here`: fewer than 90
-  days left. Schedule the renewal.
-- `[ERROR] PQ Root CRL expires in N day(s) and cannot be renewed from this container`: fewer than
-  14 days left. Renew now.
+## The CA custodian (ADR-024)
+
+- **CRLs.** Issued inside every revocation (the revoke answers 200 once a CRL carrying it is
+  published, or 202 with the CRL pending while the custodian retries from 1 s to 60 s), daily with
+  `-updatedb`, and at every start. Published atomically, the combined CRL intermediate first, the
+  files named in certificate URLs in DER. If no CRL can be issued for 6 hours past schedule, the
+  custodian exits so the restart policy acts. Watch `pqc_ca_crl_next_update_seconds` and
+  `pqc_ca_crl_issue_failures_total` on its `/metrics`, and the gateway's
+  `pqc_crl_next_update_seconds`: if no new CRL arrives within 7 days, nginx refuses every client.
+- **When it is down,** the data plane keeps serving; signing, renewal and revocation answer 503.
+  A revocation that cannot wait: `scripts/ca-break-glass-revoke.sh SERIAL [REASON]`, as root on the
+  host, with the custodian stopped (it refuses otherwise). It records the revocation and publishes
+  the next CRL exactly as the custodian would.
+- **One writer.** The custodian holds `/var/lib/pqc-ca/state/.writer.lock` while it runs. Every
+  host tool that writes CA state (`migrate-ca-state.sh`, the break-glass revocation,
+  `ca-unique-subject.sh`, the bootstrap admin certificate in `deploy.sh`) takes it first and
+  refuses if it cannot.
+- **Key backend.** `CA_KEY_URI` names the key as an OpenSSL store URI; `file:` on the read-only key
+  mount today, a PKCS#11 or other provider URI once an HSM is used.
 
 ---
 
@@ -647,11 +677,33 @@ release-candidate builds of its Lua modules (`ngx_lua` 0.10.32rc7, `ngx_stream_l
 this release and turned TLS session tickets off as the interim mitigation, they can go back
 on.
 
+**The CA custodian becomes the only holder of the CA key (ADR-024).** A deployment made before
+this release keeps its intermediate CA in the shared tree until it is migrated; `setup-pki.sh`
+says so and does nothing by itself. The migration is a planned step with a rollback, and only the
+admin path (enrollment, renewal, revocation) is down during it, for minutes:
+
+1. Deploy `management-api` from ADR-024 PR 3 first (it accepts the custodian's 202 and its CRL
+   status). Make a backup (`scripts/backup-state.sh live`, and the encrypted key set).
+2. Stop `management-api`, `crl-renewer` and `pqc-ca-custodian`.
+3. `scripts/migrate-ca-state.sh forward`: copies the key and state into the custodian's layout and
+   verifies every copy. Nothing in `/etc/pki/pqc-ca` changes.
+4. Bring the stack up from this release (`docker compose up -d`). The custodian publishes CRL N+1.
+   Check it is a superset of N, numbered N+1, intermediate first, before anything else.
+5. `scripts/migrate-ca-state.sh retire`, then remove the old `crl-renewer` container and the
+   `pqc-signals`, `pqc-www-pki` and `pqc-logs-crl` volumes.
+6. Rollback at any point: stop the new containers, `scripts/migrate-ca-state.sh reverse` (it copies
+   the state back, including the CRL number and the latest CRLs, and checks nothing is un-revoked),
+   check out the previous release, `docker compose up -d`.
+
+Keep the retired copy of the intermediate key for the rollback window, then destroy it and record
+that.
+
 **Client certificate renewal (off until enabled).** Generate the new secret
 (`scripts/generate-gateway-secrets.sh` writes `secrets/renew-hmac.key`; without it `/renew`
 answers 503), recreate the stack, and only then set `RENEWAL_ENABLED=1`. An existing CA
-database must be switched to `unique_subject = no` with `scripts/ca-unique-subject.sh` after
-the new custodian and crl-renewer run (they take the CA database lock the tool needs).
+database must be switched to `unique_subject = no` with `scripts/ca-unique-subject.sh`, with
+the custodian stopped (since ADR-024 the tool takes the custodian's writer lock and refuses
+while it runs).
 
 **Reloads now end old connections after 60 s.** `nginx.conf` sets
 `worker_shutdown_timeout 60s`: after a reload, which happens on every CRL change
@@ -815,7 +867,9 @@ pki/                  OpenSSL CA configuration templates
 | `scripts/issue-cert.sh` | Issue an ML-DSA-65 client certificate, self-enrollment or admin-direct, native PQ OpenSSL or Docker fallback |
 | `scripts/setup-pki.sh` | Bootstrap the ML-DSA PKI, and assert the deployed CAs carry ML-DSA keys |
 | `scripts/generate-gateway-secrets.sh` | JWT signing keys and the control-plane HMAC |
-| `scripts/pqc-crl-renew.sh` | Regenerate CRLs |
+| `scripts/migrate-ca-state.sh` | Move a running deployment's intermediate CA into the custodian's layout, and back (ADR-024) |
+| `scripts/ca-break-glass-revoke.sh` | Revoke while the custodian cannot run (host, custodian stopped) |
+| `scripts/check-compose-policy.sh` | Static ADR-024 checks of the compose file (CI) |
 | `scripts/verify-admin-sha256.sh` | Verify the admin fingerprint allowlist end to end |
 | `scripts/test-stack-smoke.sh` | All containers running and healthy |
 | `scripts/test-issuance-e2e.sh` | Issue → route → mTLS request → 200 → revoke, against a live gateway |
