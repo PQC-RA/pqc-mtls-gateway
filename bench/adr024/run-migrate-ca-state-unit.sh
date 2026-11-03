@@ -51,6 +51,9 @@ check "layout owners and modes match the spec" "ca_layout_check >/dev/null"
 check "key: 0400, owned by the custodian uid, only in the key directory" "[ \"$(stat -c %u:%a $CA_KEY_FILE)\" = 1003:400 ] && ! grep -rlq \"PRIVATE KEY\" $CA_STATE_DIR $CA_INBOX_DIR $CA_PUBLIC_DIR $CA_STATUS_DIR"
 check "OCSP key: only in its own directory, root:1002 0640" "[ \"$(stat -c %u:%g:%a $OCSP_KEY_DIR/ocsp-pq.key)\" = 0:1002:640 ]"
 check "configuration points at the new layout" "grep -qx \"dir               = $CA_STATE_DIR\" $CA_CNF_FILE && grep -qx \"private_key       = $CA_KEY_FILE\" $CA_CNF_FILE"
+as_ca sh -c "echo x > $CA_STATUS_DIR/probe"
+check "a file the custodian writes into the status directory is readable by group 1002 (setgid)" "[ \"$(stat -c %g $CA_STATUS_DIR/probe)\" = 1002 ]"
+rm -f $CA_STATUS_DIR/probe
 check "public and status directories start empty (the custodian publishes)" "[ -z \"$(find $CA_PUBLIC_DIR $CA_STATUS_DIR -mindepth 1)\" ]"
 $M forward > /tmp/fwd2.log 2>&1; rc=$?
 check "a second forward refuses (target not empty)" "[ $rc != 0 ] && grep -q \"not empty\" /tmp/fwd2.log"

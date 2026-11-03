@@ -37,7 +37,10 @@ CA_KEY_FILE="$CA_KEY_DIR/intermediate-ca.key"
 CA_CNF_FILE="$CA_STATE_DIR/openssl-intermediate.cnf"
 
 # owner:group mode, per directory. The single source for both creating the
-# layout and checking it.
+# layout and checking it. The status directory is setgid (2750): the custodian
+# (gid 1003) writes the OCSP snapshot there and ocsp-pq (gid 1002) must read
+# it, so every file it creates takes the directory's group. Found in the
+# rehearsal on a copy of the live tree: without it the files were 1003:1003.
 ca_layout_spec() {
     cat <<EOF
 $CA_ROOT 0:0 0755
@@ -49,7 +52,7 @@ $CA_STATE_DIR/certs $CA_UID:$CA_GID 0700
 $CA_STATE_DIR/crl $CA_UID:$CA_GID 0700
 $CA_INBOX_DIR 0:$CA_GID 0750
 $CA_PUBLIC_DIR $CA_UID:$CA_GID 0755
-$CA_STATUS_DIR $CA_UID:$OCSP_GID 0750
+$CA_STATUS_DIR $CA_UID:$OCSP_GID 2750
 $OCSP_KEY_DIR 0:$OCSP_GID 0750
 EOF
 }
@@ -69,8 +72,10 @@ ca_layout_check() {
     local dir owner mode got bad=0
     while read -r dir owner mode; do
         if [ ! -d "$dir" ]; then echo "missing: $dir"; bad=1; continue; fi
-        got=$(stat -c '%u:%g 0%a' "$dir")
-        [ "$got" = "$owner $mode" ] || { echo "$dir: $got, expected $owner $mode"; bad=1; }
+        got=$(stat -c '%u:%g %a' "$dir")
+        if [ "${got% *}" != "$owner" ] || [ $((8#${got#* })) != $((8#$mode)) ]; then
+            echo "$dir: $got, expected $owner $mode"; bad=1
+        fi
     done < <(ca_layout_spec)
     return "$bad"
 }
