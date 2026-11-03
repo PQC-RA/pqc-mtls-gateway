@@ -17,29 +17,23 @@ const os = require("os");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
-const { execFile } = require("child_process");
+const { execFile, spawnSync } = require("child_process");
 const { promisify } = require("util");
 
 const execFileAsync = promisify(execFile);
 
 const OPENSSL = process.env.OPENSSL_BIN || "/opt/openssl/bin/openssl";
-const CA_DIR = process.env.CA_DIR || "/etc/pki/pqc-ca/intermediate";
+// The custodian's own state (ADR-024, scripts/lib/ca-layout.sh): mounted into
+// this container only, at the same path as on the host.
+const CA_DIR = process.env.CA_DIR || "/var/lib/pqc-ca/state";
 const CA_CNF = process.env.CA_CNF || "openssl-intermediate.cnf";
 const INDEX_FILE = path.join(CA_DIR, "db", "index.txt");
 const ISSUED_DIR = path.resolve(path.join(CA_DIR, "issued"));
-// Lives in db/, not directly under CA_DIR, CA_DIR's own root dir is
-// root:root 755 (appuser can traverse it, not write into it); db/ is the
-// subdirectory setup-pki.sh actually chowns to the app uid, so that's where
-// anything this process needs to create (as opposed to just read) has to go.
 const FINGERPRINT_INDEX_FILE = path.join(CA_DIR, "db", "fingerprint-index.json");
-// Combined CRL, public data (not the private key), but it lives under the
-// same CA tree that management-api no longer mounts, so it's served through
-// the same narrow, fixed-path read surface as /index and /issued/:serial.
-// With CUSTODIAN_ISSUES_CRL=1 (ADR-024) it is the copy this process publishes.
+// The combined CRL this process publishes (below), also served to
+// management-api through GET /crl.
 const CRL_FILE = process.env.CRL_FILE
-	|| (process.env.CUSTODIAN_ISSUES_CRL === "1" && process.env.CRL_PUBLIC_DIR
-		? path.join(process.env.CRL_PUBLIC_DIR, "hybrid-combined-crl.pem")
-		: path.join(path.dirname(CA_DIR), "hybrid-combined-crl.pem"));
+	|| path.join(process.env.CRL_PUBLIC_DIR || "/var/lib/pqc-ca-public", "hybrid-combined-crl.pem");
 // Custodian-owned default: NOT accepted from the caller, so a compromised
 // management-api can never request a non-standard validity window.
 const CERT_VALIDITY_DAYS = String(Number(process.env.CERT_VALIDITY_DAYS || 365));
@@ -57,11 +51,11 @@ const PROFILES = { "client-30d": 30 * 86400, "demo-120s": 120 };
 const LINEAGE_CAP_S = 365 * 86400; // a renewal chain ends this long after its bootstrap enrollment
 const REBOOTSTRAP_WINDOW_S = 30 * 86400; // a new bootstrap is allowed this close to the cap
 const BACKDATE_S = 60; // notBefore = issue time - 60 s, for client clock skew
-// One lock for every writer of the CA database, shared with the CRL renewer
-// (which runs -updatedb and -gencrl against the same index). `openssl ca` itself
-// does no locking. Inside this process the mutex below serialises the CN check
-// with the signing that follows it.
-const CA_LOCK_FILE = process.env.CA_LOCK_FILE || path.join(CA_DIR, "db", ".ca-db.lock");
+// This process is the only writer of CA state (ADR-024). `openssl ca` does no
+// locking; the in-process mutex below serialises every call, and with one
+// writer nothing else is needed. The writer lock keeps host-side tools
+// (migrate-ca-state.sh, the break-glass revocation) out while this runs.
+const WRITER_LOCK_FILE = path.join(CA_DIR, ".writer.lock");
 const LINEAGE_FILE = path.join(CA_DIR, "db", "lineage.json");
 const IDEMPOTENCY_FILE = path.join(CA_DIR, "db", "idempotency.json");
 const CLOCK_SKEW_MS = 30_000;
@@ -259,18 +253,27 @@ function withCaMutex(fn) {
 	return run;
 }
 
-// The intermediate key as an OpenSSL store URI (ADR-024): `file:/path` today, a
-// PKCS#11 or other provider URI once an HSM is chosen. Unset: the cnf's
-// private_key, as before. Only `openssl ca` uses the key, so this is the one
-// place that names it.
-const CA_KEY_URI = process.env.CA_KEY_URI || "";
+// The intermediate key as an OpenSSL store URI (ADR-024): `file:` on the
+// read-only key mount today, a PKCS#11 or other provider URI once an HSM is
+// chosen. Only `openssl ca` uses the key, so this is the one place that names it.
+const CA_KEY_URI = process.env.CA_KEY_URI || "file:/var/lib/pqc-ca/key/intermediate-ca.key";
 
-// `openssl ca` under the CA-wide file lock shared with the CRL renewer. The
-// lock stays while the renewer and the shared CA tree exist; ADR-024 PR 4
-// removes both, and with them the lock.
-function opensslCaLocked(args) {
-	const keyArgs = CA_KEY_URI ? ["-keyfile", CA_KEY_URI] : [];
-	return execFileAsync("flock", ["-w", "20", CA_LOCK_FILE, OPENSSL, ...args, ...keyArgs], { cwd: CA_DIR });
+// Every `openssl ca` call. Callers run inside withCaMutex.
+function opensslCa(args) {
+	return execFileAsync(OPENSSL, [...args, "-keyfile", CA_KEY_URI], { cwd: CA_DIR });
+}
+
+// Held for the life of the process: flock(2) locks belong to the open file
+// description, so the lock that `flock` takes on our inherited descriptor
+// stays after it exits, for as long as this process keeps the descriptor.
+function takeWriterLock() {
+	const fd = fs.openSync(WRITER_LOCK_FILE, "a", 0o600);
+	const r = spawnSync("flock", ["-n", "-x", "3"], { stdio: ["ignore", "ignore", "pipe", fd] });
+	if (r.status !== 0) {
+		log("ERROR", `Another writer holds ${WRITER_LOCK_FILE} (a migration or break-glass revocation?); refusing to start`);
+		process.exit(1);
+	}
+	return fd; // never closed: the lock goes with the process
 }
 
 async function subjectRfc2253(kind, file) {
@@ -508,7 +511,7 @@ async function handleSign(res, payload) {
 	if (renewsSerial && !RENEWAL_ENABLED) return sendError(res, 403, "renewal_disabled", "Renewal is disabled");
 	const idemKey = normalizeIdempotencyKey(payload.idempotencyKey);
 	if (idemKey === null) return sendError(res, 400, "invalid_idempotency_key", "idempotencyKey must be 8 to 160 characters of [A-Za-z0-9:_-]");
-	if (CRL_ISSUER && !crlState.ready) return sendError(res, 503, "not_ready", "Custodian has not published its first CRL yet; retry");
+	if (!crlState.ready) return sendError(res, 503, "not_ready", "Custodian has not published its first CRL yet; retry");
 
 	return withCaMutex(async () => {
 		const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "pqc-custodian-"));
@@ -592,7 +595,7 @@ async function handleSign(res, payload) {
 			else args.push("-startdate", opensslTime(now - BACKDATE_S * 1000), "-enddate", opensslTime(notAfterMs));
 			let stderr = "";
 			try {
-				const result = await opensslCaLocked(args);
+				const result = await opensslCa(args);
 				stderr = result.stderr || "";
 			} catch (err) {
 				log("ERROR", `openssl ca signing failed: ${err.stderr || err.message}`);
@@ -635,7 +638,7 @@ async function handleSign(res, payload) {
 			}
 			// The OCSP snapshot follows every index change, or a new certificate
 			// answers "unknown" until the next CRL pass.
-			if (CRL_ISSUER) publishStatusSnapshotLogged();
+			publishStatusSnapshotLogged();
 			return sendJson(res, 201, { certificate, serialNumber, notBefore: nb ? new Date(nb[1]).toISOString() : "", expiresAt, lineageId: lineageId || (profile !== "legacy" ? serialNumber : undefined) });
 		} finally {
 			fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -703,11 +706,11 @@ async function handleRevoke(res, payload) {
 		args.push("-crl_reason", reason);
 	}
 
-	if (CRL_ISSUER && !crlState.ready) return sendError(res, 503, "not_ready", "Custodian has not published its first CRL yet; retry");
+	if (!crlState.ready) return sendError(res, 503, "not_ready", "Custodian has not published its first CRL yet; retry");
 
 	const recorded = await withCaMutex(async () => {
 	try {
-		const { stdout, stderr } = await opensslCaLocked(args.slice(0));
+		const { stdout, stderr } = await opensslCa(args.slice(0));
 		const output = `${stdout}\n${stderr}`;
 		if (/already revoked/i.test(output)) {
 			return sendError(res, 409, "already_revoked", `Certificate ${serial} is already revoked`);
@@ -726,7 +729,6 @@ async function handleRevoke(res, payload) {
 	}
 
 	log("INFO", `Revoked certificate serial=${serial} reason=${reason || "unspecified"}`);
-	if (!CRL_ISSUER) return sendJson(res, 200, { ok: true });
 	return true;
 	});
 	if (recorded !== true) return recorded;
@@ -746,15 +748,13 @@ async function handleRevoke(res, payload) {
 }
 
 // ---------------------------------------------------------------------------
-// CRL issuer (ADR-024). Off unless CUSTODIAN_ISSUES_CRL=1, and then this
-// process, the only holder of the intermediate key, issues every intermediate
-// CRL: on each revocation (inside the revoke call), every CRL_REISSUE_AFTER_S
-// (daily by default, with -updatedb), and once at start. It publishes the
-// public artefacts to CRL_PUBLIC_DIR (read-only for every other container) and
-// the OCSP index snapshot to CRL_STATUS_DIR (read only by ocsp-pq). With the
-// flag off nothing below runs, and the CRL renewer keeps doing this job.
+// CRL issuer (ADR-024). This process, the only holder of the intermediate key,
+// issues every intermediate CRL: on each revocation (inside the revoke call),
+// every CRL_REISSUE_AFTER_S (daily by default, with -updatedb), and once at
+// start. It publishes the public artefacts to CRL_PUBLIC_DIR (read-only for
+// every other container) and the OCSP index snapshot to CRL_STATUS_DIR (read
+// only by ocsp-pq). Paths default to scripts/lib/ca-layout.sh.
 // ---------------------------------------------------------------------------
-const CRL_ISSUER = process.env.CUSTODIAN_ISSUES_CRL === "1";
 const CRL_REISSUE_AFTER_S = Number(process.env.CRL_REISSUE_AFTER_S || 86400);
 // A CRL this much later than its schedule means the issuer is wedged. Docker
 // restarts a container that exits, not one that is merely unhealthy, so exit.
@@ -766,10 +766,10 @@ const INT_CRL = path.join(CA_DIR, "crl", "intermediate-ca.crl");
 // The root CRL the custodian currently publishes. It is signed offline with
 // the root key; the operator drops a new one into ROOT_CRL_INBOX.
 const ROOT_CRL = path.join(CA_DIR, "crl", "root-ca.crl");
-const CRL_PUBLIC_DIR = process.env.CRL_PUBLIC_DIR || "";
-const CRL_STATUS_DIR = process.env.CRL_STATUS_DIR || "";
-const ROOT_CRL_INBOX = process.env.ROOT_CRL_INBOX || "";
-const ROOT_CA_CERT = process.env.ROOT_CA_CERT || "";
+const CRL_PUBLIC_DIR = process.env.CRL_PUBLIC_DIR || "/var/lib/pqc-ca-public";
+const CRL_STATUS_DIR = process.env.CRL_STATUS_DIR || "/var/lib/pqc-ca-status";
+const ROOT_CRL_INBOX = process.env.ROOT_CRL_INBOX || "/var/lib/pqc-ca/inbox";
+const ROOT_CA_CERT = process.env.ROOT_CA_CERT || path.join(CA_DIR, "certs", "root-ca.crt");
 // Test-only fault injection for bench/adr024 (never set in a deployment;
 // ADR-024's compose policy check asserts that).
 const TEST_FAULT = process.env.CUSTODIAN_TEST_FAULT || "";
@@ -886,14 +886,14 @@ async function issueCrlNow(withUpdatedb) {
 	if (testFault("crl-fail")) throw new Error("CUSTODIAN_TEST_FAULT crl-fail");
 	if (withUpdatedb) {
 		try {
-			await opensslCaLocked(["ca", "-config", CA_CNF, "-updatedb"]);
+			await opensslCa(["ca", "-config", CA_CNF, "-updatedb"]);
 		} catch (err) {
 			log("WARN", `openssl ca -updatedb failed: ${err.stderr || err.message}; continuing with the CRL`);
 		}
 	}
 	const tmp = `${INT_CRL}.tmp-${process.pid}`;
 	try {
-		await opensslCaLocked(["ca", "-config", CA_CNF, "-gencrl", "-out", tmp]);
+		await opensslCa(["ca", "-config", CA_CNF, "-gencrl", "-out", tmp]);
 		const crl = await inspectCrl(tmp, INT_CERT);
 		if (crlState.crlNumber !== null && crl.number <= crlState.crlNumber) {
 			throw new Error(`CRL number ${crl.number} is not above the last published ${crlState.crlNumber}`);
@@ -922,7 +922,7 @@ async function issueCrlNow(withUpdatedb) {
 		publishFile(CRL_PUBLIC_DIR, "hybrid-combined-crl.pem", combined, 0o644);
 
 		Object.assign(crlState, { lastIssuedAt: Date.now(), crlNumber: crl.number, nextUpdate: crl.nextUpdate, rootNextUpdate: root.nextUpdate, pending: false });
-		log("INFO", `Published intermediate CRL number ${crl.number}, next update ${new Date(crl.nextUpdate).toISOString()}`);
+		log("INFO", `Published intermediate CRL number 0x${crl.number.toString(16).toUpperCase()}, next update ${new Date(crl.nextUpdate).toISOString()}`);
 		return { crlNumber: `0x${crl.number.toString(16).toUpperCase()}` };
 	} finally {
 		fs.rmSync(tmp, { force: true });
@@ -1015,13 +1015,13 @@ function handleGetMetrics(res) {
 	res.end(body);
 }
 
-// Fail closed at start: with the flag on, every path it needs must be named
-// and the first pass must succeed, or the process exits and the restart
-// policy and the alert both see it.
+// Fail closed at start: every path it needs must be set and the first pass
+// must succeed, or the process exits and the restart policy and the alert
+// both see it.
 async function startCrlIssuer() {
 	for (const [name, value] of Object.entries({ CRL_PUBLIC_DIR, CRL_STATUS_DIR, ROOT_CRL_INBOX, ROOT_CA_CERT })) {
 		if (!value) {
-			log("ERROR", `CUSTODIAN_ISSUES_CRL=1 needs ${name}; refusing to start (fail closed)`);
+			log("ERROR", `${name} is empty; refusing to start (fail closed)`);
 			process.exit(1);
 		}
 	}
@@ -1071,9 +1071,8 @@ const server = http.createServer(async (req, res) => {
 		if (req.method === "GET" && req.url === "/healthz") {
 			const indexOk = fs.existsSync(INDEX_FILE);
 			const crlOk = fs.existsSync(CRL_FILE);
-			if (!CRL_ISSUER) return sendJson(res, indexOk && crlOk ? 200 : 503, { ok: indexOk && crlOk, indexOk, crlOk });
-			// As the CRL issuer it is healthy only once it has published and
-			// while its schedule is kept (5 min of grace: a scheduled pass
+			// Healthy only once it has published its first CRL and while its
+			// schedule is kept (5 min of grace: a scheduled pass
 			// starts within a minute of falling due).
 			const crlIssuerOk = crlState.ready && crlOverdueSeconds() <= 300;
 			const ok = indexOk && crlOk && crlIssuerOk;
@@ -1081,8 +1080,8 @@ const server = http.createServer(async (req, res) => {
 		}
 		// Numbers about CRL issuance only, no CA data; unauthenticated like
 		// /healthz so a scraper needs no credential (ADR-024 PR 7 decides who
-		// scrapes it). Only with the CRL issuer on.
-		if (CRL_ISSUER && req.method === "GET" && req.url === "/metrics") {
+		// scrapes it).
+		if (req.method === "GET" && req.url === "/metrics") {
 			return handleGetMetrics(res);
 		}
 
@@ -1152,11 +1151,7 @@ const server = http.createServer(async (req, res) => {
 		}
 
 		// An operator's "renew the CRL now" (management-api's forced renewal).
-		// 404 while this process is not the CRL issuer, so the caller knows to
-		// use the renewer instead; that is how management-api tells the two
-		// apart during the migration.
 		if (req.method === "POST" && url === "/crl/issue") {
-			if (!CRL_ISSUER) return sendError(res, 404, "not_crl_issuer", "This custodian does not issue CRLs");
 			if (!crlState.ready) return sendError(res, 503, "not_ready", "Custodian has not published its first CRL yet; retry");
 			try {
 				const pass = await requestCrlPass("manual", { updatedb: true });
@@ -1173,9 +1168,10 @@ const server = http.createServer(async (req, res) => {
 	}
 });
 
+takeWriterLock();
 server.listen(PORT, () => {
-	log("INFO", `pqc-ca-custodian listening on :${PORT} (CA_DIR=${CA_DIR}, renewal=${RENEWAL_ENABLED ? "on" : "off"}, demo profile=${DEMO_PROFILE_ENABLED ? "on" : "off"}, CRL issuer=${CRL_ISSUER ? "on" : "off"})`);
-	if (CRL_ISSUER) startCrlIssuer();
+	log("INFO", `pqc-ca-custodian listening on :${PORT} (CA_DIR=${CA_DIR}, renewal=${RENEWAL_ENABLED ? "on" : "off"}, demo profile=${DEMO_PROFILE_ENABLED ? "on" : "off"})`);
+	startCrlIssuer();
 });
 
 // Graceful stop. As PID 1, node ignores SIGTERM unless it is handled, so every
