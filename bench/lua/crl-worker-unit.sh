@@ -4,6 +4,7 @@
 #
 #   1. crl-worker-unit.lua: the date parser against fixed vectors, and against a
 #      real CRL's nextUpdate as `openssl crl` prints it in both date formats.
+#      Without a Lua on the host (a CI runner) it runs inside the image of 2.
 #   2. crl-worker-poll-unit.lua: one real poll of crl_worker.lua with a stub
 #      ngx, against a real ML-DSA-65 CRL with one revoked certificate. Needs
 #      /opt/openssl and the CRL at the path crl_worker.lua hard-codes, so it runs
@@ -15,7 +16,7 @@
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd); repo=$(cd "$here/../.." && pwd)
 O=${OPENSSL:-/opt/openssl/bin/openssl}; [ -x "$O" ] || O=$(command -v openssl)
-L=${LUA:-$(command -v luajit || command -v lua)}
+if [ -n "${LUA:-}" ]; then L=$LUA; elif ! L=$(command -v luajit || command -v lua); then L=""; fi
 T=$(mktemp -d); trap 'rm -rf "$T"' EXIT
 
 # A throwaway CA: ca <dir> <openssl> <key algorithm args...>
@@ -44,25 +45,40 @@ CNF
     -keyout "$d/ca.key" -out "$d/ca.crt" > "$d/req.log" 2>&1 || { cat "$d/req.log"; exit 1; }
 }
 
-echo "== 1. date parser"
-mkca "$T/a" "$O" -newkey ec -pkeyopt ec_paramgen_curve:P-256
-"$O" ca -config "$T/a/ca.cnf" -gencrl -out "$T/a/c.crl" > "$T/gencrl.log" 2>&1 || { cat "$T/gencrl.log"; exit 1; }
-rfc=$("$O" crl -in "$T/a/c.crl" -noout -text | sed -n 's/^ *Next Update: *//p' | head -1)
-iso=$("$O" crl -in "$T/a/c.crl" -noout -nextupdate -dateopt iso_8601 | sed 's/^nextUpdate=//')
-"$L" "$here/crl-worker-unit.lua" "$rfc" "$iso"
-
-[ "${SKIP_POLL_TEST:-0}" = 1 ] && { echo "== 2. poll test SKIPPED (SKIP_POLL_TEST=1)"; exit 0; }
-echo "== 2. one real poll, ML-DSA-65 CRL, OpenSSL and LuaJIT from base.lock"
-lock() { sed -n "s/.*\"$1\": *\"\\([^\"]*\\)\".*/\\1/p" "$repo/base.lock"; }
-OB="$(lock image)@$(lock digest)"; RB="$(lock openresty_image)@$(lock openresty_digest)"
-cat > "$T/Dockerfile" <<DF
+# The image for the poll test (and for part 1 without a host Lua): OpenSSL and
+# LuaJIT from the two pinned base images in base.lock.
+img=crl-worker-unit:local
+build_img() {
+  lock() { sed -n "s/.*\"$1\": *\"\\([^\"]*\\)\".*/\\1/p" "$repo/base.lock"; }
+  local OB RB
+  OB="$(lock image)@$(lock digest)"; RB="$(lock openresty_image)@$(lock openresty_digest)"
+  cat > "$T/Dockerfile" <<DF
 FROM $OB AS o
 FROM $RB
 COPY --from=o /opt /opt
 ENV LD_LIBRARY_PATH=/opt/openssl/lib64:/opt/openssl/lib:/usr/local/openresty/luajit/lib OPENSSL_CONF=/dev/null
 DF
-img=crl-worker-unit:local
-docker build -q -t "$img" "$T" >/dev/null
+  docker build -q -t "$img" "$T" >/dev/null
+}
+
+echo "== 1. date parser"
+if [ -z "$L" ]; then
+  echo "   (no Lua on this host: running it with the image's LuaJIT)"
+  build_img
+  docker run --rm --network none -v "$repo:/r:ro" -e SKIP_POLL_TEST=1 \
+    -e LUA=/usr/local/openresty/luajit/bin/luajit -e OPENSSL=/opt/openssl/bin/openssl \
+    --entrypoint bash "$img" /r/bench/lua/crl-worker-unit.sh
+else
+  mkca "$T/a" "$O" -newkey ec -pkeyopt ec_paramgen_curve:P-256
+  "$O" ca -config "$T/a/ca.cnf" -gencrl -out "$T/a/c.crl" > "$T/gencrl.log" 2>&1 || { cat "$T/gencrl.log"; exit 1; }
+  rfc=$("$O" crl -in "$T/a/c.crl" -noout -text | sed -n 's/^ *Next Update: *//p' | head -1)
+  iso=$("$O" crl -in "$T/a/c.crl" -noout -nextupdate -dateopt iso_8601 | sed 's/^nextUpdate=//')
+  "$L" "$here/crl-worker-unit.lua" "$rfc" "$iso"
+fi
+
+[ "${SKIP_POLL_TEST:-0}" = 1 ] && { echo "== 2. poll test SKIPPED (SKIP_POLL_TEST=1)"; exit 0; }
+echo "== 2. one real poll, ML-DSA-65 CRL, OpenSSL and LuaJIT from base.lock"
+build_img
 docker run --rm --network none -v "$repo:/r:ro" --entrypoint sh "$img" -c '
 set -eu; O=/opt/openssl/bin/openssl; d=$(mktemp -d); mkdir -p /etc/pki/pqc-ca
 q() { "$@" > /tmp/q.log 2>&1 || { echo "FAILED: $*"; cat /tmp/q.log; exit 1; }; }   # quiet unless it fails
@@ -91,4 +107,8 @@ cat $d/int.crl $d/root.crl > /etc/pki/pqc-ca/hybrid-combined-crl.pem
 echo "-- combined CRL root first"
 cat $d/root.crl $d/int.crl > /etc/pki/pqc-ca/hybrid-combined-crl.pem
 /usr/local/openresty/luajit/bin/luajit crl-worker-poll-unit.lua withdrawn "$serial"
+echo "-- chain file unreadable"
+cat $d/int.crl $d/root.crl > /etc/pki/pqc-ca/hybrid-combined-crl.pem
+rm /etc/pki/pqc-ca/hybrid-ca-chain.crt
+/usr/local/openresty/luajit/bin/luajit crl-worker-poll-unit.lua nochain "$serial"
 '
