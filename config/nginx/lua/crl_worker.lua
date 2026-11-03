@@ -68,6 +68,66 @@ end
 -- attacker-controlled PQC_OPENSSL_BIN would be a shell injection vector.
 local OPENSSL  = "/opt/openssl/bin/openssl"
 local CRL_FILE = "/etc/pki/pqc-ca/hybrid-combined-crl.pem"
+-- The client-auth chain, intermediate first: the subject of its first
+-- certificate is the issuer the first CRL in CRL_FILE must have for its
+-- nextUpdate to be the one the metric reports.
+local CHAIN_FILE = "/etc/pki/pqc-ca/hybrid-ca-chain.crt"
+
+-- Subject of the first certificate in CHAIN_FILE, in the form `openssl crl
+-- -text` prints an Issuer (same default name format); or nil and what openssl
+-- said instead (its stderr is read, not discarded).
+local function intermediate_subject()
+    local f, err = io.popen(string.format("%s x509 -in %s -noout -subject 2>&1", OPENSSL, CHAIN_FILE), "r")
+    if not f then return nil, "cannot run openssl: " .. tostring(err) end
+    local out = f:read("*a") or ""; f:close()
+    local subject = out:match("^subject=%s*([^\n]-)%s*\n?$")
+    if subject then return subject end
+    out = out:gsub("%s+$", ""):gsub("\n", " | ")
+    return nil, out ~= "" and out or "no output"
+end
+
+-- nextUpdate of the CRL this poller last loaded, published for
+-- pqc_crl_next_update_seconds (ADR-024). pqc_crl_age_seconds says whether this
+-- poller is alive, and is refreshed on an unchanged file, so it cannot see a
+-- CRL that nobody renews run out. This value can: the metric falls by one per
+-- second until a new CRL arrives and goes negative once the CRL has expired,
+-- which is when nginx's ssl_crl starts refusing every client certificate.
+-- `openssl crl -text` reads only the FIRST CRL in the file, so this is the
+-- intermediate CRL as long as the combined file is written intermediate first,
+-- as pqc-crl-renew.sh does.
+local MONTHS = {
+    Jan = 1, Feb = 2, Mar = 3, Apr = 4, May = 5, Jun = 6,
+    Jul = 7, Aug = 8, Sep = 9, Oct = 10, Nov = 11, Dec = 12,
+}
+
+-- "Nov 10 08:52:27 2026 GMT", as ASN1_TIME_print writes it (day space-padded,
+-- optional fractional seconds) -> seconds since the epoch, or nil. Computed
+-- here rather than with os.time, which reads its table as LOCAL time.
+function M.parse_openssl_time(s)
+    if type(s) ~= "string" then
+        return nil
+    end
+    local mon, d, h, mi, sec, y =
+        s:match("^(%a%a%a)%s+(%d%d?)%s+(%d%d):(%d%d):(%d%d)%.?%d*%s+(%d%d%d%d)%s+GMT$")
+    local m = mon and MONTHS[mon]
+    if not m then
+        return nil
+    end
+    d, h, mi, sec, y = tonumber(d), tonumber(h), tonumber(mi), tonumber(sec), tonumber(y)
+    if d < 1 or d > 31 or h > 23 or mi > 59 or sec > 60 then
+        return nil
+    end
+    -- Days since 1970-01-01 in the proleptic Gregorian calendar
+    -- (H. Hinnant's days_from_civil).
+    local yy  = (m <= 2) and (y - 1) or y
+    local era = math.floor(yy / 400)
+    local yoe = yy - era * 400
+    local mp  = (m + 9) % 12
+    local doy = math.floor((153 * mp + 2) / 5) + d - 1
+    local doe = yoe * 365 + math.floor(yoe / 4) - math.floor(yoe / 100) + doy
+    local days = era * 146097 + doe - 719468
+    return days * 86400 + h * 3600 + mi * 60 + sec
+end
 
 -- Forward declaration: reschedule() refers to poll_crl, which refers back to
 -- reschedule(). Declared local so neither ever becomes a global: a global here
@@ -117,11 +177,18 @@ poll_crl = function(premature)
     else
         local saw_crl   = false
         local loaded    = 0
+        local next_update_text, issuer_text
         for line in f:lines() do
             -- The header confirms openssl actually parsed a CRL (vs. an error).
             if line:find("Certificate Revocation List", 1, true)
                 or line:find("Last Update", 1, true) then
                 saw_crl = true
+            end
+            if not next_update_text then
+                next_update_text = line:match("^%s*Next Update:%s*(.-)%s*$")
+            end
+            if not issuer_text then
+                issuer_text = line:match("^%s*Issuer:%s*(.-)%s*$")
             end
             -- Match plain hex ("1A2B") and colon-delimited serials ("1A:2B:3C").
             local raw = line:match("Serial Number:%s*([0-9A-Fa-f:]+)")
@@ -156,6 +223,36 @@ poll_crl = function(premature)
             held      = loaded
             last_beat = ngx.now()
             publish(last_beat)
+            -- A CRL without a parsable nextUpdate ("NONE") withdraws the value,
+            -- so the metric disappears rather than reporting the previous CRL's.
+            -- So does a first CRL that is not the intermediate's (a combined
+            -- file written root first): reporting the root CRL's nextUpdate
+            -- would hide an intermediate CRL that runs out. Revocation loading
+            -- above is not affected by either.
+            local next_update = M.parse_openssl_time(next_update_text)
+            -- Each reason is logged on its own, once.
+            local expected, why = intermediate_subject()
+            if not next_update then
+                ngx.log(ngx.ERR, "[crl_worker] CRL has no parsable Next Update (",
+                    tostring(next_update_text), "), pqc_crl_next_update_seconds withdrawn")
+            elseif not expected then
+                next_update = nil
+                ngx.log(ngx.ERR, "[crl_worker] cannot read the intermediate's subject from ", CHAIN_FILE,
+                    ": ", why, "; pqc_crl_next_update_seconds withdrawn")
+            elseif issuer_text ~= expected then
+                next_update = nil
+                ngx.log(ngx.ERR, "[crl_worker] the first CRL in ", CRL_FILE, " is issued by '",
+                    tostring(issuer_text), "', not by the intermediate '", tostring(expected),
+                    "' (combined file not intermediate first?); pqc_crl_next_update_seconds withdrawn")
+            end
+            if next_update then
+                local nu_ok, nu_err = ngx.shared.pqc_route_meta:set("crl_next_update", next_update)
+                if not nu_ok then
+                    ngx.log(ngx.ERR, "[crl_worker] failed to publish crl_next_update: ", tostring(nu_err))
+                end
+            else
+                ngx.shared.pqc_route_meta:delete("crl_next_update")
+            end
             ngx.log(ngx.WARN, "[crl_worker] CRL poll OK, ", loaded, " revoked serial(s) loaded")
         end
     end
