@@ -473,7 +473,10 @@ jobs:
           sudo -E docker compose down          # this release's containers; volumes stay
           sudo ./scripts/migrate-ca-state.sh reverse
           git checkout -q --detach "${{ steps.rel.outputs.prev }}"
-          sudo -E docker compose up -d
+          # As the README says: recreate every container of the previous
+          # release (its stopped crl-renewer would otherwise be restarted on a
+          # network the compose down above deleted).
+          sudo -E docker compose up -d --force-recreate
           wait_healthy pqc-gateway 180
           # The previous release must run the images it ran before the switch.
           while read -r c img; do

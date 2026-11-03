@@ -723,7 +723,8 @@ not, until step 5):
 4. `scripts/migrate-ca-state.sh check-next`: N+1 verifies, is numbered N+1, carries every serial of
    N, is first in the combined CRL and runs 6 or more days. **If it fails, do not go on:** stop
    the custodian, `scripts/migrate-ca-state.sh abort` (it sets the unused new layout aside and
-   leaves `/etc/pki/pqc-ca` untouched), check out the previous release and start it. A gateway
+   leaves `/etc/pki/pqc-ca` untouched), check out the previous release and recreate all its
+   containers with `docker compose up -d --force-recreate`. A gateway
    started on a bad N+1 would un-revoke certificates (its revoked set starts empty).
 5. Only now move the readers and the rest: `docker compose up -d` (recreates the gateway,
    `ocsp-pq`, `pki-dist` and `management-api`).
@@ -733,8 +734,11 @@ not, until step 5):
 7. Rollback after step 5: stop the new containers, `scripts/migrate-ca-state.sh reverse` (it copies
    the state back, including the CRL number, the latest CRLs and the trust files as they are now,
    takes the larger serial and CRL number, checks nothing is un-revoked and no row is lost, and
-   sets `/etc/pki/pqc-trust` aside), check out the previous release, `docker compose up -d` (it
-   runs that release's own images, still on the host). `reverse` refuses a layout the old system
+   sets `/etc/pki/pqc-trust` aside), check out the previous release, and recreate all its
+   containers: `docker compose up -d --force-recreate`. Not a plain `up -d`: it would restart the
+   previous release's stopped `crl-renewer` (step 1 stops it, this release's `compose down` does not
+   remove it, as it is not in this compose file) on a network that `compose down` deleted, and fail.
+   It runs that release's own images, still on the host. `reverse` refuses a layout the old system
    has moved on from since forward (after an abort that went back to it): that one is set aside
    with `abort`, never restored. CI rehearses all of this on every PR that still makes the switch
    (`bring-up.yml`, job `cutover-rehearsal`): the previous release deployed, this release

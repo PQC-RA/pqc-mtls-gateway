@@ -483,7 +483,9 @@ reverse() {
         if [ -d "$f" ]; then mv "$f" "$f.reversed-$TS"; fi
     done
     echo "    $CA_ROOT.reversed-$TS holds a copy of the intermediate key: destroy it when no longer needed, and record that."
-    say "reverse done. Recreate the old containers (they mount the trust file by inode); the renewer's next CRL is number $next."
+    say "reverse done. Check out the previous release and recreate ALL its containers: docker compose up -d --force-recreate"
+    echo "    (a plain up -d would restart the stopped crl-renewer on a network this release's compose down removed; and the old"
+    echo "    containers mount the trust file by inode). The renewer's next CRL is number $next."
 }
 
 # --- abort --------------------------------------------------------------------
@@ -517,7 +519,8 @@ abort() {
         mv "$TRUST_DIR" "$TRUST_DIR.aborted-$TS"
     fi
     echo "    $CA_ROOT.aborted-$TS holds a copy of the intermediate key: destroy it when no longer needed, and record that."
-    say "abort done. Start the old containers; the old system goes on from where it is."
+    say "abort done. Check out the previous release and recreate ALL its containers: docker compose up -d --force-recreate"
+    echo "    (this release's compose replaced the custodian's container). The old system goes on from where it is."
 }
 
 case "$cmd" in
