@@ -100,12 +100,14 @@ const mode = f => (fs.statSync(f).mode & 0o777).toString(8);
 // What ocsp-pq answers, run exactly as it runs: openssl ocsp as uid 1002, on the
 // status snapshot, the public chain and its own key directory (one request, no
 // network: -reqin / -respout).
-function ocspStatus(serial) {
-	const cert = `${STATE}/issued/${serial}.pem`, issuer = `${STATE}/certs/intermediate-ca.crt`;
+// The responder's -CA, read from its Dockerfile (what is deployed is what is tested).
+const OCSP_CA = (/"-CA", "([^"]+)"/.exec(fs.readFileSync("/repo/docker/ocsp-pq/Dockerfile", "utf8")) || [])[1];
+const ocspStatus = serial => ocspFor(`${STATE}/issued/${serial}.pem`, `${STATE}/certs/intermediate-ca.crt`);
+function ocspFor(cert, issuer) {
 	ossl(["ocsp", "-issuer", issuer, "-cert", cert, "-no_nonce", "-reqout", "/tmp/ocsp.req"]);
 	try { fs.rmSync("/tmp/ocsp.resp"); } catch { /* first call */ }
 	execFileSync("setpriv", ["--reuid=1002", "--regid=1002", "--clear-groups", O, "ocsp", "-index", `${STATUS}/index.txt`,
-		"-CA", `${PUB}/ca-chain.crt`, "-rsigner", "/var/lib/pqc-ocsp/ocsp-pq.crt", "-rkey", "/var/lib/pqc-ocsp/ocsp-pq.key",
+		"-CA", OCSP_CA, "-rsigner", "/var/lib/pqc-ocsp/ocsp-pq.crt", "-rkey", "/var/lib/pqc-ocsp/ocsp-pq.key",
 		"-reqin", "/tmp/ocsp.req", "-respout", "/tmp/ocsp.resp"], { ...osslEnv, stdio: "pipe" });
 	const out = execFileSync(O, ["ocsp", "-respin", "/tmp/ocsp.resp", "-issuer", issuer, "-CAfile", `${PUB}/ca-chain.crt`, "-cert", cert], { ...osslEnv, stdio: "pipe" }).toString();
 	return (/: (good|revoked|unknown)/.exec(out) || [, out.trim().slice(0, 60)])[1];
@@ -577,6 +579,19 @@ exec ${O} "$@"
 	check("9-6: root-owned index.txt.new and crlnumber.new beside the current files: set aside, the custodian starts and issues", s.exitCode === null && r.status === 200 && !fs.existsSync(`${STATE}/db/crlnumber.new`) && /Set aside crlnumber\.new/.test(logs), `${s.exitCode} ${r.status}`);
 
 	check("7-5: the intermediate CRL file left replaced by 7-4 is not taken as the baseline of revoked serials (said), the pass publishes", s.exitCode === null && /not a verifiable intermediate CRL/.test(logs) && r.status === 200);
+
+	// 9-8: ocsp-pq answers only for what the intermediate issued
+	// (Only the status is read: a response by the intermediate's responder about
+	// a root-issued certificate cannot verify, and that is not the point here.)
+	let intOcsp;
+	try {
+		ossl(["ocsp", "-issuer", `${STATE}/certs/root-ca.crt`, "-cert", `${STATE}/certs/intermediate-ca.crt`, "-no_nonce", "-reqout", "/tmp/q98.req"]);
+		execFileSync("setpriv", ["--reuid=1002", "--regid=1002", "--clear-groups", O, "ocsp", "-index", `${STATUS}/index.txt`,
+			"-CA", OCSP_CA, "-rsigner", "/var/lib/pqc-ocsp/ocsp-pq.crt", "-rkey", "/var/lib/pqc-ocsp/ocsp-pq.key",
+			"-reqin", "/tmp/q98.req", "-respout", "/tmp/q98.resp"], { ...osslEnv, stdio: "pipe" });
+		intOcsp = (/Cert Status: (\w+)/.exec(ossl(["ocsp", "-respin", "/tmp/q98.resp", "-resp_text", "-noverify"])) || [])[1];
+	} catch (e) { intOcsp = String(e.stderr || e.message).slice(0, 80); }
+	check("9-8: OCSP for a certificate the root issued (the intermediate's own) is unknown, not answered from the intermediate's index", intOcsp === "unknown", intOcsp);
 
 	// 9-7: a failed OCSP snapshot does not fail the CRL pass
 	const statusMode = fs.statSync(STATUS).mode & 0o7777;

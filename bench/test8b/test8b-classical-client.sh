@@ -28,11 +28,13 @@
 #      server certificate and CA, WITHOUT the guard, accepts the ECDSA leaf
 #      from the patched client; WITH -client_sigalgs ML-DSA-65 it refuses it
 #
-# It signs two 1-day classical-keyed leaves with the intermediate CA on this
-# host (openssl ca, writing the CA index; run it when no enrollment is in
-# flight) and revokes them through the admin API at the end. So it refuses to
-# run unless TEST8B_I_UNDERSTAND=1. It must run on the gateway host, as root:
-# it reads the CA tree, the server key (case 5) and the gateway's log volume.
+# It mints two 1-day classical-keyed leaves out of band with the intermediate's
+# key (openssl x509 -req, as verify-suite.sh G10 does): they never enter the CA
+# database, so the custodian stays its only writer (ADR-024), and there is
+# nothing to revoke; they end in a day and their keys are shredded. It still
+# refuses to run unless TEST8B_I_UNDERSTAND=1. It must run on the gateway host,
+# as root: it reads the intermediate key, the server key (case 5) and the
+# gateway's log volume.
 #
 # Usage: TEST8B_I_UNDERSTAND=1 OPENSSL_8B=<prefix> test8b-classical-client.sh WORKDIR
 set -uo pipefail
@@ -42,9 +44,10 @@ REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 HOST=${HOST:-127.0.0.1}                 # loopback only, enforced below
 TLS_PORT=${TLS_PORT:-443}               # the mTLS listener as published on the host
 SNI=${SNI:-pqc-gw.local}
-PKI=${PKI:-/etc/pki/pqc-ca}
+# shellcheck source=scripts/lib/ca-layout.sh
+. "$REPO/scripts/lib/ca-layout.sh"     # CA_STATE_DIR, CA_KEY_FILE, CA_PUBLIC_DIR
 SSL_DIR=${SSL_DIR:-/etc/ssl/pqc}
-CA=$PKI/ca-chain.crt; DB=$PKI/intermediate/db
+CA=$CA_PUBLIC_DIR/ca-chain.crt; INT_CRT=$CA_STATE_DIR/certs/intermediate-ca.crt
 ADM_C=${ADMIN_CERT:-$REPO/admin-cert/gateway-admin.crt}; ADM_K=${ADMIN_KEY:-$REPO/admin-cert/gateway-admin.key}
 GW=${GW_CONTAINER:-pqc-gateway}
 NGINX_LOGS=${NGINX_LOGS:-/var/lib/docker/volumes/pqc-gw_pqc-logs-nginx/_data}
@@ -55,8 +58,8 @@ O="$OSSL_PREFIX/bin/openssl"
 export LD_LIBRARY_PATH=$OSSL_PREFIX/lib64 OPENSSL_CONF=/dev/null
 
 if [ "${TEST8B_I_UNDERSTAND:-0}" != 1 ]; then
-	echo "refusing to run: this signs two classical-keyed test certificates with the"
-	echo "intermediate CA on this host. Set TEST8B_I_UNDERSTAND=1."
+	echo "refusing to run: this mints two classical-keyed test certificates with the"
+	echo "intermediate key on this host (outside the CA database). Set TEST8B_I_UNDERSTAND=1."
 	exit 2
 fi
 W=${1:?workdir}; mkdir -p "$W"
@@ -65,7 +68,7 @@ check(){ if eval "$2"; then echo "PASS  $1"; pass=$((pass+1)); else echo "FAIL  
 
 # guard WORKDIR: refuse anything but the gateway on this host. HOST must be a
 # loopback address, the port must be the one $GW publishes, and the server
-# certificate on it must chain to the CA in $PKI, the CA this test signs with.
+# certificate on it must chain to $CA, the chain this test mints under.
 guard() {
 	local w=$1
 	case "$HOST" in 127.*|::1|localhost) ;; *) echo "GUARD ABORT: HOST=$HOST is not local"; exit 90 ;; esac
@@ -79,20 +82,22 @@ guard() {
 	for f in "$NGINX_LOGS/pqc-mtls-access.log" "$NGINX_LOGS/pqc-mtls-handshake.log"; do
 		[ -r "$f" ] || { echo "GUARD ABORT: cannot read $f"; exit 90; }
 	done
-	echo "GUARD OK ($GW on $HOST:$TLS_PORT, CA $PKI)"
+	echo "GUARD OK ($GW on $HOST:$TLS_PORT, CA $CA)"
 }
 guard "$W"
 
-# -- classical leaves signed by the intermediate (host-path config copy) --------
-sed "s#^dir[[:space:]]*=.*#dir               = $PKI/intermediate#" "$PKI/intermediate/openssl-intermediate.cnf" > "$W/int-host.cnf"
+# -- classical leaves minted with the intermediate key, outside the CA database --
+# Never `openssl ca`: that writes the database the custodian alone writes.
+# A serial in a range the CA database never uses (0x7f...), the extensions of
+# a client leaf, one day.
+printf 'basicConstraints = critical, CA:FALSE\nkeyUsage = critical, digitalSignature\nextendedKeyUsage = clientAuth\n' > "$W/leaf.ext"
 TS=$(date -u +%H%M%S)
 mkleaf(){ # mkleaf NAME KEYARGS...
 	local n=$1; shift
-	"$O" genpkey "$@" -out "$W/$n.key" 2>/dev/null
+	"$O" genpkey "$@" -out "$W/$n.key"
 	"$O" req -new -key "$W/$n.key" -subj "/C=BG/O=ACME/OU=M2M-Client/CN=t8b-$n-$TS" -out "$W/$n.csr"
-	"$O" ca -config "$W/int-host.cnf" -batch -notext -days 1 -in "$W/$n.csr" -out "$W/$n.crt" 2>"$W/$n.ca.err"
-	# The custodian (uid 1001) writes the same database; keep it writable for it.
-	chown 1001:1001 "$DB"/index.txt* "$DB"/serial* 2>/dev/null || true
+	"$O" x509 -req -in "$W/$n.csr" -CA "$INT_CRT" -CAkey "$CA_KEY_FILE" -set_serial "0x7f$("$O" rand -hex 8)" \
+		-days 1 -extfile "$W/leaf.ext" -out "$W/$n.crt" || echo "   could not mint the $n leaf" >&2
 }
 mkleaf ecdsa -algorithm EC -pkeyopt ec_paramgen_curve:P-256
 mkleaf rsa -algorithm RSA -pkeyopt rsa_keygen_bits:3072
@@ -153,18 +158,8 @@ done
 check "5 without the guard the server ACCEPTS the classical ECDSA leaf (HTTP 200 from s_server -www)" "grep -q 'HTTP/1.0 200' '$W/c5-noguard.out'"
 check "5 with -client_sigalgs ML-DSA-65 the same server REFUSES it" "! grep -q 'HTTP/1.0 200' '$W/c5-guard.out' && grep -q 'wrong signature type' '$W/s_server-guard.out'"
 
-# Revoke the two classical test leaves through the admin API, the supported
-# path (it regenerates the CRL). Best effort: they expire in a day regardless.
-for n in ecdsa rsa; do
-	[ -f "$W/$n.crt" ] || continue
-	ser=$("$O" x509 -in "$W/$n.crt" -noout -serial 2>/dev/null | cut -d= -f2)
-	[ -n "$ser" ] || continue
-	r=$(curl -sS --max-time 15 --cacert "$CA" --cert "$ADM_C" --key "$ADM_K" -H "X-PQC-CSRF:1" \
-		--resolve "$SNI:$TLS_PORT:$HOST" -X POST "https://$SNI:$TLS_PORT/admin/certs/revoke" \
-		-H "Content-Type: application/json" -d "{\"serial\":\"$ser\",\"reason\":\"cessationOfOperation\"}" 2>&1)
-	echo "   revoke $n leaf $ser: $(echo "$r" | head -c 100)"
-done
-
+# The two leaves are in no CA database, so there is nothing to revoke: they
+# end in a day, and their keys are shredded now.
 find "$W" -name '*.key' -exec shred -u {} +
 echo "== result: $pass passed, $fail failed"
 exit $fail

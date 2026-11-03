@@ -118,6 +118,11 @@ jobs:
       - name: Compose policy check refuses what it must (ADR-024)
         run: ./bench/adr024/compose-policy-unit.sh
 
+      # One writer of CA state: a script that runs openssl ca on the live CA
+      # takes the custodian's writer lock, or is a named exception.
+      - name: CA state has one writer (ADR-024)
+        run: ./scripts/check-ca-writers.sh
+
       # ADR-024: the gateway entrypoint fails when the custodian's CA files do
       # not come, and its reload watcher reports nginx's own errors. The real
       # functions, sourced, with a fake nginx: no images needed.
