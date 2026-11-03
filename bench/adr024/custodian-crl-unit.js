@@ -36,6 +36,9 @@ function req(method, path, body) {
 			const c = []; rr.on("data", d => c.push(d));
 			rr.on("end", () => { const raw = Buffer.concat(c).toString(); let j = {}; try { j = JSON.parse(raw); } catch { /* text */ } resolve({ status: rr.statusCode, j, raw }); });
 		});
+		// A client timeout of its own, so a custodian that never answers fails
+		// a check instead of hanging the suite.
+		r.setTimeout(20_000, () => r.destroy(Object.assign(new Error("client timeout"), { code: "TIMEOUT" })));
 		r.on("error", reject); r.end(b);
 	});
 }
@@ -370,6 +373,78 @@ function itemUnitPasses() {
 	for (let i = 0; i < 50 && !early; i++) { await sleep(100); try { const x = await metrics(); if (x.status === 200) early = x.m; } catch { /* not listening yet */ } }
 	check("/metrics before the first CRL: no time gauges (never a misleading 0)", early && early.pqc_ca_crl_last_issued_timestamp_seconds === undefined && early.pqc_ca_crl_next_update_seconds === undefined && early.pqc_ca_crl_issue_failures_total === 0, JSON.stringify(early));
 	fs.rmSync(FAILFLAG);
+	await stop();
+
+	// ------------------- guards from the re-review of 2026-11-03 (#9 items)
+	// An openssl that hangs or fails on purpose, for the custodian only.
+	fs.writeFileSync("/tmp/fake-openssl", `#!/bin/sh
+case " $* " in
+  *" -gencrl "*) [ -e /tmp/hang ] && exec sleep 600 ;;
+  *" -updatedb "*) [ -e /tmp/updb-fail ] && { echo "forced -updatedb failure" >&2; exit 1; } ;;
+esac
+exec ${O} "$@"
+`, { mode: 0o755 });
+	const HYB2 = `${PUB}/hybrid-combined-crl.pem`;
+
+	// a hung openssl is killed by the exec timeout; the revoke still answers
+	s = await start({ ...CRL_ENV, OPENSSL_BIN: "/tmp/fake-openssl", EXEC_TIMEOUT_MS: "1500" });
+	serial = await issue("hang");
+	fs.writeFileSync("/tmp/hang", "");
+	let th = Date.now();
+	r = await req("POST", "/revoke", { serialNumber: serial });
+	const hangMs = Date.now() - th;
+	let sleeping = ""; try { sleeping = execFileSync("pgrep", ["-f", "sleep 600"]).toString().trim(); } catch { /* none left: pgrep exits 1 */ }
+	m = (await metrics()).m;
+	check("a hung openssl is SIGKILLed at EXEC_TIMEOUT_MS: revoke answers 202, no hung process is left", r.status === 202 && hangMs < 4000 && sleeping === "" && m.pqc_ca_crl_issue_failures_total >= 1, `${r.status} ${hangMs} ms, left: '${sleeping}'`);
+	fs.rmSync("/tmp/hang");
+	let back = false;
+	for (let i = 0; i < 40 && !back; i++) { await sleep(250); back = serialsIn(HYB2).has(serial); }
+	check("  ... and the retry publishes it once openssl behaves", back);
+
+	// a failed -updatedb fails the pass (counted) instead of signing on
+	fs.writeFileSync("/tmp/updb-fail", "");
+	const nUpd = crlNumber(HYB2), u0 = (await metrics()).m.pqc_ca_crl_updatedb_failures_total;
+	r = await req("POST", "/crl/issue");
+	m = (await metrics()).m;
+	check("-updatedb fails: the pass fails (503), counted, no new CRL", r.status === 503 && m.pqc_ca_crl_updatedb_failures_total > u0 && crlNumber(HYB2) === nUpd, `${r.status} ${u0}->${m.pqc_ca_crl_updatedb_failures_total}`);
+	fs.rmSync("/tmp/updb-fail");
+
+	// the inbox counts a refused file once, not on every pass
+	rootCrl("/tmp/root-crl-expired2.pem", ["-crl_lastupdate", "20200101000000Z", "-crl_nextupdate", "20200102000000Z"]);
+	toInbox("/tmp/root-crl-expired2.pem");
+	const rj0 = (await metrics()).m.pqc_ca_root_crl_rejected_total;
+	for (let i = 0; i < 3; i++) await req("POST", "/crl/issue");
+	check("inbox: one refused file is counted once over three passes", (await metrics()).m.pqc_ca_root_crl_rejected_total === rj0 + 1, `${rj0} -> ${(await metrics()).m.pqc_ca_root_crl_rejected_total}`);
+	toInbox("/tmp/root-crl-tie.pem");
+
+	// the publisher checks the order of what it publishes
+	fs.writeFileSync("/tmp/root-first", "");
+	await stop();
+	s = await start({ ...CRL_ENV, CUSTODIAN_TEST_FAULT: "combined-root-first:/tmp/root-first" }, { expectExit: true });
+	check("a combined CRL that would start with the root CRL is never published (start-up pass refused)", s.exitCode === 1 && /would start with/.test(logs) && /Intermediate/.test(firstIssuer(HYB2)), s.exitCode);
+	fs.rmSync("/tmp/root-first");
+
+	// the whole request stays within its budget even behind a stalled pass
+	s = await start({ ...CRL_ENV, CUSTODIAN_TEST_FAULT: `crl-delay:${FAILFLAG}`, MUTEX_WAIT_MS: "1000" });
+	serial = await issue("busy");
+	fs.writeFileSync(FAILFLAG, "");
+	const stalled = req("POST", "/crl/issue");   // a pass that holds the mutex
+	await sleep(300);
+	let tb = Date.now();
+	r = await req("POST", "/revoke", { serialNumber: serial }).catch(e => ({ status: e.code, j: {} }));
+	const busyMs = Date.now() - tb;
+	check("behind a stalled pass, revoke answers 503 busy at MUTEX_WAIT_MS and records nothing", r.status === 503 && r.j.error === "busy" && busyMs < 3000 && statusRow(serial) === "V" && fs.readFileSync(`${STATE}/db/index.txt`, "utf8").split("\n").some(l => l.startsWith("V") && l.split("\t")[3] === serial), `${r.status} ${r.j.error} ${busyMs} ms`);
+	fs.rmSync(FAILFLAG); await stalled;
+	r = await req("POST", "/revoke", { serialNumber: serial });
+	check("  ... and the same revoke succeeds once the CA is free", r.status === 200, r.status);
+	await stop();
+
+	// an openssl run killed between its two renames: recovered at start
+	fs.copyFileSync(`${STATE}/db/index.txt`, `${STATE}/db/index.txt.new`);
+	fs.renameSync(`${STATE}/db/index.txt`, `${STATE}/db/index.txt.old`);
+	const want = fs.readFileSync(`${STATE}/db/index.txt.new`);
+	s = await start(CRL_ENV);
+	check("index.txt missing after an interrupted rename: recovered from .new at start, custodian serves", s.exitCode === null && fs.existsSync(`${STATE}/db/index.txt`) && /Recovered .*index\.txt from index\.txt\.new/.test(logs) && fs.readFileSync(`${STATE}/db/index.txt`).length >= want.length, s.exitCode);
 	await stop();
 
 	// ----------------------------------------- start-up failure fails closed
