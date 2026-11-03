@@ -704,7 +704,10 @@ admin path (enrollment, renewal, revocation) is down during it, for minutes:
 3. Back up: `scripts/backup-state.sh live`, and the encrypted key set.
 4. Check out this release and run `scripts/generate-gateway-secrets.sh`: it gives the custodian
    HMAC secret to the custodian's own uid (1003:1001 0440). Without it the new custodian cannot
-   read its secret and refuses to start.
+   read its secret and refuses to start. Then build this release's images with
+   `scripts/build-all.sh` (the old system keeps running). They are tagged `adr024-4b`, so the
+   previous release's images stay on the host, unchanged, for a rollback. Do not run
+   `deploy.sh`: it refuses on a deployment from before ADR-024.
 5. Issue a fresh CRL N with the old system (`docker exec pqc-crl-renewer touch
    /signals/renew-crl`), and check its `nextUpdate` is at least 6 days ahead.
 
@@ -730,9 +733,12 @@ not, until step 5):
 7. Rollback after step 5: stop the new containers, `scripts/migrate-ca-state.sh reverse` (it copies
    the state back, including the CRL number, the latest CRLs and the trust files as they are now,
    takes the larger serial and CRL number, checks nothing is un-revoked and no row is lost, and
-   sets `/etc/pki/pqc-trust` aside), check out the previous release, `docker compose up -d`.
-   `reverse` refuses a layout the old system has moved on from since forward (after an abort
-   that went back to it): that one is set aside with `abort`, never restored.
+   sets `/etc/pki/pqc-trust` aside), check out the previous release, `docker compose up -d` (it
+   runs that release's own images, still on the host). `reverse` refuses a layout the old system
+   has moved on from since forward (after an abort that went back to it): that one is set aside
+   with `abort`, never restored. CI rehearses all of this on every PR that still makes the switch
+   (`bring-up.yml`, job `cutover-rehearsal`): the previous release deployed, this release
+   refused over it, the switch, and the rollback to a previous release that serves.
 
 Keep the retired copy of the intermediate key for the rollback window, then destroy it and record
 that.

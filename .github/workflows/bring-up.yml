@@ -351,3 +351,148 @@ jobs:
       - name: Tear down
         if: always()
         run: sudo docker compose down -v --remove-orphans || true
+
+  # The cut-over and its rollback, as the README runbook writes them, on a
+  # deployment of the PREVIOUS release (pre-merge review 9-2 and 9-3). Only
+  # while the target branch still predates ADR-024: once it carries the
+  # custodian's layout there is no switch left to rehearse.
+  #
+  #   1. the previous release (the target branch) deployed and serving;
+  #   2. this release's deploy.sh refuses over it and changes nothing (9-3);
+  #   3. the switch: build (images tagged by release), secrets, stop, forward,
+  #      only the custodian, check-next, the readers; smoke and issuance e2e;
+  #      retire;
+  #   4. the rollback: this release down, reverse, the previous release up;
+  #      it runs its OWN images (not rebuilt, not this release's: 9-2) and
+  #      serves (its smoke test and issuance e2e).
+  #
+  # One checkout, switched between the two commits, as on a real host:
+  # secrets/, admin-cert/ and the compose project (pqc-gw) are shared.
+  cutover-rehearsal:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Which releases
+        id: rel
+        run: |
+          set -euo pipefail
+          echo "DOCKER_CONFIG=$RUNNER_TEMP/docker" >> "$GITHUB_ENV"
+          prev=$(git rev-parse "origin/${{ github.base_ref }}")
+          new=$(git rev-parse HEAD)
+          echo "prev=$prev" >> "$GITHUB_OUTPUT"
+          echo "new=$new" >> "$GITHUB_OUTPUT"
+          if git show "$prev:scripts/lib/ca-layout.sh" > /dev/null 2>&1; then
+            echo "skip=1" >> "$GITHUB_OUTPUT"
+            echo "::notice::${{ github.base_ref }} already has the custodian layout: no cut-over to rehearse"
+          else
+            echo "skip=0" >> "$GITHUB_OUTPUT"
+            echo "previous release ${prev:0:7}, this release ${new:0:7}"
+          fi
+
+      - name: Authenticate docker to GHCR
+        if: steps.rel.outputs.skip == '0'
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          ACTOR: ${{ github.actor }}
+        run: |
+          set -euo pipefail
+          mkdir -p "$DOCKER_CONFIG"
+          printf '%s' "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+
+      - name: 1. Deploy the previous release
+        if: steps.rel.outputs.skip == '0'
+        run: |
+          set -euo pipefail
+          git checkout -q --detach "${{ steps.rel.outputs.prev }}"
+          sudo -E ./scripts/deploy.sh
+          ./scripts/test-stack-smoke.sh
+          # The images the previous release runs, by ID, to compare after the rollback.
+          for c in pqc-ca-custodian pqc-ocsp-pq pqc-pki-dist pqc-gateway; do
+            echo "$c $(sudo docker inspect -f '{{.Image}}' "$c")"
+          done | tee /tmp/prev-images
+
+      - name: 2. This release refuses to deploy over it (9-3)
+        if: steps.rel.outputs.skip == '0'
+        run: |
+          set -euo pipefail
+          git checkout -q --detach "${{ steps.rel.outputs.new }}"
+          # shellcheck disable=SC2024  # the log is the runner's own, in /tmp
+          if sudo -E ./scripts/deploy.sh > /tmp/deploy-new.log 2>&1; then
+            cat /tmp/deploy-new.log; echo "::error::deploy.sh of this release ran over a deployment from before ADR-024"; exit 1
+          fi
+          grep -q "predates ADR-024" /tmp/deploy-new.log || { cat /tmp/deploy-new.log; echo "::error::deploy.sh failed for another reason"; exit 1; }
+          [ ! -e /var/lib/pqc-ca ] || { echo "::error::deploy.sh created /var/lib/pqc-ca before refusing"; exit 1; }
+          [ "$(sudo docker inspect -f '{{.State.Health.Status}}' pqc-gateway)" = healthy ] \
+            || { echo "::error::the previous release's gateway is no longer healthy"; exit 1; }
+          echo "refused, nothing changed, the previous release still serves"
+
+      - name: 3. The switch (README runbook)
+        if: steps.rel.outputs.skip == '0'
+        run: |
+          set -euo pipefail
+          wait_healthy() { # wait_healthy CONTAINER SECONDS
+            for _ in $(seq 1 "$2"); do
+              [ "$(sudo docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$1")" = healthy ] && return 0
+              sleep 1
+            done
+            echo "::error::$1 not healthy after $2 s"; sudo docker logs --tail 60 "$1"; return 1
+          }
+          # Before: secrets for this release, its images (the old system keeps running).
+          sudo ./scripts/generate-gateway-secrets.sh
+          sudo -E ./scripts/build-all.sh
+          # The switch.
+          sudo docker stop pqc-mtls-management-api pqc-crl-renewer pqc-ca-custodian
+          sudo ./scripts/migrate-ca-state.sh forward
+          sudo -E docker compose up -d --no-deps pqc-ca-custodian
+          wait_healthy pqc-ca-custodian 90
+          sudo ./scripts/migrate-ca-state.sh check-next
+          sudo -E docker compose up -d
+          wait_healthy pqc-gateway 180
+          wait_healthy pqc-mtls-management-api 180
+          ./scripts/test-stack-smoke.sh
+          sudo -E ./scripts/test-issuance-e2e.sh
+          sudo ./scripts/migrate-ca-state.sh retire
+
+      - name: 4. The rollback, and the previous release serves on its own images (9-2)
+        if: steps.rel.outputs.skip == '0'
+        run: |
+          set -euo pipefail
+          wait_healthy() {
+            for _ in $(seq 1 "$2"); do
+              [ "$(sudo docker inspect -f '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$1")" = healthy ] && return 0
+              sleep 1
+            done
+            echo "::error::$1 not healthy after $2 s"; sudo docker logs --tail 60 "$1"; return 1
+          }
+          sudo -E docker compose down          # this release's containers; volumes stay
+          sudo ./scripts/migrate-ca-state.sh reverse
+          git checkout -q --detach "${{ steps.rel.outputs.prev }}"
+          sudo -E docker compose up -d
+          wait_healthy pqc-gateway 180
+          # The previous release must run the images it ran before the switch.
+          while read -r c img; do
+            now=$(sudo docker inspect -f '{{.Image}}' "$c")
+            [ "$now" = "$img" ] || { echo "::error::$c runs $now after the rollback, not the previous release's $img"; exit 1; }
+          done < /tmp/prev-images
+          echo "the previous release runs its own images"
+          ./scripts/test-stack-smoke.sh
+          sudo -E ./scripts/test-issuance-e2e.sh
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          sudo docker ps -a
+          for c in $(sudo docker ps -a --format '{{.Names}}'); do
+            echo "::group::$c"; sudo docker logs --tail 80 "$c" 2>&1; echo "::endgroup::"
+          done
+          sudo ls -la /var/lib/pqc-ca* /etc/pki/pqc-ca /etc/pki/pqc-trust* 2>&1 | head -60
+
+      - name: Tear down
+        if: always()
+        run: sudo docker compose down -v --remove-orphans || true
