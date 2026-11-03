@@ -431,7 +431,11 @@ services:
   # Pinned by digest for the same reason base.lock is, a tag can be moved under
   # you. To bump: take the digest from the publish run's job summary in
   # pqc-mtls-management-api and change it here, in this one place.
-  image: ghcr.io/pqc-ra/pqc-mtls-management-api@sha256:d70503f12ac3d36fd794551e181541e90f62c8cbb305458741e87b9d7e90e01c
+  # This is main at 3a7ec9f (ADR-024 PR 3: the custodian as CRL issuer, 202 on
+  # a pending CRL, no CRL renewer script), publish run 41672787711. The
+  # cut-over needs it: an image from before PR 3 runs a renewer script this
+  # compose file no longer has, so every revoke answers 500.
+  image: ghcr.io/pqc-ra/pqc-mtls-management-api@sha256:1056f30855bd3cd28d76147baf98ce8a118c93f57cf9594a0ea5342dfdfc5b69
   # Dedicated non-root account (matches the image + setup-pki.sh host perms).
   user: "1001:1001"
   depends_on:

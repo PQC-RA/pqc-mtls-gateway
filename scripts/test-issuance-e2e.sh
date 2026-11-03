@@ -17,8 +17,8 @@
 #      enrollment-CA bug broke) and produces a certificate file.
 #   2. A request through the gateway with that client cert returns the backend's
 #      200 body (route + mTLS + JWT hand-off all work).
-#   Then it revokes the test cert and removes the test route (best-effort
-#   cleanup) so the run leaves no lasting state.
+#   3. Revoking that certificate answers 200 or 202, and its serial reaches the
+#      published combined CRL. Then the test route is removed.
 #
 # Overridable env (defaults suit a server-local run):
 #   PQC_GATEWAY PQC_CA_CHAIN PQC_ENROLL_CA PQC_ADMIN_CERT PQC_ADMIN_KEY
@@ -85,19 +85,31 @@ echo "$RESP" | tail -1 | grep -q "pqc-shadow-success" \
     || fail "gateway did not return the expected backend body (last line: $(echo "$RESP" | tail -1))"
 echo "   OK: gateway returned the backend 200"
 
-echo "== [3/3] Cleanup: revoke the test cert + remove the test route (best-effort) =="
-SERIAL="$("$OSSL" x509 -in "$CRT" -noout -serial 2>/dev/null | cut -d= -f2 | tr 'A-F' 'a-f')"
-if [ -n "$SERIAL" ]; then
-    REV="$(_https POST /admin/certs/revoke "$CA_CHAIN" "$ADMIN_CERT" "$ADMIN_KEY" \
-        "{\"serial\":\"$SERIAL\",\"reason\":\"unspecified\"}" "X-PQC-CSRF: 1")"
-    if echo "$REV" | grep -qiE '"revoked"|revoked|HTTP/1\.1 20'; then
-        echo "   revoked serial $SERIAL"
-    else
-        echo "   WARNING: could not confirm revocation of serial $SERIAL, revoke manually:" >&2
-        echo "     POST $GW/admin/certs/revoke  {\"serial\":\"$SERIAL\",\"reason\":\"unspecified\"}" >&2
-    fi
+echo "== [3/3] Revoke the test cert (200 or 202, and it reaches the published CRL), remove the test route =="
+# A failed revoke is a failure, not a warning: a revoke that answered 500 was
+# reported as "could not confirm" here and the run still passed (pre-merge
+# review 9-1, an image from before ADR-024 PR 3).
+SERIAL="$("$OSSL" x509 -in "$CRT" -noout -serial | cut -d= -f2 | tr 'a-f' 'A-F')"
+[ -n "$SERIAL" ] || fail "cannot read the serial of $CRT"
+REV="$(_https POST /admin/certs/revoke "$CA_CHAIN" "$ADMIN_CERT" "$ADMIN_KEY" \
+    "{\"serial\":\"$SERIAL\",\"reason\":\"unspecified\"}" "X-PQC-CSRF: 1")"
+REV_STATUS="$(printf '%s\n' "$REV" | sed -n '1s#^HTTP/1\.[01] \([0-9][0-9][0-9]\).*#\1#p')"
+case "$REV_STATUS" in
+    200|202) echo "   revoke answered $REV_STATUS for serial $SERIAL" ;;
+    *) fail "revoke of serial $SERIAL answered '${REV_STATUS:-no status}', not 200 or 202 (body: $(printf '%s\n' "$REV" | tail -1))" ;;
+esac
+# 200: the custodian published a CRL carrying it before answering; 202: it
+# keeps retrying, so allow it a while.
+CRL_FILE="${PQC_PUBLIC_CRL:-/var/lib/pqc-ca-public/hybrid-combined-crl.pem}"
+in_crl() { "$OSSL" crl -in "$CRL_FILE" -noout -text | grep -qE "Serial Number: *0*$SERIAL\$"; }
+if [ "$REV_STATUS" = 200 ]; then
+    in_crl || fail "revoke answered 200 but $CRL_FILE does not list serial $SERIAL"
+else
+    for _ in $(seq 1 30); do in_crl && break; sleep 1; done
+    in_crl || fail "revoke answered 202 but serial $SERIAL is not in $CRL_FILE after 30 s"
 fi
+echo "   OK: serial $SERIAL is in the published CRL"
 _https DELETE "/admin/policy/routes/$CN" "$CA_CHAIN" "$ADMIN_CERT" "$ADMIN_KEY" "" "X-PQC-CSRF: 1" >/dev/null
 
 echo
-echo "PASS, issuance works end-to-end (issue -> route -> mTLS request -> 200)."
+echo "PASS, issuance works end-to-end (issue -> route -> mTLS request -> 200 -> revoke -> CRL)."
