@@ -41,12 +41,12 @@ policy           = p
 commonName       = supplied
 CNF
   OPENSSL_CONF=/dev/null "$o" req -x509 "$@" -nodes -subj /CN=crl-worker-unit -days 1 \
-    -keyout "$d/ca.key" -out "$d/ca.crt" 2>/dev/null
+    -keyout "$d/ca.key" -out "$d/ca.crt" > "$d/req.log" 2>&1 || { cat "$d/req.log"; exit 1; }
 }
 
 echo "== 1. date parser"
 mkca "$T/a" "$O" -newkey ec -pkeyopt ec_paramgen_curve:P-256
-"$O" ca -config "$T/a/ca.cnf" -gencrl -out "$T/a/c.crl" 2>/dev/null
+"$O" ca -config "$T/a/ca.cnf" -gencrl -out "$T/a/c.crl" > "$T/gencrl.log" 2>&1 || { cat "$T/gencrl.log"; exit 1; }
 rfc=$("$O" crl -in "$T/a/c.crl" -noout -text | sed -n 's/^ *Next Update: *//p' | head -1)
 iso=$("$O" crl -in "$T/a/c.crl" -noout -nextupdate -dateopt iso_8601 | sed 's/^nextUpdate=//')
 "$L" "$here/crl-worker-unit.lua" "$rfc" "$iso"
@@ -64,15 +64,31 @@ DF
 img=crl-worker-unit:local
 docker build -q -t "$img" "$T" >/dev/null
 docker run --rm --network none -v "$repo:/r:ro" --entrypoint sh "$img" -c '
-set -eu; O=/opt/openssl/bin/openssl; d=$(mktemp -d)
-mkdir -p $d/db /etc/pki/pqc-ca; : > $d/db/index.txt; echo 1000 > $d/db/crlnumber; echo 1000 > $d/db/serial
-printf "[ca]\ndefault_ca=c\n[c]\ndir=$d\ndatabase=$d/db/index.txt\ncrlnumber=$d/db/crlnumber\nserial=$d/db/serial\nnew_certs_dir=$d\ncertificate=$d/ca.crt\nprivate_key=$d/ca.key\ndefault_md=default\ndefault_days=1\ndefault_crl_days=7\npolicy=p\n[p]\ncommonName=supplied\n" > $d/ca.cnf
-$O req -x509 -newkey ML-DSA-65 -nodes -subj /CN=crl-worker-unit -days 1 -keyout $d/ca.key -out $d/ca.crt 2>/dev/null
-$O req -new -newkey ML-DSA-65 -nodes -subj /CN=leaf -keyout $d/l.key -out $d/l.csr 2>/dev/null
-$O ca -config $d/ca.cnf -batch -in $d/l.csr -out $d/l.crt 2>/dev/null
-$O ca -config $d/ca.cnf -revoke $d/l.crt 2>/dev/null
-$O ca -config $d/ca.cnf -gencrl -out /etc/pki/pqc-ca/hybrid-combined-crl.pem 2>/dev/null
+set -eu; O=/opt/openssl/bin/openssl; d=$(mktemp -d); mkdir -p /etc/pki/pqc-ca
+q() { "$@" > /tmp/q.log 2>&1 || { echo "FAILED: $*"; cat /tmp/q.log; exit 1; }; }   # quiet unless it fails
+# A root and an intermediate as the gateway has them, one revoked leaf.
+mkca() { # mkca DIR: an openssl ca database and configuration in DIR
+	mkdir -p "$1/db"; : > "$1/db/index.txt"; echo 1000 > "$1/db/crlnumber"; echo 1000 > "$1/db/serial"
+	printf "[ca]\ndefault_ca=c\n[c]\ndir=$1\ndatabase=$1/db/index.txt\ncrlnumber=$1/db/crlnumber\nserial=$1/db/serial\nnew_certs_dir=$1\ncertificate=$1/ca.crt\nprivate_key=$1/ca.key\ndefault_md=default\ndefault_days=1\ndefault_crl_days=7\npolicy=p\n[p]\ncommonName=supplied\n[v3_ca]\nbasicConstraints=critical,CA:true\nkeyUsage=critical,keyCertSign,cRLSign\n" > "$1/ca.cnf"
+}
+mkca $d/root; mkca $d/int
+q $O req -x509 -newkey ML-DSA-65 -nodes -subj "/O=unit/CN=Unit Root CA" -days 2 -keyout $d/root/ca.key -out $d/root/ca.crt
+q $O req -new -newkey ML-DSA-65 -nodes -subj "/O=unit/CN=Unit Intermediate CA" -keyout $d/int/ca.key -out $d/int/ca.csr
+q $O ca -config $d/root/ca.cnf -batch -extensions v3_ca -in $d/int/ca.csr -out $d/int/ca.crt
+q $O req -new -newkey ML-DSA-65 -nodes -subj /CN=leaf -keyout $d/l.key -out $d/l.csr
+q $O ca -config $d/int/ca.cnf -batch -in $d/l.csr -out $d/l.crt
+q $O ca -config $d/int/ca.cnf -revoke $d/l.crt
+q $O ca -config $d/int/ca.cnf -gencrl -out $d/int.crl
+q $O ca -config $d/root/ca.cnf -gencrl -crldays 30 -out $d/root.crl
+cat $d/int/ca.crt $d/root/ca.crt > /etc/pki/pqc-ca/hybrid-ca-chain.crt
 serial=$($O x509 -in $d/l.crt -noout -serial | sed "s/serial=//" | tr A-F a-f)
-nu=$($O crl -in /etc/pki/pqc-ca/hybrid-combined-crl.pem -noout -nextupdate -dateopt iso_8601 | sed "s/^nextUpdate=//")
+nu=$($O crl -in $d/int.crl -noout -nextupdate -dateopt iso_8601 | sed "s/^nextUpdate=//")
 epoch=$(date -u -d "${nu%Z}" +%s)
-cd /r/bench/lua && /usr/local/openresty/luajit/bin/luajit crl-worker-poll-unit.lua "$epoch" "$serial"'
+cd /r/bench/lua
+echo "-- combined CRL intermediate first"
+cat $d/int.crl $d/root.crl > /etc/pki/pqc-ca/hybrid-combined-crl.pem
+/usr/local/openresty/luajit/bin/luajit crl-worker-poll-unit.lua "$epoch" "$serial"
+echo "-- combined CRL root first"
+cat $d/root.crl $d/int.crl > /etc/pki/pqc-ca/hybrid-combined-crl.pem
+/usr/local/openresty/luajit/bin/luajit crl-worker-poll-unit.lua withdrawn "$serial"
+'
