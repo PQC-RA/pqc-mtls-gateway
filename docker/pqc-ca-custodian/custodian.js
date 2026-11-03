@@ -905,8 +905,9 @@ function publishStatusSnapshotLogged() {
 }
 
 // A root CRL from the inbox replaces the published one only if it verifies
-// against the root certificate, has not expired, and is NEWER by both CRL
-// number and lastUpdate: an older root CRL must never un-revoke an intermediate.
+// against the root certificate, has not expired, has a HIGHER CRL number and a
+// lastUpdate that is not earlier: an older root CRL must never un-revoke an
+// intermediate.
 async function adoptInboxRootCrl() {
 	const inbox = path.join(ROOT_CRL_INBOX, "root-ca.crl");
 	if (!fs.existsSync(inbox)) return;
@@ -919,7 +920,10 @@ async function adoptInboxRootCrl() {
 		if (current) {
 			const c = await inspectCrl(ROOT_CRL, ROOT_CA_CERT);
 			if (o.number <= c.number) throw new Error(`CRL number ${o.number} is not above the published ${c.number}`);
-			if (o.lastUpdate <= c.lastUpdate) throw new Error("its lastUpdate is not later than the published one");
+			// The CRL number orders CRLs (RFC 5280 5.2.3). lastUpdate has one-second
+			// resolution, so two root CRLs issued in the same second tie; only an
+			// EARLIER lastUpdate is refused.
+			if (o.lastUpdate < c.lastUpdate) throw new Error(`its lastUpdate ${new Date(o.lastUpdate).toISOString()} is earlier than the published one's ${new Date(c.lastUpdate).toISOString()}`);
 		}
 		publishFile(path.dirname(ROOT_CRL), path.basename(ROOT_CRL), offered, 0o644);
 		log("INFO", `Adopted root CRL number ${o.number} from ${inbox}`);

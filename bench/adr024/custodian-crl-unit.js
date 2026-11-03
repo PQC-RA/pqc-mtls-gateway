@@ -233,12 +233,21 @@ function itemUnitPasses() {
 	toInbox("/tmp/root-crl-old-lastupdate.pem"); rej0 = (await metrics()).m.pqc_ca_root_crl_rejected_total;
 	await req("POST", "/revoke", { serialNumber: await issue("r6") });
 	m = (await metrics()).m;
-	check("inbox: a higher number does not help an OLDER lastUpdate: refused", m.pqc_ca_root_crl_rejected_total > rej0 && fs.readFileSync(`${PUB}/root-ca.crl`).equals(newDer) && /lastUpdate is not later/.test(logs), m.pqc_ca_root_crl_rejected_total);
+	check("inbox: a higher number does not help an OLDER lastUpdate: refused", m.pqc_ca_root_crl_rejected_total > rej0 && fs.readFileSync(`${PUB}/root-ca.crl`).equals(newDer) && /lastUpdate \S+ is earlier/.test(logs), m.pqc_ca_root_crl_rejected_total);
 	toInbox("/tmp/root-crl-initial.pem"); rej0 = (await metrics()).m.pqc_ca_root_crl_rejected_total;
 	await req("POST", "/revoke", { serialNumber: await issue("r4") });
 	m = (await metrics()).m;
 	check("inbox: an OLDER root CRL (lower number) is refused, the newer stays", m.pqc_ca_root_crl_rejected_total > rej0 && fs.readFileSync(`${PUB}/root-ca.crl`).equals(newDer));
 	toInbox("/tmp/root-crl-new.pem");
+	// The case that made this test flaky once: a root CRL with a higher number
+	// and the SAME lastUpdate second as the published one is newer (RFC 5280
+	// 5.2.3 orders CRLs by number; lastUpdate has one-second resolution).
+	const pubLast = /lastUpdate=(\S+) (\S+)Z/.exec(ossl(["crl", "-inform", "DER", "-in", `${PUB}/root-ca.crl`, "-noout", "-lastupdate", "-dateopt", "iso_8601"]));
+	rootCrl("/tmp/root-crl-tie.pem", ["-crl_lastupdate", `${pubLast[1].replace(/-/g, "")}${pubLast[2].replace(/:/g, "")}Z`]);
+	toInbox("/tmp/root-crl-tie.pem");
+	await req("POST", "/revoke", { serialNumber: await issue("r7") });
+	const tieDer = execFileSync(O, ["crl", "-in", "/tmp/root-crl-tie.pem", "-outform", "DER"]);
+	check("inbox: a higher number in the same lastUpdate second is adopted (CRL numbers order CRLs)", fs.readFileSync(`${PUB}/root-ca.crl`).equals(tieDer), (logs.match(/(Adopted|Refused) root CRL[^\n]*/g) || []).slice(-1)[0]);
 
 	// -------------------------------------------- existing behaviour, flag on
 	check("flag on: bench/item4/custodian-unit.js all pass", itemUnitPasses(), lastUnit);
