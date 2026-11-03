@@ -1,6 +1,70 @@
 #!/bin/bash
 set -euo pipefail
 
+# ── CA files and the reload watcher (functions) ───────────────────────────────
+# Defined first so bench/gateway/entrypoint-ca-unit.sh can source this file and
+# test them; the guard below stops a sourcing shell before anything runs.
+
+# wait_for_ca_files CRL CHAIN SECONDS: the CA custodian publishes both on its
+# first start (ADR-024) and nginx cannot start without them. Fails, naming the
+# files and the custodian, if they are not there within SECONDS.
+wait_for_ca_files() {
+    local i
+    for i in $(seq 1 "$3"); do
+        if [ -s "$1" ] && [ -s "$2" ]; then return 0; fi
+        if [ "$i" = 1 ]; then echo "[entrypoint] waiting for the CA custodian to publish $1 and $2 ..."; fi
+        sleep 1
+    done
+    if [ -s "$1" ] && [ -s "$2" ]; then return 0; fi
+    echo "FATAL: $1 or $2 is missing or empty after $3 s. pqc-ca-custodian publishes them on its first start: start it and read its log (docker logs pqc-ca-custodian)." >&2
+    return 1
+}
+
+# reload_nginx: test the configuration, then reload. nginx's own output is
+# kept in RELOAD_OUT so a failure can be reported with its cause.
+reload_nginx() {
+    RELOAD_OUT=$(nginx -t -q 2>&1) && RELOAD_OUT=$(nginx -s reload 2>&1)
+}
+
+# watch_crl: nginx's static ssl_crl is read only on reload, so reload when the
+# CRL file itself changes. The custodian replaces it with rename(2), which
+# gives it a new inode; the file is the signal, there is no separate sentinel
+# that could disagree with it. Polled rather than inotify (not in this image).
+# A change counts as handled only once the reload succeeded: a failed test or
+# reload is retried every poll and reported once, with nginx's own output.
+watch_crl() {
+    local last now reload_failed_for=""
+    # Wait for the master to write its pid before attempting any reload.
+    while [ ! -f "$NGINX_PID_FILE" ]; do sleep 1; done
+    # An unreadable file is a change (its stat error goes to the log, and the
+    # reload attempt reports why nginx cannot use it), never the end of the loop.
+    crl_id() { if [ -e "$CRL_FILE" ]; then stat -c '%i %Y %s' "$CRL_FILE" || echo unreadable; else echo missing; fi; }
+    last=$(crl_id)
+    while true; do
+        sleep "$RELOAD_POLL_INTERVAL"
+        now=$(crl_id)
+        [ "$now" = "$last" ] && continue
+        [ "$now" = missing ] && continue
+        if reload_nginx; then
+            last="$now"
+            reload_failed_for=""
+            echo "[reload-watcher] $CRL_FILE changed: nginx reloaded"
+        elif [ "$reload_failed_for" != "$now" ]; then
+            reload_failed_for="$now"
+            echo "[reload-watcher] ERROR: $CRL_FILE changed but nginx did not reload; retrying every ${RELOAD_POLL_INTERVAL}s. nginx said:" >&2
+            printf '%s\n' "$RELOAD_OUT" | tail -5 >&2
+        fi
+    done
+}
+
+CRL_FILE="${NGINX_CRL_FILE:-/etc/pki/pqc-ca/hybrid-combined-crl.pem}"
+CA_CHAIN_FILE="${NGINX_CA_CHAIN_FILE:-/etc/pki/pqc-ca/hybrid-ca-chain.crt}"
+CA_WAIT_S="${CA_FILES_WAIT_S:-120}"
+RELOAD_POLL_INTERVAL="${NGINX_RELOAD_POLL_INTERVAL:-5}"
+NGINX_PID_FILE="${NGINX_PID_FILE:-/run/nginx.pid}"
+
+if [ "${BASH_SOURCE[0]}" != "$0" ]; then return 0; fi   # sourced by a test
+
 echo "Starting OpenResty PQ-TLS Gateway..."
 
 # ── Runtime secret validation ────────────────────────────────────────────────
@@ -104,49 +168,15 @@ chown -R nobody:nogroup "$ROUTES_DIR" 2>/dev/null || \
 # The CA custodian publishes the chain and the CRLs into the public directory
 # mounted at /etc/pki/pqc-ca (ADR-024). On a brand-new deployment that happens
 # when the custodian first starts, so wait for it here instead of letting nginx
-# fail on a missing file. Afterwards the files persist on the host, so a gateway
-# restart never waits on the custodian.
-CRL_FILE="${NGINX_CRL_FILE:-/etc/pki/pqc-ca/hybrid-combined-crl.pem}"
-CA_WAIT_S="${CA_FILES_WAIT_S:-120}"
-for _i in $(seq 1 "$CA_WAIT_S"); do
-    [ -s "$CRL_FILE" ] && [ -s /etc/pki/pqc-ca/hybrid-ca-chain.crt ] && break
-    [ "$_i" = 1 ] && echo "[entrypoint] waiting for the CA custodian to publish $CRL_FILE ..."
-    sleep 1
-done
+# fail on a missing file, and fail if it does not come. Afterwards the files
+# persist on the host, so a gateway restart never waits on the custodian.
+wait_for_ca_files "$CRL_FILE" "$CA_CHAIN_FILE" "$CA_WAIT_S" || exit 1
 
-# nginx's static ssl_crl is read only on reload, so reload when the CRL file
-# itself changes. The custodian replaces it with rename(2), which gives it a new
-# inode; the file is the signal, there is no separate sentinel that could
-# disagree with it. Polled rather than inotify (not in this image). Runs in the
-# background so nginx stays PID 1; it must stay the FIRST background subshell
-# (bench/crl-fastpath.sh pauses it by that position). The Lua fast path
-# (crl_worker.lua, 1 s) refuses a revoked certificate before this reload.
-RELOAD_POLL_INTERVAL="${NGINX_RELOAD_POLL_INTERVAL:-5}"
-
-(
-    # Wait for the master to write its pid before attempting any reload.
-    while [ ! -f /run/nginx.pid ]; do sleep 1; done
-
-    crl_id() { stat -c '%i %Y %s' "$CRL_FILE" 2>/dev/null || echo missing; }
-    last=$(crl_id)
-    while true; do
-        sleep "$RELOAD_POLL_INTERVAL"
-        now=$(crl_id)
-        [ "$now" = "$last" ] && continue
-        [ "$now" = missing ] && continue
-        # Handled only once the reload succeeded: a failed test or reload is
-        # retried every poll (reported once), so a new CRL cannot stay unloaded.
-        if nginx -t -q 2>/dev/null && nginx -s reload 2>/dev/null; then
-            last="$now"
-            reload_failed_for=
-            echo "[reload-watcher] $CRL_FILE changed: nginx reloaded"
-        elif [ "${reload_failed_for:-}" != "$now" ]; then
-            reload_failed_for="$now"
-            echo "[reload-watcher] ERROR: $CRL_FILE changed but nginx did not reload; retrying every ${RELOAD_POLL_INTERVAL}s" >&2
-            nginx -t 2>&1 | tail -3 >&2 || true
-        fi
-    done
-) &
+# The watcher runs in the background so nginx stays PID 1; it must stay the
+# FIRST background subshell (bench/crl-fastpath.sh pauses it by that
+# position). The Lua fast path (crl_worker.lua, 1 s) refuses a revoked
+# certificate before this reload.
+watch_crl &
 
 # ── Certificate expiry warning ────────────────────────────────────────────────
 # Nothing renews the gateway's own server certificates automatically (the :8081
