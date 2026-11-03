@@ -59,5 +59,20 @@ override keyrw pqc-ca-custodian "/var/lib/pqc-ca/key:/var/lib/pqc-ca/key:rw"
 run "$repo/docker-compose.yml" "$T/keyrw.yml"
 check "9-4: the custodian key mount writable is refused" "[ $(rc) = 1 ] && grep -q 'pqc-ca-custodian: mounts the CA key directory /var/lib/pqc-ca/key writable' $T/out" || show
 
+for path in //var/lib/pqc-ca/key //etc/pki/pqc-ca //var/lib/pqc-ca; do
+    n=$(echo "$path" | tr -c 'a-z' '_')
+    override "lead$n" gateway "$path:/lead$n:ro"
+    run "$repo/docker-compose.yml" "$T/lead$n.yml"
+    check "B2: a leading // does not get past the policy ($path)" "[ $(rc) = 1 ] && grep -q 'gateway: mounts' $T/out" || show
+done
+
+printf 'services:\n  gateway:\n    volumes:\n      - keybind:/k:ro\nvolumes:\n  keybind:\n    driver_opts:\n      type: none\n      o: bind\n      device: /var/lib/pqc-ca/key\n' > "$T/namedbind.yml"
+run "$repo/docker-compose.yml" "$T/namedbind.yml"
+check "B2: a named volume that binds /var/lib/pqc-ca/key is refused" "[ $(rc) = 1 ] && grep -q 'gateway: mounts the custodian.s /var/lib/pqc-ca/key' $T/out" || show
+
+printf 'services:\n  gateway:\n    volumes:\n      - ext:/e:ro\nvolumes:\n  ext:\n    external: true\n' > "$T/external.yml"
+run "$repo/docker-compose.yml" "$T/external.yml"
+check "B2: an external volume, whose host path cannot be checked, is refused" "[ $(rc) = 1 ] && grep -q 'gateway: mounts the external volume ext' $T/out" || show
+
 echo "$PASS/$((PASS + FAIL)) passed"
 [ "$FAIL" = 0 ]

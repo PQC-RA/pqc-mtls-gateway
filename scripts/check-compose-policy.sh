@@ -49,14 +49,37 @@ def under(p, d):
     return p == d or p.startswith(d + "/")
 def parent_of(p, d):
     return p != d and (p == "/" or d.startswith(p + "/"))
+import re
+VOLS = cfg.get("volumes") or {}
+def host_path(v):
+    # The host path a mount reads, normalised: a bind source, or the device
+    # of a named volume that is a bind (driver_opts o=bind), so neither
+    # //var/lib/pqc-ca/key nor a volume with device /var/lib/pqc-ca/key gets
+    # past the checks below. normpath keeps exactly two leading slashes
+    # (POSIX leaves their meaning to the system), so they are collapsed first.
+    # None for an external volume: compose cannot show what it binds.
+    src = v.get("source", "")
+    if v.get("type") == "volume" and src:
+        vol = VOLS.get(src) or {}
+        opts = vol.get("driver_opts") or {}
+        if "bind" in str(opts.get("o", "")).split(",") and opts.get("device"):
+            src = str(opts["device"])
+        elif vol.get("external"):
+            return None
+    if src.startswith("/"):
+        src = os.path.normpath(re.sub(r"^/+", "/", src))
+    return src
 bad = []
 for name, svc in sorted(cfg.get("services", {}).items()):
     for v in svc.get("volumes", []):
-        src, dst = v.get("source", ""), v.get("target", "")
-        # Bind sources are compared normalised: /var/lib/pqc-ca//key and
+        src, dst = host_path(v), v.get("target", "")
+        if src is None:
+            ext = v.get("source")
+            bad.append(f"{name}: mounts the external volume {ext}, whose host path cannot be checked")
+            continue
+        # Compared normalised: /var/lib/pqc-ca//key, //var/lib/pqc-ca/key and
         # /var/lib/pqc-ca/./key are /var/lib/pqc-ca/key.
         if src.startswith("/"):
-            src = os.path.normpath(src)
             for d in PROTECTED:
                 if parent_of(src, d):
                     bad.append(f"{name}: mounts {src}, a parent of {d}")
