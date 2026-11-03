@@ -57,9 +57,18 @@ describe() { # describe FILE: "alg, subject" of every certificate in it
 	rm -rf "$d"
 }
 
-served() { # what :8081 serves, verified with the trust file, from inside the gateway
-	docker exec "$GW" sh -c 'echo | /opt/openssl/bin/openssl s_client -connect 127.0.0.1:8081 -servername gateway -CAfile /etc/pki/pqc-ca/internal-tls-ca.crt -verify_return_error -brief 2>&1' \
-		| sed -n 's/^Signature type: //p; s/^Verification: /verification /p' | tr '\n' ' '
+# What :8081 serves, verified with the trust file as the gateway mounts it
+# (/etc/pki/internal-tls-ca.crt, the healthcheck's file; since ADR-024 the
+# gateway's /etc/pki/pqc-ca is the custodian's public directory, without it).
+# Without a verification line, openssl's own error is shown instead.
+served() {
+	local out rc=0
+	out=$(docker exec "$GW" sh -c 'echo | /opt/openssl/bin/openssl s_client -connect 127.0.0.1:8081 -servername gateway -CAfile /etc/pki/internal-tls-ca.crt -verify_return_error -brief 2>&1') || rc=$?
+	if printf '%s\n' "$out" | grep -q '^Verification: '; then
+		printf '%s\n' "$out" | sed -n 's/^Signature type: //p; s/^Verification: /verification /p' | tr '\n' ' '
+	else
+		echo "NOT VERIFIED (exit $rc): $(printf '%s\n' "$out" | grep -v '^$' | head -2 | tr '\n' ' ')"
+	fi
 }
 
 status() {
