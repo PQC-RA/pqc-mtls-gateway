@@ -51,8 +51,14 @@ BEFORE=$(treehash $P)
 TRUST=/etc/pki/pqc-trust
 
 # --- setup-pki.sh of this release, re-run on the old deployment: changes nothing --
+# (Only where this checkout has the cut-over: on PR 4a setup-pki.sh is main and
+# knows nothing of either layout.)
+if grep -q "itls_adopt_legacy_trust" /tmp/r/scripts/setup-pki.sh; then
 ( cd /tmp/r && PKI_DIR=$P SSL_DIR=/etc/ssl/pqc SERVER_IP=127.0.0.1 ./scripts/setup-pki.sh ) > /tmp/rerun.log 2>&1; rc=$?
 check "setup-pki.sh re-run on a pre-ADR-024 deployment: exit 0, the tree unchanged, no trust directory made" "[ $rc = 0 ] && [ \"$(treehash $P)\" = \"$BEFORE\" ] && [ ! -e $TRUST ] && grep -q \"internal TLS left as it is\" /tmp/rerun.log" || tail -8 /tmp/rerun.log
+else
+echo "SKIP  setup-pki.sh re-run on a pre-ADR-024 deployment (this checkout has no cut-over yet)"
+fi
 
 # --- 8-5: the guards fail closed --------------------------------------------------
 mkdir -p /tmp/fakebin
