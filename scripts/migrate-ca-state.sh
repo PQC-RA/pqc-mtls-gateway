@@ -333,10 +333,16 @@ hex_max() {
 hex_inc() { printf '%X' $(( 16#$1 + 1 )); }
 # sources_unchanged [RETIRED]: every file forward copied is, in the old tree,
 # still the file it copied (looked for where retire renamed it, if it did).
+# Only what the OLD SYSTEM writes counts (its CA state under intermediate/,
+# its OCSP files): those change only if it ran on. The root CRL is renewed by
+# the operator's offline procedure in the rollback window (README, at least
+# every 90 days) and the higher-numbered one is kept below; the trust files
+# are the operator's too.
 sources_unchanged() {
     local want dst src f bad=0
     while read -r want dst src; do
         case "$src" in *"(paths rewritten)"*) continue ;; esac
+        case "$src" in "$INT"/*|"$FROM"/ocsp/*) ;; *) continue ;; esac
         f=$src
         if [ ! -e "$f" ]; then
             case "$f" in
@@ -400,6 +406,14 @@ reverse() {
     # inbox); keep whichever has the higher number.
     if hex_gt "$(crl_number "$CA_STATE_DIR/crl/root-ca.crl")" "$(crl_number "$FROM/root/crl/root-ca.crl")"; then
         install -m 0644 -o 0 -g 0 "$CA_STATE_DIR/crl/root-ca.crl" "$STAGE/root-ca.crl"
+    elif hex_gt "$(crl_number "$FROM/root/crl/root-ca.crl")" "$(crl_number "$CA_STATE_DIR/crl/root-ca.crl")"; then
+        # The operator renewed the root CRL in the old tree after forward: the
+        # combined CRL the old gateway reads must carry THAT root CRL, not the
+        # older one the custodian published. Intermediate first.
+        for f in hybrid-combined-crl.pem combined-crl.pem; do
+            cat "$S/crl/intermediate-ca.crl" "$FROM/root/crl/root-ca.crl" > "$STAGE/public/$f"
+            chmod 0644 "$STAGE/public/$f"
+        done
     fi
     # The trust anchors as they are now (an ADR-022 switch may have changed
     # them since forward), back where the previous release reads them.

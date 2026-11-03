@@ -29,6 +29,7 @@ ok()   { echo "PASS  $1"; PASS=$((PASS+1)); }
 bad()  { echo "FAIL  $1"; FAIL=$((FAIL+1)); }
 check(){ if eval "$2"; then ok "$1"; else bad "$1"; fi; }
 crlno(){ $O crl -in "$1" -noout -crlnumber | sed "s/crlNumber=0x//"; }
+second_crlno(){ awk "/BEGIN X509 CRL/{n++} n==2" "$1" | $O crl -noout -crlnumber | sed "s/crlNumber=0x//"; }
 serials(){ $O crl -in "$1" -noout -text | sed -n "s/^ *Serial Number: *//p" | sort -u; }
 treehash(){ (cd "$1" && find . -type f ! -name "*.lock" -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -c1-16); }
 as_ca(){ setpriv --reuid=1003 --regid=1003 --clear-groups "$@"; }
@@ -195,11 +196,16 @@ check "8-2: reverse refuses a state index that lost a row of the old one ($S3, v
 cp $TRUST/internal-tls-ca-mldsa.crt /tmp/trust-new.crt
 cat /tmp/trust-new.crt /tmp/trust-new.crt > $TRUST/internal-tls-ca.crt
 TRUST_NOW=$(sha256sum < $TRUST/internal-tls-ca.crt)
+# B3: the operator renews the root CRL in the old tree during the rollback window
+# (README root-CRL procedure). That is not the old system running on.
+$O ca -config $P/root/openssl-root.cnf -gencrl -out $P/root/crl/root-ca.crl > /tmp/rootrenew.log 2>&1 || cat /tmp/rootrenew.log
+RN=$(crlno $P/root/crl/root-ca.crl); cp $P/root/crl/root-ca.crl /tmp/root-renewed.crl
 # Counters lower than the old tree in the custodian state: reverse takes the larger.
 OS=$(cat "$(ls -d $INT.migrated-* | tail -1)/db/serial")
 echo 01 > $CA_STATE_DIR/db/serial; echo 01 > $CA_STATE_DIR/db/crlnumber
 $M reverse > /tmp/rev.log 2>&1; rc=$?
 check "reverse succeeds" "[ $rc = 0 ]" || tail -8 /tmp/rev.log
+check "B3: a root CRL renewed in the old tree after forward does not block reverse; it is kept and the combined CRL carries it second (0x$RN)" "[ $rc = 0 ] && cmp -s $P/root/crl/root-ca.crl /tmp/root-renewed.crl && [ \"$(second_crlno $P/hybrid-combined-crl.pem)\" = \"$RN\" ]"
 check "the old tree is back in place" "[ -d $INT ] && [ -f $P/hybrid-combined-crl.pem ] && [ -d $P/ocsp ]"
 check "the revocation made in the new layout is in the old index" "grep -q \"^R.*	$S2	\" $INT/db/index.txt"
 check "the old combined CRL is the latest one: $S1 and $S2 revoked, intermediate first" "serials $P/hybrid-combined-crl.pem | grep -qx $S1 && serials $P/hybrid-combined-crl.pem | grep -qx $S2 && $O crl -in $P/hybrid-combined-crl.pem -noout -issuer | grep -q Intermediate"
