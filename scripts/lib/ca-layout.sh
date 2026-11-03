@@ -123,8 +123,24 @@ ca_take_writer_lock() {
     # descriptor (in chown and chmod, /proc/self/fd/9 is the inherited fd 9),
     # never through the name a link could have redirected meanwhile.
     flock -n 9 || return 1
-    if [ -L "$CA_WRITER_LOCK" ]; then
-        echo "ERROR: $CA_WRITER_LOCK became a symbolic link; refusing to use it" >&2
+    # The open above follows a link, and the check before it can race: a
+    # writer with the custodian's uid could plant a link, then put a regular
+    # file back. So the descriptor itself must be the file at the name, before
+    # anything is changed through it: the same device and inode as the name
+    # (stat without -L: the name itself, never a link target), a regular file,
+    # and one link only (a hard link to /etc/shadow has the same inode as it).
+    local fd_id name_id links ftype
+    if ! { fd_id=$(stat -L -c '%d:%i' /proc/self/fd/9) && links=$(stat -L -c '%h' /proc/self/fd/9) \
+           && name_id=$(stat -c '%d:%i' "$CA_WRITER_LOCK") && ftype=$(stat -c '%F' "$CA_WRITER_LOCK"); }; then
+        echo "ERROR: cannot stat $CA_WRITER_LOCK and the descriptor opened on it; refusing to use it" >&2
+        exit 1
+    fi
+    case "$ftype" in
+        "regular file"|"regular empty file") ;;
+        *) echo "ERROR: $CA_WRITER_LOCK is a $ftype, not a regular file; refusing to use it" >&2; exit 1 ;;
+    esac
+    if [ "$fd_id" != "$name_id" ] || [ "$links" != 1 ]; then
+        echo "ERROR: $CA_WRITER_LOCK is not the file that was opened, or has other hard links ($links); refusing to use it" >&2
         exit 1
     fi
     chown "$CA_UID:$CA_GID" /proc/self/fd/9

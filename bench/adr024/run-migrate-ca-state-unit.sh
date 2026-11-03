@@ -25,6 +25,9 @@ export OPENSSL_CONF=/dev/null
 O=/opt/openssl/bin/openssl; M=/tmp/r/scripts/migrate-ca-state.sh
 P=/etc/pki/pqc-ca; INT=$P/intermediate
 PASS=0; FAIL=0
+# This container runs no containers and has no docker client: say so, as
+# migrate-ca-state.sh asks (it fails closed otherwise).
+export MIGRATE_NO_DOCKER=1
 ok()   { echo "PASS  $1"; PASS=$((PASS+1)); }
 bad()  { echo "FAIL  $1"; FAIL=$((FAIL+1)); }
 check(){ if eval "$2"; then ok "$1"; else bad "$1"; fi; }
@@ -124,6 +127,12 @@ $M verify > /dev/null 2>&1
 mv $CA_WRITER_LOCK /tmp/lock.keep; ln -s /tmp/lock-target $CA_WRITER_LOCK
 $M verify > /tmp/lsym.log 2>&1; rc=$?
 check "8-1: a symbolic link as the writer lock is refused, and what it points at is not created" "[ $rc != 0 ] && grep -q \"not a regular file\" /tmp/lsym.log && [ ! -e /tmp/lock-target ]"
+rm $CA_WRITER_LOCK; mv /tmp/lock.keep $CA_WRITER_LOCK
+# L1: a hard link to another file passes a "not a symlink" check; its owner
+# and mode must not change through the lock.
+mv $CA_WRITER_LOCK /tmp/lock.keep; echo victim > /tmp/victim; chmod 644 /tmp/victim; ln /tmp/victim $CA_WRITER_LOCK
+$M verify > /tmp/lhard.log 2>&1; rc=$?
+check "L1: a writer lock that is a hard link to another file is refused, and that file keeps its owner and mode" "[ $rc != 0 ] && grep -q \"other hard links\" /tmp/lhard.log && [ \"$(stat -c %u:%a /tmp/victim)\" = 0:644 ]" || tail -2 /tmp/lhard.log
 rm $CA_WRITER_LOCK; mv /tmp/lock.keep $CA_WRITER_LOCK
 
 # --- the custodian at work on the new layout, as uid 1003 -----------------------
@@ -253,6 +262,8 @@ cat $CA_STATE_DIR/crl/intermediate-ca.crl $CA_STATE_DIR/crl/root-ca.crl > $CA_PU
 $M abort > /tmp/abortL2.log 2>&1; rc=$?
 rm $CA_PUBLIC_DIR/hybrid-combined-crl.pem
 check "L2: abort refuses once the custodian has published beyond its first CRL (the readers may have read it)" "[ $rc != 0 ] && grep -q \"beyond its first\" /tmp/abortL2.log" || tail -3 /tmp/abortL2.log
+env -u MIGRATE_NO_DOCKER $M abort > /tmp/abortnd.log 2>&1; rc=$?
+check "with no docker client, and MIGRATE_NO_DOCKER not set, abort refuses (it cannot tell where the readers are)" "[ $rc != 0 ] && grep -q \"no docker client\" /tmp/abortnd.log"
 PA=$(treehash $P)
 $M abort > /tmp/abort2.log 2>&1; rc=$?
 check "8-2: abort sets the unused layout aside and leaves the old tree as the old system left it" "[ $rc = 0 ] && [ ! -d $CA_ROOT ] && [ \"$(treehash $P)\" = \"$PA\" ]" || tail -5 /tmp/abort2.log

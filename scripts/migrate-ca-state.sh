@@ -103,7 +103,10 @@ container_running() {
 # Fails closed like container_running.
 readers_on_public() {
     local c out line name
-    command -v docker >/dev/null 2>&1 || return 1
+    if ! command -v docker >/dev/null 2>&1; then
+        [ "${MIGRATE_NO_DOCKER:-0}" = 1 ] && return 1
+        die "no docker client to ask which containers mount $CA_PUBLIC_DIR; refusing (MIGRATE_NO_DOCKER=1 on a host that runs no containers)"
+    fi
     out=$(docker ps -aq 2>&1) || die "cannot ask docker for its containers ($out); refusing"
     for c in $out; do
         line=$(docker inspect -f '{{.Name}} {{range .Mounts}}{{.Source}} {{end}}' "$c" 2>&1) || die "cannot inspect container $c ($line); refusing"

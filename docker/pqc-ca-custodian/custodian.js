@@ -815,7 +815,7 @@ async function handleRevoke(res, payload) {
 			const pub = path.join(CRL_PUBLIC_DIR, "hybrid-combined-crl.pem");
 			published = fs.existsSync(pub) && (await crlSerials(pub)).has(serial.toUpperCase());
 		} catch (err) {
-			log("ERROR", `Cannot read ${INT_CRL} to tell whether ${serial} is published: ${err.message}`);
+			log("ERROR", `Cannot read the published combined CRL to tell whether ${serial} is published: ${err.message}`);
 		}
 		if (published) return sendError(res, 409, "already_revoked", `Certificate ${serial} is already revoked`);
 		log("WARN", `Serial ${serial} is revoked in the index but no published CRL lists it yet: publishing`);
