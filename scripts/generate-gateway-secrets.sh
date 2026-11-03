@@ -148,18 +148,17 @@ if [ -f "$CUSTODIAN_HMAC_FILE" ]; then
 else
     echo "Generating 256-bit custodian HMAC secret..."
     openssl rand -hex 32 > "$CUSTODIAN_HMAC_FILE"
-    # root:1001 mode 640, both management-api and pqc-ca-custodian run as uid
-    # 1001, so group-read is sufficient; same rationale as control-plane-hmac
-    # above (do NOT use 600/root, neither reader is root).
-    APP_GID="${APP_GID:-1001}"
-    if chown "root:$APP_GID" "$CUSTODIAN_HMAC_FILE" 2>/dev/null && chmod 640 "$CUSTODIAN_HMAC_FILE" 2>/dev/null; then
-        echo "  Written: $CUSTODIAN_HMAC_FILE (root:$APP_GID mode 640)"
-    else
-        echo "  WARN: could not set ownership to root:$APP_GID on $CUSTODIAN_HMAC_FILE (gid $APP_GID may not exist on this host)." >&2
-        echo "        Ensure uid 1001 can READ $CUSTODIAN_HMAC_FILE (mode 640, group $APP_GID) before starting management-api/pqc-ca-custodian." >&2
-        chmod 640 "$CUSTODIAN_HMAC_FILE" 2>/dev/null || true
-        echo "  Written: $CUSTODIAN_HMAC_FILE"
-    fi
+fi
+# Readable by exactly its two users and nobody else: the custodian, its own
+# uid 1003 since ADR-024, as owner, and management-api (uid/gid 1001) by
+# group; mode 0440. Set on every run, so an existing deployment gets it too
+# (the custodian refuses to start without the secret).
+CA_UID="${CA_UID:-1003}"; APP_GID="${APP_GID:-1001}"
+if chown "$CA_UID:$APP_GID" "$CUSTODIAN_HMAC_FILE" && chmod 0440 "$CUSTODIAN_HMAC_FILE"; then
+    echo "  $CUSTODIAN_HMAC_FILE: $CA_UID:$APP_GID mode 0440 (custodian as owner, management-api as group)"
+else
+    echo "ERROR: could not set $CA_UID:$APP_GID mode 0440 on $CUSTODIAN_HMAC_FILE (run as root)." >&2
+    exit 1
 fi
 
 # ── 256-bit HMAC shared secret (gateway <-> management-api /enroll hop) ──────

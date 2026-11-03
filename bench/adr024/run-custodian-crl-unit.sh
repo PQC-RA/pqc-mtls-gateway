@@ -21,5 +21,9 @@ cp -r /repo /tmp/r
 [ -d /var/lib/pqc-ca/state ] || /tmp/r/scripts/migrate-ca-state.sh forward > /tmp/migrate.log 2>&1 \
   || { tail -20 /tmp/migrate.log; exit 1; }
 install -d -o 0 -g 0 -m 0755 /t
-head -c 32 /dev/urandom | od -An -tx1 | tr -d " \n" > /t/hmac; chmod 0644 /t/hmac
+# The custodian HMAC secret exactly as scripts/generate-gateway-secrets.sh
+# leaves it (owner, group, mode), so a regression there fails here: a custodian
+# that cannot read its secret refuses to start (#9, run 41625438530).
+( cd /tmp/r && ./scripts/generate-gateway-secrets.sh ) > /tmp/secrets.log 2>&1 || { tail -20 /tmp/secrets.log; exit 1; }
+cp -p /tmp/r/secrets/custodian-hmac.key /t/hmac
 node /repo/bench/adr024/custodian-crl-unit.js'

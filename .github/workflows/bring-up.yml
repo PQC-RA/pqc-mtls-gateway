@@ -298,6 +298,16 @@ jobs:
             echo "=== logs (tail 80 per service) ==="
             sudo docker compose logs --tail 80
           } > /tmp/diagnostics.txt 2>&1
+          # In the job log itself, first: the own logs of every container that
+          # is not running and healthy, and always the CA custodian's (a fresh
+          # deployment depends on its first CRL). The tail of everything below
+          # used to bury them (#9, run 41625438530).
+          for c in $(sudo docker ps -a --format '{{.Names}}'); do
+            st=$(sudo docker inspect -f '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' "$c")
+            case "$c:$st" in pqc-ca-custodian:*|*:exited*|*:restarting*|*unhealthy*|*:created*|*:dead*)
+              echo "::group::$c ($st)"; sudo docker logs --tail 80 "$c" 2>&1; echo "::endgroup::" ;;
+            esac
+          done
           tail -200 /tmp/diagnostics.txt
 
       - name: Upload diagnostics
