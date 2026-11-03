@@ -650,8 +650,12 @@ curl -sk --cacert /var/lib/pqc-ca-public/ca-chain.crt --cert admin.crt --key adm
 ```
 
 The custodian adopts a root CRL from its inbox on its next CRL (at the latest the next day) only if
-it verifies against the root certificate, has not expired, and is newer by both CRL number and
-lastUpdate; an older one can never replace a newer one. It reports
+it verifies against the root certificate, has not expired, has a higher CRL number, a lastUpdate
+that is not earlier and not in the future, and lists every serial the published one lists (do not
+prune expired entries); an older one can never replace a newer one. Run the root's clock right:
+a root CRL dated in the future is not adopted until that time. If one was published anyway (by
+hand, or by an earlier release), drop the corrected root CRL (higher number, current lastUpdate)
+into the inbox: it replaces the future-dated one at the next pass or start. It reports
 `pqc_ca_root_crl_next_update_seconds` and `pqc_ca_root_crl_rejected_total` on its `/metrics`, and
 logs each adoption or refusal. Alert below 90 days left (schedule the renewal) and below 14 days
 (renew now).
