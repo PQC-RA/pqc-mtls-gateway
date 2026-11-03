@@ -113,6 +113,12 @@ jobs:
       - name: Compose policy (ADR-024)
         run: ./scripts/check-compose-policy.sh
 
+      # ADR-024: the gateway entrypoint fails when the custodian's CA files do
+      # not come, and its reload watcher reports nginx's own errors. The real
+      # functions, sourced, with a fake nginx: no images needed.
+      - name: Gateway entrypoint CA wait and reload watcher (ADR-024)
+        run: ./bench/gateway/entrypoint-ca-unit.sh
+
       - name: Dockerfile BuildKit checks (catches what hadolint cannot)
         run: |
           set -euo pipefail

@@ -256,6 +256,32 @@ jobs:
           [ "$scanned" -ge 3 ] || { echo "::error::only $scanned image(s) scanned; expected >=3"; exit 1; }
           echo "scanned $scanned image(s) for leaked secrets"
 
+      # ADR-024's offline suites, on the custodian image this job just built and
+      # the pinned base images. Each runs in throwaway containers (no network for
+      # the CA ones) and touches nothing of the stack above. Every one has a
+      # negative control in its commit; here they gate the PR.
+      - name: ADR-024 offline suites
+        timeout-minutes: 20
+        env:
+          DOCKER_CONFIG: ${{ runner.temp }}/docker
+        run: |
+          set -euo pipefail
+          img=$(sudo docker inspect -f '{{.Config.Image}}' pqc-ca-custodian)
+          echo "::group::custodian as CRL issuer ($img)"
+          sudo -E bench/adr024/run-custodian-crl-unit.sh "$img"
+          echo "::endgroup::"
+          echo "::group::migrate-ca-state.sh (forward, check-next, retire, reverse)"
+          sudo -E bench/adr024/run-migrate-ca-state-unit.sh "$img"
+          echo "::endgroup::"
+          # As root: docker mode reads each container's filesystem through
+          # /proc/<pid>/root, as verify-suite.sh does on a host.
+          echo "::group::key isolation (ADR-024 test 2)"
+          sudo -E OSSL=/usr/bin/openssl bench/adr024/key-isolation-unit.sh "$img"
+          echo "::endgroup::"
+          echo "::group::crl_worker.lua (nextUpdate metric, issuer and chain checks)"
+          sudo -E bench/lua/crl-worker-unit.sh
+          echo "::endgroup::"
+
       - name: Smoke test
         run: ./scripts/test-stack-smoke.sh
 
