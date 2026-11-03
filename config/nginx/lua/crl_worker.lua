@@ -16,7 +16,7 @@
 -- Why the interval is short, and must stay shorter than the reload watcher:
 -- this poller exists to drop revoked serials BEFORE the nginx reload that
 -- refreshes the static ssl_crl. That reload is driven by the entrypoint's
--- /signals/reload-nginx watcher at NGINX_RELOAD_POLL_INTERVAL. At the earlier
+-- watcher of the CRL file itself, at NGINX_RELOAD_POLL_INTERVAL. At the earlier
 -- 10 s interval this poller always lost that race, so the inline check in
 -- policy_router.lua never fired: nginx was already refusing the certificate at
 -- the TLS layer by the time the dict was written, and with ssl_verify_client
@@ -25,8 +25,8 @@
 -- second by construction. Keep this STRICTLY BELOW NGINX_RELOAD_POLL_INTERVAL
 -- or the fast path goes silent again. bench/crl-fastpath.sh asserts it leads.
 --
--- 1 s (was 2 s): with the crl-renewer now checking its sentinel every second,
--- this re-read is the second-largest term in revoke-to-refusal time. Each
+-- 1 s (was 2 s): the CA custodian publishes the CRL inside the revoke call
+-- (ADR-024), so this re-read is the largest term in revoke-to-refusal time. Each
 -- worker runs its own timer (worker_processes auto), and an unchanged CRL costs
 -- one ~12 KB read per worker per second; openssl is spawned only on change.
 
@@ -77,7 +77,7 @@ local CRL_FILE = "/etc/pki/pqc-ca/hybrid-combined-crl.pem"
 -- which is when nginx's ssl_crl starts refusing every client certificate.
 -- `openssl crl -text` reads only the FIRST CRL in the file, so this is the
 -- intermediate CRL as long as the combined file is written intermediate first,
--- as pqc-crl-renew.sh does.
+-- as the CA custodian writes it (ADR-024).
 local MONTHS = {
     Jan = 1, Feb = 2, Mar = 3, Apr = 4, May = 5, Jun = 6,
     Jul = 7, Aug = 8, Sep = 9, Oct = 10, Nov = 11, Dec = 12,

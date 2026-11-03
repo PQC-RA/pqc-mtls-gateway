@@ -100,46 +100,50 @@ mkdir -p "$ROUTES_DIR"
 chown -R nobody:nogroup "$ROUTES_DIR" 2>/dev/null || \
     echo "WARN: could not chown $ROUTES_DIR, route persistence may be disabled" >&2
 
-# ── Reload watcher ────────────────────────────────────────────────────────────
-# crl-renewer touches /signals/reload-nginx after regenerating the CRL so the
-# gateway picks up the refresh at the TLS layer (ssl_crl is only re-read on
-# reload). Poll its mtime rather than inotifywait (not installed in this image
-# and not worth a new package dependency just for this). State lives under
-# /tmp (tmpfs) since the rootfs is read-only. Runs in the background so nginx
-# stays PID 1 for correct signal handling.
-RELOAD_SIGNAL="${NGINX_RELOAD_SIGNAL:-/signals/reload-nginx}"
+# ── CA files and the reload watcher ───────────────────────────────────────────
+# The CA custodian publishes the chain and the CRLs into the public directory
+# mounted at /etc/pki/pqc-ca (ADR-024). On a brand-new deployment that happens
+# when the custodian first starts, so wait for it here instead of letting nginx
+# fail on a missing file. Afterwards the files persist on the host, so a gateway
+# restart never waits on the custodian.
+CRL_FILE="${NGINX_CRL_FILE:-/etc/pki/pqc-ca/hybrid-combined-crl.pem}"
+CA_WAIT_S="${CA_FILES_WAIT_S:-120}"
+for _i in $(seq 1 "$CA_WAIT_S"); do
+    [ -s "$CRL_FILE" ] && [ -s /etc/pki/pqc-ca/hybrid-ca-chain.crt ] && break
+    [ "$_i" = 1 ] && echo "[entrypoint] waiting for the CA custodian to publish $CRL_FILE ..."
+    sleep 1
+done
+
+# nginx's static ssl_crl is read only on reload, so reload when the CRL file
+# itself changes. The custodian replaces it with rename(2), which gives it a new
+# inode; the file is the signal, there is no separate sentinel that could
+# disagree with it. Polled rather than inotify (not in this image). Runs in the
+# background so nginx stays PID 1; it must stay the FIRST background subshell
+# (bench/crl-fastpath.sh pauses it by that position). The Lua fast path
+# (crl_worker.lua, 1 s) refuses a revoked certificate before this reload.
 RELOAD_POLL_INTERVAL="${NGINX_RELOAD_POLL_INTERVAL:-5}"
-RELOAD_STATE=/tmp/.reload-nginx-last-mtime
 
 (
-    # Wait for the master to write its pid before attempting any reload,
-    # otherwise an early CRL-regen signal (e.g. crl-renewer's startup run)
-    # could race nginx -s reload against the master not yet being up.
+    # Wait for the master to write its pid before attempting any reload.
     while [ ! -f /run/nginx.pid ]; do sleep 1; done
 
-    last_mtime=0
-    if [ -f "$RELOAD_STATE" ]; then
-        last_mtime=$(cat "$RELOAD_STATE" 2>/dev/null || echo 0)
-    fi
+    crl_id() { stat -c '%i %Y %s' "$CRL_FILE" 2>/dev/null || echo missing; }
+    last=$(crl_id)
     while true; do
         sleep "$RELOAD_POLL_INTERVAL"
-        if [ -f "$RELOAD_SIGNAL" ]; then
-            mtime=$(stat -c %Y "$RELOAD_SIGNAL" 2>/dev/null || echo "$last_mtime")
-            if [ "$mtime" != "$last_mtime" ]; then
-                # The signal counts as handled only once the reload succeeded: a
-                # failed test or reload is retried every poll (reported once), so
-                # a new CRL cannot stay unloaded until the next signal.
-                if nginx -t -q 2>/dev/null && nginx -s reload 2>/dev/null; then
-                    last_mtime="$mtime"
-                    echo "$last_mtime" > "$RELOAD_STATE"
-                    reload_failed_for=
-                    echo "[reload-watcher] $RELOAD_SIGNAL updated: nginx reloaded"
-                elif [ "${reload_failed_for:-}" != "$mtime" ]; then
-                    reload_failed_for="$mtime"
-                    echo "[reload-watcher] ERROR: $RELOAD_SIGNAL updated but nginx did not reload; retrying every ${RELOAD_POLL_INTERVAL}s" >&2
-                    nginx -t 2>&1 | tail -3 >&2 || true
-                fi
-            fi
+        now=$(crl_id)
+        [ "$now" = "$last" ] && continue
+        [ "$now" = missing ] && continue
+        # Handled only once the reload succeeded: a failed test or reload is
+        # retried every poll (reported once), so a new CRL cannot stay unloaded.
+        if nginx -t -q 2>/dev/null && nginx -s reload 2>/dev/null; then
+            last="$now"
+            reload_failed_for=
+            echo "[reload-watcher] $CRL_FILE changed: nginx reloaded"
+        elif [ "${reload_failed_for:-}" != "$now" ]; then
+            reload_failed_for="$now"
+            echo "[reload-watcher] ERROR: $CRL_FILE changed but nginx did not reload; retrying every ${RELOAD_POLL_INTERVAL}s" >&2
+            nginx -t 2>&1 | tail -3 >&2 || true
         fi
     done
 ) &

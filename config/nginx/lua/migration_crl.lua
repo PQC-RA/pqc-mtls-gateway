@@ -7,7 +7,7 @@
 -- nginx gives $ssl_client_i_dn.
 --
 -- Sources, every PEM CRL in:
---   /etc/pki/pqc-ca/hybrid-combined-crl.pem   the gateway's own (crl-renewer)
+--   /etc/pki/pqc-ca/hybrid-combined-crl.pem   the gateway's own (the CA custodian's)
 --   /etc/nginx/migration/crl-bundle.pem       the customer CAs', kept current by
 --                                             the operator
 -- A CRL is used only if its signature verifies against the one certificate in

@@ -7,7 +7,6 @@
 # the njs modules. Its consumers are the components that use the `openssl` CLI /
 # libs but never run nginx:
 #   - ocsp-pq       (FROM this image; runs `openssl ocsp`)
-#   - crl-renewer   (FROM this image; runs an openssl-based CRL script)
 #   - management-api / pqc-ca-custodian / gateway (COPY --from of the whole /opt)
 # The gateway's OpenResty/nginx build is a SEPARATE base (docker/base/openresty):
 # nginx and njs deliberately do not live here.
