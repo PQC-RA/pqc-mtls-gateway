@@ -42,12 +42,24 @@ esac
 CERT="$CA_STATE_DIR/issued/$SERIAL.pem"
 [ -f "$CERT" ] || die "no issued certificate $CERT"
 
-# One writer: the custodian must not run.
-if command -v docker >/dev/null 2>&1 \
-   && [ "$(docker inspect -f '{{.State.Running}}' "$CUSTODIAN_CONTAINER" 2>/dev/null)" = true ]; then
-    die "$CUSTODIAN_CONTAINER is running: revoke through the management API instead"
+# One writer: the custodian must not run. A docker that cannot be asked
+# (daemon down, no permission) is not "not running": refused, as in
+# migrate-ca-state.sh. Only a host without a docker client has no containers.
+if command -v docker >/dev/null 2>&1; then
+    if running=$(docker inspect -f '{{.State.Running}}' "$CUSTODIAN_CONTAINER" 2>&1); then
+        [ "$running" != true ] || die "$CUSTODIAN_CONTAINER is running: revoke through the management API instead"
+    elif ! printf '%s' "$running" | grep -qi 'no such object\|no such container'; then
+        die "cannot ask docker whether $CUSTODIAN_CONTAINER is running ($running); refusing"
+    fi
 fi
 ca_take_writer_lock || die "the custodian holds $CA_WRITER_LOCK: revoke through the management API instead"
+# Whatever happens from here (a failure included), the files openssl and this
+# script write as root go back to the custodian: a root-owned crlnumber.new or
+# index.txt left behind would make every later CRL pass of the custodian (uid
+# 1003) fail with EACCES.
+tmp=""
+cleanup() { if [ -n "$tmp" ]; then rm -f "$tmp"; fi; ca_layout_file_perms; }
+trap cleanup EXIT
 
 ca() { "$OPENSSL" ca -config "$CA_CNF_FILE" -keyfile "file:$CA_KEY_FILE" "$@"; }
 crlno() { "$OPENSSL" crl -in "$1" -noout -crlnumber | sed 's/^crlNumber=0x//'; }
@@ -69,13 +81,12 @@ out=$(ca -updatedb 2>&1) || die "-updatedb failed (the revocation is recorded, n
 echo "==> issuing the next intermediate CRL"
 last=$(crlno "$CA_STATE_DIR/crl/intermediate-ca.crl")
 tmp=$(mktemp "$CA_STATE_DIR/crl/.intermediate-ca.crl.tmp-XXXXXX")
-trap 'rm -f "$tmp"' EXIT
 out=$(ca -gencrl -out "$tmp" 2>&1) || die "-gencrl failed (the revocation is recorded, not yet published; fix the cause and run this again): $out"
 "$OPENSSL" crl -in "$tmp" -noout -CAfile "$CA_STATE_DIR/certs/intermediate-ca.crt" 2>&1 | grep -q "verify OK" || die "the new CRL does not verify"
 new=$(crlno "$tmp")
 [ $((16#$new)) -gt $((16#$last)) ] || die "CRL number $new is not above the last published $last"
 "$OPENSSL" crl -in "$tmp" -noout -text | grep -q "Serial Number: $SERIAL\$" || die "the new CRL does not list $SERIAL"
-mv -f "$tmp" "$CA_STATE_DIR/crl/intermediate-ca.crl"; trap - EXIT
+mv -f "$tmp" "$CA_STATE_DIR/crl/intermediate-ca.crl"; tmp=""
 
 echo "==> publishing (as the custodian does)"
 der=$(mktemp); comb=$(mktemp)
@@ -87,7 +98,6 @@ cat "$CA_STATE_DIR/crl/intermediate-ca.crl" "$CA_STATE_DIR/crl/root-ca.crl" > "$
 publish "$CA_PUBLIC_DIR" combined-crl.pem "$comb" 0644
 publish "$CA_PUBLIC_DIR" hybrid-combined-crl.pem "$comb" 0644
 rm -f "$der" "$comb"
-ca_layout_file_perms   # openssl and this script ran as root
 
 echo "    intermediate CRL 0x$new published, $SERIAL revoked."
 echo "    The gateway refuses $SERIAL within its usual window (Lua 1 s, ssl_crl on reload)."

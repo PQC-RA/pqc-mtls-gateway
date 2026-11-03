@@ -291,10 +291,21 @@ function withCaMutexBounded(fn, waitMs = MUTEX_WAIT_MS) {
 // current file. The .new is complete by then, so finishing the rename is what
 // openssl would have done; with no .new, the .old is the current state. Run at
 // start and before every openssl ca call, so the state never stays half-moved.
+// A .new beside a current file is a run that failed before its renames (it
+// changed nothing). Left there, root-owned when a host tool ran as root, it
+// makes every later openssl ca run of this uid fail with EACCES on creating
+// its own .new: it is set aside, renamed, not deleted.
 function recoverRotations() {
 	for (const base of ["index.txt", "index.txt.attr", "serial", "crlnumber"]) {
 		const f = path.join(CA_DIR, "db", base);
-		if (fs.existsSync(f)) continue;
+		if (fs.existsSync(f)) {
+			if (fs.existsSync(`${f}.new`)) {
+				const aside = `${f}.new.abandoned-${Date.now()}`;
+				fs.renameSync(`${f}.new`, aside);
+				log("WARN", `Set aside ${path.basename(f)}.new as ${path.basename(aside)} (left by a run that failed before its renames)`);
+			}
+			continue;
+		}
 		for (const from of [`${f}.new`, `${f}.old`]) {
 			if (fs.existsSync(from)) {
 				fs.renameSync(from, f);
@@ -884,6 +895,7 @@ const crlState = {
 	rootNextUpdate: 0,     // ms, nextUpdate of the published root CRL
 	failures: 0,           // passes that failed
 	updatedbFailures: 0,   // -updatedb runs that failed (each failed its CRL pass)
+	snapshotFailures: 0,   // OCSP index snapshots that could not be published
 	rootRejected: 0,       // inbox root CRLs refused
 	pending: false,        // a revocation is recorded but no CRL carries it yet
 	lastRejectedRootCrl: null, // sha256 of the inbox file last refused definitively (refused once)
@@ -932,6 +944,23 @@ async function crlSerials(file) {
 	return new Set([...stdout.matchAll(/^\s*Serial Number:\s*([0-9A-Fa-f]+)\s*$/gm)].map(m => m[1].toUpperCase()));
 }
 const droppedSerials = (newer, older) => [...older].filter(x => !newer.has(x));
+// The serials of the last intermediate CRL: the one in the state if it is the
+// intermediate's (it verifies against the intermediate certificate), else the
+// first block of the published combined CRL; null, and said, if neither is. A
+// file someone else replaced is never the baseline.
+async function lastIntermediateSerials() {
+	for (const f of [INT_CRL, path.join(CRL_PUBLIC_DIR, "hybrid-combined-crl.pem")]) {
+		if (!fs.existsSync(f)) continue;
+		try {
+			await inspectCrl(f, INT_CERT);
+			return await crlSerials(f);
+		} catch (err) {
+			log("WARN", `${f} is not a verifiable intermediate CRL (${err.message}); not used as the baseline of revoked serials`);
+		}
+	}
+	log("WARN", "no verifiable earlier intermediate CRL: the new one is checked against none");
+	return null;
+}
 
 // PEM bytes in hand, checked and converted from a private copy: what is
 // published is exactly what was checked, never a second read of a file that
@@ -1008,10 +1037,14 @@ function publishStatusSnapshot() {
 	publishFile(CRL_STATUS_DIR, "index.txt", fs.readFileSync(INDEX_FILE), 0o640);
 }
 
+// A failed snapshot is counted and logged, never the failure of what called
+// it: the CRL a pass signed is published either way (OCSP is the second
+// channel; pqc_ca_ocsp_snapshot_failures_total shows the snapshot is stale).
 function publishStatusSnapshotLogged() {
 	try {
 		publishStatusSnapshot();
 	} catch (err) {
+		crlState.snapshotFailures++;
 		log("ERROR", `OCSP index snapshot not published: ${err.message}`);
 	}
 }
@@ -1103,8 +1136,9 @@ async function issueCrlNow(withUpdatedb) {
 			if (crlState.crlNumber !== null && c.number <= crlState.crlNumber) {
 				throw new Error(`CRL number ${c.number} is not above the last published ${crlState.crlNumber}`);
 			}
-			if (fs.existsSync(INT_CRL)) {
-				const gone = droppedSerials(await crlSerials(copy), await crlSerials(INT_CRL));
+			const last = await lastIntermediateSerials();
+			if (last) {
+				const gone = droppedSerials(await crlSerials(copy), last);
 				if (gone.length) throw new Error(`the new CRL drops revoked serial(s) ${gone.join(" ")} that the last one lists; not published`);
 			}
 			return { crl: c, intDer: await derOf("crl", copy) };
@@ -1131,7 +1165,7 @@ async function issueCrlNow(withUpdatedb) {
 		publishFile(CRL_PUBLIC_DIR, "hybrid-ca-chain.crt", chain, 0o644);
 		publishFile(CRL_PUBLIC_DIR, "intermediate-ca.crl", intDer, 0o644);
 		publishFile(CRL_PUBLIC_DIR, "root-ca.crl", rootDer, 0o644);
-		publishStatusSnapshot();
+		publishStatusSnapshotLogged();
 		const combined = testFault("combined-root-first") ? Buffer.concat([rootPem, intPem]) : Buffer.concat([intPem, rootPem]);
 		// Check the order of what is about to be published, not just how it was
 		// assembled: crl_worker.lua reads only the first CRL.
@@ -1243,6 +1277,9 @@ function handleGetMetrics(res) {
 		"# HELP pqc_ca_crl_updatedb_failures_total Runs of openssl ca -updatedb that failed; each failed its CRL pass, which is retried.",
 		"# TYPE pqc_ca_crl_updatedb_failures_total counter",
 		`pqc_ca_crl_updatedb_failures_total ${crlState.updatedbFailures}`,
+		"# HELP pqc_ca_ocsp_snapshot_failures_total OCSP index snapshots that could not be published (OCSP answers from an older index until one is).",
+		"# TYPE pqc_ca_ocsp_snapshot_failures_total counter",
+		`pqc_ca_ocsp_snapshot_failures_total ${crlState.snapshotFailures}`,
 	];
 	const body = `${lines.join("\n")}\n`;
 	res.writeHead(200, { "Content-Type": "text/plain; version=0.0.4", "Content-Length": Buffer.byteLength(body) });
@@ -1293,12 +1330,15 @@ async function startCrlIssuer() {
 
 let stopping = false; // set by shutdown() below
 const server = http.createServer(async (req, res) => {
-	if (stopping) {
-		// Graceful stop in progress (see shutdown() below): retryable refusal.
-		res.shouldKeepAlive = false;
-		return sendError(res, 503, "stopping", "Custodian is stopping; retry");
-	}
+	// Graceful stop in progress (see shutdown() below): a retryable refusal,
+	// but only once the request is authenticated, so the refusal is signed
+	// like every answer to it (management-api rejects an unsigned one as
+	// response_unauthenticated, 502). The probes below carry no signature.
+	if (stopping) res.shouldKeepAlive = false;
 	try {
+		if (stopping && req.method === "GET" && (req.url === "/healthz" || req.url === "/metrics")) {
+			return sendError(res, 503, "stopping", "Custodian is stopping; retry");
+		}
 		// Unauthenticated liveness probe only, no CA data, just booleans on
 		// whether the two files this process serves are reachable. Used by the
 		// compose healthcheck and management-api's own health indicator.
@@ -1332,6 +1372,7 @@ const server = http.createServer(async (req, res) => {
 			return sendError(res, 401, "invalid_signature", "Request authentication failed");
 		}
 		res.pqcNonce = auth.nonce;
+		if (stopping) return sendError(res, 503, "stopping", "Custodian is stopping; retry");
 
 		let payload = {};
 		if (bodyBuf.length > 0) {

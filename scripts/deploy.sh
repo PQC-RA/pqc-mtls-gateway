@@ -166,11 +166,18 @@ else
     # (the custodian holds it while it runs), so CA state still has one writer
     # at any moment. With a running custodian, issue it through the API instead.
     ca_take_writer_lock || { echo "ERROR: the custodian is running; stop it, or issue the admin certificate through the management API" >&2; exit 1; }
-    "$OSSL" ca -config "$CA_CNF_FILE" -batch -notext -days 365 \
-        -extensions v3_client \
-        -in  "$ADMIN_DIR/$ADMIN_CN.csr" \
-        -out "$ADMIN_CRT" 2>/dev/null
-    ca_layout_file_perms   # openssl ran as root: the state goes back to the custodian
+    # openssl runs as root: the state goes back to the custodian whether it
+    # succeeds or not (a root-owned crlnumber.new or index.txt left behind
+    # would make every CRL pass of the custodian fail with EACCES).
+    if ! out=$("$OSSL" ca -config "$CA_CNF_FILE" -batch -notext -days 365 \
+            -extensions v3_client \
+            -in  "$ADMIN_DIR/$ADMIN_CN.csr" \
+            -out "$ADMIN_CRT" 2>&1); then
+        ca_layout_file_perms
+        echo "ERROR: signing the bootstrap admin certificate failed: $out" >&2
+        exit 1
+    fi
+    ca_layout_file_perms
     exec 9>&-
     rm -f "$ADMIN_DIR/$ADMIN_CN.csr"
     echo "    Admin cert issued."

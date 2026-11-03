@@ -467,6 +467,8 @@ exec ${O} "$@"
 	br = bgRun();
 	check("break-glass: a failed -gencrl stops it with openssl's message, nothing published", br.rc !== 0 && /forced -gencrl failure/.test(br.out) && crlNumber(HYB2) === nBgf && !serialsIn(HYB2).has(bgf), `${br.rc} ${br.out.trim().slice(-120)}`);
 	fs.rmSync("/tmp/gencrl-fail");
+	const notOurs = execFileSync("find", [STATE, "-type", "f", "!", "-uid", "1003"]).toString().trim();
+	check("9-6: after a failed break-glass every file of the state is the custodian's again (no root-owned index or .new)", notOurs === "", notOurs.slice(0, 160));
 	br = bgRun();
 	check("  ... run again once openssl behaves: the recorded revocation is published", br.rc === 0 && serialsIn(HYB2).has(bgf) && crlNumber(HYB2) > nBgf, `${br.rc} ${br.out.trim().slice(-120)}`);
 
@@ -563,6 +565,67 @@ exec ${O} "$@"
 	fs.rmSync("/tmp/tamper");
 	check("7-4: the file replaced right after it is written: the checked CRL is still what is published (DER and combined)", r.status === 200 && /Intermediate/.test(ossl(["crl", "-inform", "DER", "-in", `${PUB}/intermediate-ca.crl`, "-noout", "-issuer"])) && /Intermediate/.test(firstIssuer(HYB2)) && crlNumber(HYB2) === BigInt(r.j.crlNumber), `${r.status} ${r.raw.slice(0, 120)}`);
 	await stop();
+
+	// ------------------------------ pre-merge review of 2026-11-03 (#9 items)
+	// 9-6: a root-owned .new left by a failed host run must not stop the custodian
+	for (const b of ["index.txt", "crlnumber"]) {
+		fs.writeFileSync(`${STATE}/db/${b}.new`, "left by a failed run\n", { mode: 0o644 });
+		fs.chownSync(`${STATE}/db/${b}.new`, 0, 0);
+	}
+	s = await start(CRL_ENV);
+	r = s.exitCode === null ? await req("POST", "/crl/issue") : { status: 0, j: {} };
+	check("9-6: root-owned index.txt.new and crlnumber.new beside the current files: set aside, the custodian starts and issues", s.exitCode === null && r.status === 200 && !fs.existsSync(`${STATE}/db/crlnumber.new`) && /Set aside crlnumber\.new/.test(logs), `${s.exitCode} ${r.status}`);
+
+	check("7-5: the intermediate CRL file left replaced by 7-4 is not taken as the baseline of revoked serials (said), the pass publishes", s.exitCode === null && /not a verifiable intermediate CRL/.test(logs) && r.status === 200);
+
+	// 9-7: a failed OCSP snapshot does not fail the CRL pass
+	const statusMode = fs.statSync(STATUS).mode & 0o7777;
+	fs.chmodSync(STATUS, 0o550);
+	const sf0 = (await metrics()).m.pqc_ca_ocsp_snapshot_failures_total;
+	const nSnap = crlNumber(HYB2);
+	r = await req("POST", "/crl/issue");
+	fs.chmodSync(STATUS, statusMode);
+	const sf1 = (await metrics()).m.pqc_ca_ocsp_snapshot_failures_total;
+	check("9-7: the OCSP snapshot cannot be written: the CRL is still published (200, number up), the failure counted", r.status === 200 && crlNumber(HYB2) > nSnap && sf1 === sf0 + 1, `${r.status} ${sf0}->${sf1}`);
+
+	// 9-9: a request that arrives while the custodian stops gets a SIGNED 503.
+	// Two requests pipelined on one connection: A is in flight when SIGTERM
+	// comes, so B is read (and its handler starts) only once the custodian is
+	// already stopping. B must be refused with a signature bound to its nonce.
+	const net = require("net");
+	const signedReq = (path, body) => {
+		const ts = String(Date.now()), nonce = crypto.randomBytes(16).toString("hex");
+		const head = `POST ${path} HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\nContent-Length: ${body.length}\r\n` +
+			`X-Custodian-Timestamp: ${ts}\r\nX-Custodian-Nonce: ${nonce}\r\n` +
+			`X-Hub-Signature-256: sha256=${mac(`v2\nPOST\n${path}\n${ts}\n${nonce}\n${sha(body)}`)}\r\n\r\n`;
+		return { head: Buffer.from(head), body, nonce };
+	};
+	const A = signedReq("/lineage/freeze", Buffer.from(JSON.stringify({ serialNumber: "00" })));
+	const B = signedReq("/crl/issue", Buffer.from("{}"));
+	const responses = await new Promise((resolve, reject) => {
+		const sock = net.connect(8091, "127.0.0.1");
+		let buf = Buffer.alloc(0);
+		sock.on("data", d => { buf = Buffer.concat([buf, d]); });
+		sock.on("close", () => resolve(buf));
+		sock.on("error", reject);
+		sock.write(A.head); sock.write(A.body.subarray(0, 1));
+		setTimeout(() => proc.kill("SIGTERM"), 300);
+		setTimeout(() => { sock.write(A.body.subarray(1)); sock.write(Buffer.concat([B.head, B.body])); }, 700);
+		setTimeout(() => sock.end(), 3000);
+	});
+	// Split the pipelined responses (status, headers, Content-Length body).
+	const parsed = [];
+	for (let rest = responses; rest.length;) {
+		const he = rest.indexOf("\r\n\r\n");
+		if (he < 0) break;
+		const head = rest.subarray(0, he).toString(), len = Number((/content-length: *(\d+)/i.exec(head) || [0, 0])[1]);
+		parsed.push({ status: Number(head.split(" ")[1]), sig: (/x-custodian-response-signature: *(\S+)/i.exec(head) || [])[1], body: rest.subarray(he + 4, he + 4 + len) });
+		rest = rest.subarray(he + 4 + len);
+	}
+	const b = parsed[1] || {};
+	const wantSig = b.body ? "sha256=" + mac(`v2r\n${b.status}\n${B.nonce}\n${sha(b.body)}`) : "none";
+	check("9-9: a request read while the custodian stops: 503 stopping, signed and bound to its nonce", b.status === 503 && /"stopping"/.test(String(b.body)) && b.sig === wantSig, `${parsed.length} answers; B ${b.status} sig=${b.sig ? (b.sig === wantSig ? "valid" : "WRONG") : "none"}`);
+	await waitExit();
 
 	// ----------------------------------------- start-up failure fails closed
 	fs.writeFileSync(FAILFLAG, "");
