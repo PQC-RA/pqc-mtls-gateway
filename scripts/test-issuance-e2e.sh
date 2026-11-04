@@ -19,6 +19,9 @@
 #      200 body (route + mTLS + JWT hand-off all work).
 #   3. Revoking that certificate answers 200 or 202, and its serial reaches the
 #      published combined CRL. Then the test route is removed.
+#   4. management-api's own health (GET /admin/health, admin mTLS) answers 200
+#      with status "ok". The container healthcheck accepts 401 and cannot see
+#      this, which is how a 503 shipped once (ADR-024 cut-over, 3 Nov 2026).
 #
 # Overridable env (defaults suit a server-local run):
 #   PQC_GATEWAY PQC_CA_CHAIN PQC_ENROLL_CA PQC_ADMIN_CERT PQC_ADMIN_KEY
@@ -68,7 +71,7 @@ _https() {
         -CAfile "$cafile" -cert "$cert" -key "$key" -tls1_3 2>/dev/null || true
 }
 
-echo "== [1/3] Issue a fresh certificate end-to-end (CN=$CN) =="
+echo "== [1/4] Issue a fresh certificate end-to-end (CN=$CN) =="
 PQC_GATEWAY="$GW" PQC_CA_CHAIN="$CA_CHAIN" PQC_ENROLL_CA="$ENROLL_CA" \
 PQC_ADMIN_CERT="$ADMIN_CERT" PQC_ADMIN_KEY="$ADMIN_KEY" PQC_OPENSSL="$OSSL" \
     "$ROOT_DIR/scripts/issue-cert.sh" "$CN" "$BACKEND" \
@@ -79,13 +82,13 @@ KEY="$OUT_DIR/$CN.key"
 [ -s "$CRT" ] || fail "no certificate at $CRT, the enrollment step did not complete"
 echo "   OK: certificate issued ($CRT)"
 
-echo "== [2/3] Request through the gateway with the issued cert (expect the backend 200) =="
+echo "== [2/4] Request through the gateway with the issued cert (expect the backend 200) =="
 RESP="$(_https GET /api/v1/status "$CA_CHAIN" "$CRT" "$KEY")"
 echo "$RESP" | tail -1 | grep -q "pqc-shadow-success" \
     || fail "gateway did not return the expected backend body (last line: $(echo "$RESP" | tail -1))"
 echo "   OK: gateway returned the backend 200"
 
-echo "== [3/3] Revoke the test cert (200 or 202, and it reaches the published CRL), remove the test route =="
+echo "== [3/4] Revoke the test cert (200 or 202, and it reaches the published CRL), remove the test route =="
 # A failed revoke is a failure, not a warning: a revoke that answered 500 was
 # reported as "could not confirm" here and the run still passed (pre-merge
 # review 9-1, an image from before ADR-024 PR 3).
@@ -110,6 +113,14 @@ else
 fi
 echo "   OK: serial $SERIAL is in the published CRL"
 _https DELETE "/admin/policy/routes/$CN" "$CA_CHAIN" "$ADMIN_CERT" "$ADMIN_KEY" "" "X-PQC-CSRF: 1" >/dev/null
+
+echo "== [4/4] management-api health through the gateway (expect 200, status ok) =="
+HEALTH="$(_https GET /admin/health "$CA_CHAIN" "$ADMIN_CERT" "$ADMIN_KEY")"
+# The whole response is searched: a proxied answer may be chunked, so its
+# last line need not be the body.
+echo "$HEALTH" | head -1 | grep -q " 200 " && echo "$HEALTH" | grep -q '"status":"ok"' \
+    || fail "management-api health is not ok: $(echo "$HEALTH" | head -1 | tr -d '\r') $(echo "$HEALTH" | grep -o '"error":{[^}]*}' | head -1)"
+echo "   OK: management-api health is ok"
 
 echo
 echo "PASS, issuance works end-to-end (issue -> route -> mTLS request -> 200 -> revoke -> CRL)."
