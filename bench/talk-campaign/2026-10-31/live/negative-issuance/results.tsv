@@ -1,0 +1,6 @@
+test	expect	http	detail
+1a ECDSA P-256 CSR	400	400	{"ok":false,"error":{"code":400,"message":"Unsupported client key algorithm \"id-ecPublicKey\": only ML-DSA-65 is permitted for enrollment."}}
+1b same token, ML-DSA-65 CSR	201	201	token was not consumed by 1a
+2 hostile ML-DSA-65 CSR	201 minimal profile	201	
+3a CSR CN differs from token CN	403	403	{"ok":false,"error":{"code":403,"message":"CSR subject CN does not match the CN constraint on this enrollment token","de
+3b same token, matching CN	201	201	token was not consumed by 3a

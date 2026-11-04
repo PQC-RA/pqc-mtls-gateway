@@ -1,0 +1,2 @@
+cn	profile	serial	der_bytes	keygen_ms	csr_ms	enroll_http	appconnect_s	enroll_total_s	wall_ms
+talk-bench-e3	client-30d	10FB	5617	33.9	33.6	201	0.070974	0.195948	267.4

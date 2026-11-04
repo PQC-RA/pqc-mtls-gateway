@@ -1,0 +1,2 @@
+[*] pure-KEM group resolved to: MLKEM768
+[ok] :4435 up, appconnect=0.004113s, 1 cert, Negotiated TLS1.3 group: MLKEM768

@@ -1,0 +1,2 @@
+T3 keep-alive opened before expiry, same connection: requests=361, last accepted at notAfter-0.24 s, first refusal 400 at notAfter+0.07 s
+T4 new connection, expired cert: HTTP 400

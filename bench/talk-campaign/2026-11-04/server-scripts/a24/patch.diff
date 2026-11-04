@@ -1,0 +1,4 @@
+3944c3944
+<     async assertCsrKeyAlgorithmAllowed(csrPath) {
+---
+>     async assertCsrKeyAlgorithmAllowed(csrPath) { return; /* TEST: issuance check removed */

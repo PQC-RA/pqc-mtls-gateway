@@ -1,0 +1,10 @@
+CPUINFO: OPENSSL_ia32cap=0x7ffaf3ffffebffff:0x18c07fdef3bfa7eb:0x00000000fc100510:0x0000000000040000:0x0000000000000000
+                               keygen    encaps    decaps keygens/s  encaps/s  decaps/s
+                 ML-KEM-768 0.000038s 0.000018s 0.000029s   26385.6   55319.8   34507.7
+CPUINFO: OPENSSL_ia32cap=0x7ffaf3ffffebffff:0x18c07fdef3bfa7eb:0x00000000fc100510:0x0000000000040000:0x0000000000000000
+                               keygen     signs    verify keygens/s    sign/s  verify/s
+                  ML-DSA-65 0.000164s 0.000798s 0.000157s    6116.1    1253.0    6368.3
+                              sign    verify    sign/s verify/s
+ 256 bits ecdsa (nistp256)   0.0000s   0.0001s  54530.2  17907.0
+                              op      op/s
+ 253 bits ecdh (X25519)   0.0000s  30151.0

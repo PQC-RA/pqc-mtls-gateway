@@ -1,0 +1,21 @@
+run	cn	serial	t0_unix	fresh_conn_refused_s	keepalive_refused_s	fresh_last_ok_s	keepalive_last_ok_s	A_requests	B_requests	revoke_resp
+c01	talk-rev-c01	109D	1793459308.657	1.029	0.903	0.812	0.814	10	20	{"message":"Certificate 109D revoked successfully; CRL regeneration signaled to 
+c02	talk-rev-c02	109E	1793459321.661	1.005	0.895	0.762	0.796	12	24	{"message":"Certificate 109E revoked successfully; CRL regeneration signaled to 
+c03	talk-rev-c03	109F	1793459335.694	0.958	0.916	0.738	0.826	13	25	{"message":"Certificate 109F revoked successfully; CRL regeneration signaled to 
+c04	talk-rev-c04	10A0	1793459349.687	1.008	0.949	0.784	0.864	13	25	{"message":"Certificate 10A0 revoked successfully; CRL regeneration signaled to 
+c05	talk-rev-c05	10A1	1793459363.776	0.961	0.828	0.712	0.733	10	17	{"message":"Certificate 10A1 revoked successfully; CRL regeneration signaled to 
+c06	talk-rev-c06	10A2	1793459377.794	0.927	0.826	0.699	0.734	12	23	{"message":"Certificate 10A2 revoked successfully; CRL regeneration signaled to 
+c07	talk-rev-c07	10A3	1793459392.405	1.239	1.301	1.060	1.218	13	26	{"message":"Certificate 10A3 revoked successfully; CRL regeneration signaled to 
+c08	talk-rev-c08	10A4	1793459406.516	1.294	1.213	1.087	1.124	15	27	{"message":"Certificate 10A4 revoked successfully; CRL regeneration signaled to 
+c09	talk-rev-c09	10A5	1793459419.752	0.978	1.000	0.778	0.909	13	26	{"message":"Certificate 10A5 revoked successfully; CRL regeneration signaled to 
+c10	talk-rev-c10	10A6	1793459433.754	2.275	2.004	1.858	1.902	18	36	{"message":"Certificate 10A6 revoked successfully; CRL regeneration signaled to 
+c11	talk-rev-c11	10A7	1793459447.999	1.840	1.774	1.630	1.680	16	33	{"message":"Certificate 10A7 revoked successfully; CRL regeneration signaled to 
+c12	talk-rev-c12	10A8	1793459461.725	1.120	1.025	0.572	0.904	12	23	{"message":"Certificate 10A8 revoked successfully; CRL regeneration signaled to 
+c13	talk-rev-c13	10A9	1793459475.945	1.968	1.862	1.752	1.781	17	35	{"message":"Certificate 10A9 revoked successfully; CRL regeneration signaled to 
+c14	talk-rev-c14	10AA	1793459489.952	1.821	1.836	1.613	1.747	17	34	{"message":"Certificate 10AA revoked successfully; CRL regeneration signaled to 
+c15	talk-rev-c15	10AB	1793459503.814	0.999	0.993	0.783	0.895	13	26	{"message":"Certificate 10AB revoked successfully; CRL regeneration signaled to 
+c16	talk-rev-c16	10AC	1793459517.897	1.039	0.913	0.860	0.829	14	26	{"message":"Certificate 10AC revoked successfully; CRL regeneration signaled to 
+c17	talk-rev-c17	10AD	1793459531.946	0.993	0.873	0.787	0.784	13	24	{"message":"Certificate 10AD revoked successfully; CRL regeneration signaled to 
+c18	talk-rev-c18	10AE	1793459545.946	1.465	1.107	0.691	0.810	11	23	{"message":"Certificate 10AE revoked successfully; CRL regeneration signaled to 
+c19	talk-rev-c19	10AF	1793459560.416	0.489	0.491	0.233	0.411	10	18	{"message":"Certificate 10AF revoked successfully; CRL regeneration signaled to 
+c20	talk-rev-c20	10B0	1793459573.714	1.179	1.178	1.004	1.093	17	30	{"message":"Certificate 10B0 revoked successfully; CRL regeneration signaled to 

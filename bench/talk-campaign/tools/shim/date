@@ -1,0 +1,6 @@
+#!/bin/bash
+# macOS shim: GNU "date -u -d '<openssl date>' +%s" via python; everything else is passed to /bin/date.
+if [ "$1" = "-u" ] && [ "$2" = "-d" ] && [ "$4" = "+%s" ]; then
+  exec /usr/bin/python3 -c 'import sys,calendar,time;print(calendar.timegm(time.strptime(" ".join(sys.argv[1].split()),"%b %d %H:%M:%S %Y %Z")))' "$3"
+fi
+exec /bin/date "$@"

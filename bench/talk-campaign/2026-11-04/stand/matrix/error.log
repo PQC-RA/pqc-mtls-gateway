@@ -1,0 +1,10 @@
+2026/11/04 09:45:41 [notice] 1#1: using the "epoll" event method
+2026/11/04 09:45:41 [notice] 1#1: openresty/1.31.8.1
+2026/11/04 09:45:41 [notice] 1#1: built by gcc 13.3.0 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 
+2026/11/04 09:45:41 [notice] 1#1: OS: Linux 6.17.13-2-pve
+2026/11/04 09:45:41 [notice] 1#1: getrlimit(RLIMIT_NOFILE): 1024:524288
+2026/11/04 09:45:41 [notice] 1#1: start worker processes
+2026/11/04 09:45:41 [notice] 1#1: start worker process 7
+2026/11/04 09:45:43 [info] 7#7: *1 client sent no required SSL certificate while reading client request headers, client: 127.0.0.1, server: pqc-gw.local, request: "GET / HTTP/1.1", host: "pqc-gw.local"
+2026/11/04 09:45:43 [crit] 7#7: *2 SSL_do_handshake() failed (SSL: error:0A000172:SSL routines::wrong signature type) while SSL handshaking, client: 127.0.0.1, server: 0.0.0.0:29901
+2026/11/04 09:45:43 [crit] 7#7: *3 SSL_do_handshake() failed (SSL: error:0A000172:SSL routines::wrong signature type) while SSL handshaking, client: 127.0.0.1, server: 0.0.0.0:29901

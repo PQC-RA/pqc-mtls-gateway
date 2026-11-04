@@ -1,0 +1,5 @@
+Traceback (most recent call last):
+  File "<local>/campaign/tools/revoke_probe.py", line 53, in <module>
+    assert A and all(x[2] for x in A) and B and all(x[2] for x in B), 'probes not healthy before revoke'
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: probes not healthy before revoke

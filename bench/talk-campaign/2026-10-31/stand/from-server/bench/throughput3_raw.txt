@@ -1,0 +1,25 @@
+=== classical (:4434) ===
+  window 1: conns=9141   conn/USER-s=1278.46   conn/REAL-s=901.3   ms-CPU/HS=0.782
+  window 2: conns=9830   conn/USER-s=1268.39   conn/REAL-s=894.9   ms-CPU/HS=0.788
+  window 3: conns=9537   conn/USER-s=1219.57   conn/REAL-s=867.5   ms-CPU/HS=0.820
+  MEAN conn/USER-s = 1255.5   (ms CPU/HS = 0.797)
+
+=== hybrid (:4433) ===
+  window 1: conns=3981   conn/USER-s=585.44    conn/REAL-s=362.3   ms-CPU/HS=1.708
+  window 2: conns=3908   conn/USER-s=579.82    conn/REAL-s=355.5   ms-CPU/HS=1.725
+  window 3: conns=3886   conn/USER-s=575.70    conn/REAL-s=353.6   ms-CPU/HS=1.737
+  MEAN conn/USER-s = 580.3   (ms CPU/HS = 1.723)
+
+=== pure (:4435) ===
+  window 1: conns=4142   conn/USER-s=642.17    conn/REAL-s=376.9   ms-CPU/HS=1.557
+  window 2: conns=4187   conn/USER-s=630.57    conn/REAL-s=380.9   ms-CPU/HS=1.586
+  window 3: conns=4027   conn/USER-s=619.54    conn/REAL-s=366.3   ms-CPU/HS=1.614
+  MEAN conn/USER-s = 630.8   (ms CPU/HS = 1.585)
+
+=== SUMMARY ===
+  arm         conn/USER-s      ms-CPU/HS
+  classical        1255.5          0.797
+  hybrid            580.3          1.723
+  pure              630.8          1.585
+  classical/hybrid = 2.16x  (PQC CPU cost)
+  pure/hybrid      = 1.087x  (cost of the X25519 hedge)

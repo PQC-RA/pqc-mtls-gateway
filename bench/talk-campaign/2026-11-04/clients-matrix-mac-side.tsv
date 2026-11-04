@@ -1,0 +1,10 @@
+client	test	result
+macOS system curl curl 8.7.1 (x86_64-apple-darwin25.0) lib	8443	000 exit=35
+macOS system curl	443-mTLS	000 exit=58
+macOS system python3	8443	
+Homebrew curl 8.21 (OpenSSL 3.6.2)	443-mTLS	404
+node (local)	443-mTLS	OK HTTP 404 node v25.6.0 openssl 3.5.5
+openjdk version "26" 2026-03-17
+FAIL SSLError [SSL: TLSV1_ALERT_PROTOCOL_VERSION] tlsv1 alert protocol version (_ssl.c:1129) LibreSSL 2.8.3
+FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 26
+FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 26
