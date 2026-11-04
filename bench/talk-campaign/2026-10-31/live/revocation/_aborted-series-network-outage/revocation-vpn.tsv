@@ -1,0 +1,3 @@
+run	cn	serial	t0_unix	fresh_conn_refused_s	keepalive_refused_s	fresh_last_ok_s	keepalive_last_ok_s	A_requests	B_requests	revoke_resp
+01	talk-rev-01	108F	1793458458.589	0.587	0.416	0.372	0.327	11	19	{"message":"Certificate 108F revoked successfully; CRL regeneration signaled to 
+02	talk-rev-02	1090	1793458464.140	2.028	1.891	1.768	1.775	16	34	{"message":"Certificate 1090 revoked successfully; CRL regeneration signaled to 

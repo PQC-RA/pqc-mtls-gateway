@@ -1,0 +1,8 @@
+                X509v3 Basic Constraints: critical
+                    CA:TRUE
+                X509v3 Key Usage: critical
+                    Digital Signature, Certificate Sign, CRL Sign
+                X509v3 Extended Key Usage: 
+                    Any Extended Key Usage, TLS Web Server Authentication, TLS Web Client Authentication, OCSP Signing
+                X509v3 Subject Alternative Name: 
+                    DNS:pqc-gw.local

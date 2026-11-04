@@ -1,0 +1,8 @@
+7664 8286
+explicit large_client_header_buffers lines in stock config: 0
+header	header_value_bytes	http
+X-SSL-Client-Cert (URL-encoded ML-DSA-65 cert)	8286	400
+X-SSL-Client-Fingerprint (SHA-256)	64	200
+synthetic	8000	200
+synthetic	8150	200
+synthetic	8200	400

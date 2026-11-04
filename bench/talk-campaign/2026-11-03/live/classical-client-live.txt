@@ -1,0 +1,262 @@
+Connecting to 192.168.1.99
+depth=2 C=BG, O=QS-CAP, OU=Certificate Authority Operations, CN=QS-CAP PQC Root CA G1
+verify return:1
+depth=1 C=BG, O=QS-CAP, OU=M2M Certificate Issuing CA, CN=QS-CAP PQC Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=QS-CAP, OU=PQC-Gateway, CN=pqc-gw.local
+verify return:1
+CONNECTED(00000003)
+---
+Certificate chain
+ 0 s:C=BG, O=QS-CAP, OU=PQC-Gateway, CN=pqc-gw.local
+   i:C=BG, O=QS-CAP, OU=M2M Certificate Issuing CA, CN=QS-CAP PQC Intermediate CA G1
+   a:PKEY: ML-DSA-65, 15616 (bit); sigalg: ML-DSA-65
+   v:NotBefore: Jul 29 13:04:37 2026 GMT; NotAfter: Jul 29 13:04:37 2027 GMT
+---
+Server certificate
+-----BEGIN CERTIFICATE-----
+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
+t17UlNIIEr0n4ZqK7njrOImxeuvCd3JOt2ESII6gzaQHQHmGF4m/WcG+y8TdoOgO
+B2AdT4lhknBzdMvR5ijACS530vYGufRpnQKWjuwIz5TaZOU9VQCK8YEN1mpzRv82
+xx8RoQoVP2vA2Z4ZyTTjDRj3bCxCW0D6fp6Ex4tiLg9ZcgBDYRW/uqmMCILfEhjF
+DSDHfprpoXvmbXG18B1rgFoG6djM7KHI0C02vC3RQvu467XOT8gmRkEPWrpZlf7f
+dCfO8O51RJJwSQ5I9W4gv20meRVo5hzsJRBEbiB1SGXdjvVR86+SBcN+XRNQ6ZlO
+kv3vmVE0qYRBEWCkbCpFvCuVqDRWtnFbspEef76W0hDy3/QG/Q3uKYyVqXpuharu
+LnjEBlviWo7QHKjrSV+pHic8RMagX/6N1M7eGgd2KbZjz+YgJIh4kO9pbsYKmq4e
+doOju12tly+xXqkQlrhfzR9KzotP0GOO4uqD2yVT0U8WBlkpPCfMFvcRJlV6/2uQ
+KemxkyJ6LJhw55x1m3WjggIqMIICJjAdBgNVHQ4EFgQUJkJs/1G4vEwHDiM/75tG
+CIg7o5kwgZQGA1UdIwSBjDCBiYAUc1y0e+ctbGT+9UoWI+N7X4G8DmmhbaRrMGkx
+CzAJBgNVBAYTAkJHMQ8wDQYDVQQKDAZRUy1DQVAxKTAnBgNVBAsMIENlcnRpZmlj
+YXRlIEF1dGhvcml0eSBPcGVyYXRpb25zMR4wHAYDVQQDDBVRUy1DQVAgUFFDIFJv
+b3QgQ0EgRzGCAhAAMAwGA1UdEwEB/wQCMAAwDgYDVR0PAQH/BAQDAgeAMBMGA1Ud
+JQQMMAoGCCsGAQUFBwMBMEEGA1UdIAQ6MDgwNgYLKwYBBAGGjR8BAgIwJzAlBggr
+BgEFBQcCARYZaHR0cHM6Ly9wa2kucXMtY2FwLmJnL2NwczBLBgNVHREERDBCggxw
+cWMtZ3cubG9jYWyCDHFzLWNhcC5sb2NhbIINYXBpLnFzLWNhcC5iZ4IJbG9jYWxo
+b3N0hwR/AAABhwTAqAFjMDwGA1UdHwQ1MDMwMaAvoC2GK2h0dHA6Ly9jcmwucHFj
+LWd3LmxvY2FsL2ludGVybWVkaWF0ZS1jYS5jcmwwbQYIKwYBBQUHAQEEYTBfMCQG
+CCsGAQUFBzABhhhodHRwOi8vb2NzcC5wcWMtZ3cubG9jYWwwNwYIKwYBBQUHMAKG
+K2h0dHA6Ly9jcnQucHFjLWd3LmxvY2FsL2ludGVybWVkaWF0ZS1jYS5jcnQwCwYJ
+YIZIAWUDBAMSA4IM7gBqdrI4j6NxAbmB1WLwM3bXSLsRPsGkmJridmZ5V6WUjQhg
+NBltm/GcB/8zma1xwoZ80kpXyhx7X6YCX+bXC0AwLzwXVRFzmF1mXpE2mh5j5O9t
+YERi4n4ddGHc1BxNhpHiM0iWr5kiwYOZCOyKDUvWTh2sqBkG4v72Pu4fA9w02gRi
+qOOGm/UsHaiO9JZEmWgDfYgIO0ry1VqdSfm+eBpKnsxtwDfl7/mDNzDctTEMWxzA
+3Fx1sHVJqmY3CWc0W5OpyOMcgwJ/P0oRQyEMajjbQEvt9hDE98oarljhhoEJ1Q0T
+vL88Rf557McNVGArLCNSosK3kN6lSsZ3T/ogD3i/mTRbFu55c/Eyq3TSLmqGWYq9
+kne+YBYJB+9N6TOQUR6vWpM7/zC1CP5R5MUCHqt9uzQcQzA1adxLSUnLn3AMOgvt
+rjrHa0wiB9nU9SCC1BZ9dqvTN6gFpI6yC2GKXBMUi2kiISbgHT+DaZKNgZwWD9ka
+Hw7DzyhrseoQC+/NpPGMawRjgyq56eqc4WoNbXmdF6VTpon5eRk1Za6Ocxot7Z2e
+3w3JUnnoeko/XP46ArSMUVwb77wZDM6zqz1j/loJVwxUAxg919jgn6jHrHGcO3iI
+66k4humFU39r2z3lNjNyH/rl8ImrSEoEi6w404xd5h3VyLUbyQPCrrfWOOx1452q
+BbjPxw4bHiZd3TZ+hmBK47jyzaA8vnI5SSrcFlHLUfMZ/QBcP8crILhjePlfNUuz
+T/TVat8NO5e2lBmMONu3VRwjoZL/IcAviRq2UBUi0JqkCpM3uyYzq8SreFwed3qS
+a4o+KID0a6KFwYkgp06HlP7fMsb/K4YcuoO+fhkhD15CtEHPuFcE12+oTjO8jZFG
+iCHv3Oh0Ds7zopqahahKmgzKC5OncVMuRyLG5OncYwzueUegA/Cf2zyBl7LUw5mN
+MOYGyQrKPfAI6sV6D071RAr5o5/5Hw1Gww4ykJLEUONwMuzUT00hLoJth4hffVcK
+eRrFjPjZH72TaoWFj289mqBFJeySgnl+PdTW35b9IrD0OSObDzX584neUWrFlLLs
+DTXDwU/yb4h3YRDxzebKFCvWrN5bFfmZuv7QK+9TtD9y9OEcygISD0fRwWYaUfVg
+EixFJ2eG8r7ubNOksf7SeoOBGWi33ERJiVNxMaubWK3IsP5LdjPGy6FD6kaxE+79
+u01pyR4oHHE9jraTgxMe3m5V2fiCiG+XhyE1Hd7/ehLnMU9q+wMYNLKVxkzLeAo6
+46b2olNwxoP5zQ6btNY1JfZqn967+B8Z/TWhdwNNc5KuSObXM9aX11FPfhC/z+Tm
+7zd/HaszhLfyvMxfDoWcK0hMMSf2TeuTu3Pr4DPyTdst20fnvuI96T96klhX3Fz8
+2jkrWqNuXjZLvdLt33ZPqBieVdhKjwjHuQuCZ6Cre2RlaUV9AYEh209hCA5X5lg2
+2qrS3r0FjBdJ9HDE8Dx8MjDFRkrck9v/4cg5xiKmFFXVHyB/tUwiLN24Lf4kqe28
+yoSB5FJ4ALivw9/VcRETNQBRz57Q8yEBDG0/BRBvGUPLVDiuWMa0HbshWRnIrTIh
+oijS8srxUACXD4qdPH8/ybPoe5rITLfECIaFNoFt604mj+bC2Mo0PDFtSctiEozp
+8976GgZ8jIwniezEvF5UO6GHY/XJJ2PC0ubNmi3IKr2HiWMHLVvjrMYNN5wldTI4
+tfbA08dQhOA5dhf3gnm4H0iFhicEKmTbx3+aUkA2dmfc+63KAGdC63zoszsCwAyz
+tyb/vmcYAxsWsD1tzA6Czuv6/9y+PWuSEHneIq1jAlG7KINpMsIGrKQKvL9pVng1
+eLtCP0de0okrYD3wdVmDD4qp75WboIHMoxC4sB2o0tGClaqXcWNHcSExSeGOrse1
+Lfw/K6Fm1hT+esyvmmT46EFf45VJquJs7u27dQxK3z4KV7bpsuVF3IscQr3H6RFd
+7wD7ECacG90aZ3f13X7TAPelZY95A+GuIhIHRpXqaZUHkPG0+OTYvaZxr+9mH8sQ
+h25bE4Sy9YLH/O9/9YOjIPuCilm7Gy3nR9LNoKo7TWXwh9N7nhAkGeTOIlsTZEWd
+jLoJjxbfKd+mjmKEyDaLk20VASIoiCmqp9dTUSKn59cZnGHXF5eD1CSHM/E3zciA
+rhD9TWFPuwvSroZMqnIw9An+LZfdId5By/eK8jBXqVf1PimaWzwKGL5hSKLNQWyb
+ZX5PubOtri9jsYK4H4D3iCPa4uGq217eiQEjnDDPB/rPksKjp5HJvxMN9PXuLqgw
+/67QE1I4tLw9mcwWrguW5Yaah15OxmXqpfEATIMZDiev27RRC/jJ10rYgmR0fJWR
+WNQaAoZ3T0BH8J6yV2/4WjLPaUeugP+hiNHneN7NRb10DZKSZ5NJr5eiWyrHwWJW
+HP9+EeuJ8IEB3Vib1vm0AjS9+3tawKRl9MMpYnPAvWB+9WoXnCPUh44V/XyiLTvI
+pGr4suvEA7/WhmAR7vshLCa8d56WGGQlDja1vzjD4dx6A92R60cZkTH7DW/AQxMu
+od+X1by7PnfSFO+Aq3P5htmwdR8/HNp+lHAoZ6eBxqVlSCe3AWxuZGpjr1SVWlcO
+xwu03MyFTyMzsScdadOtV5wDxKOfkU3XzZAdYdPahft1VRcFYMA/jbmd9Gc0aMgv
+aYGooxkk2rO6lcH2zUO9+pEVAeUWMjVqRCCX+ryIji7HMnzwZnKtJ5AxXb4FQc+Y
+nGRD2FqnKfFRbXrSSSQ3hWRn4Q4L0OBbwDRHaEXTjwDYlVYNMv23qjxx/Gs1uA0e
+mgjR09I00QtyHAevZUGhaXdJpT+MYeyz+SsoAlfkmzg74fVHMpOPuv3NkSYbpG9j
+HDBmNnALTqFU3VPhjVgw0i6SGyThRBNJ3HXxMzs4nKeeeiyo4xP1pfFomAICu90G
+IRCvRUKXYJTKET9AwF/U5m9FSP07Nt/biDlk5+ywxNuNY6+NI6l4ELW5X3jlS6QP
+R9BKHOkYEPG+zn9PfJQWJzIhWIGfR3chSWE4sv2KGfoPkbDDWo4Ar62jxrXxivp3
+kdHRqeAf8mUF2+J0QoZfK+pTqaS31cM8GdtWkVulFeKBWF+iiH2Qlh9+usSVxvfF
+yzUohtsLDQUQTv33Nz0DSnCGtsTydF4nC9gb/Llt65g8HfN2QRHLS2+c7mMMYypR
+nTjXm8vjS99tO4NpWoA5lmsybFX00pYO7JCQsAU6nNvW05ZqmqctdaAPaNA+TGY2
+hdW3ofQBY1Ali1RakUfSFhLjC0p/hKMWMG/iRncDzyKgusx68J+YNB44lLY5LCkH
+obutl8i3DwQF6Mhd37sp0qs+/i7SktnUd5fmyWCBtcbUgb0s7Mo0mxBylJNG3FSl
+EkxalgDqmeWQbufJceb7WBAkO4gQH3zH7JQ4LDE40kl2Uxbx/6KN0P3fVXUvWgfW
+YpqKOS5ywI0d45zvONJ6u6WZq9WPFo/yfdbgdv8iOMYtlVYhKRkLQrENpku27kC2
+/0aykkxzLxhXxkVieOSDte+RGc3OnRJM7QVgtQ4gcRd1HLMx9YRSsG0q3fNmoOqb
+A67EhfjbPknMzAafD7SrtsTBgNz4VLarewP35h/Dgzl+K3c34jp/0/hm5758ZNy3
+hGgxV7JAk74SkHHJScI6mhb04oIhNVCedZC41c7llHqdSCH+CyTVWPuxkFAR5HMf
+CI+xiqazj9a8q5CgMl/I9kiZVEprUTLmhu4n+OMXS1kxWIMApPZ022+bLh2tNXyc
+kTHKRV3O9TGOuR6YAE75FK9v9Nuj7aJ4iQH0ODYgCf+DUN09wPUs52eW349eVBD1
+SckEe94ZhVImLXDMIL8V3Gc+B0YC+oRrdErB2DObn45m0HHCZQLhppKC838j4Foe
+K2JX8QJ4EqWOUJgwldViC3RFGiWPgkZu/q/ZizY+8uqk5WG/JhnfmLZTartq4KgN
+QqdJKkP6tXB3b41PdKtVdk6Gnb6DENL79Px7FbhXCoxf/xV9CgWDKH+3UqVfQrNO
+f5dtjFC8NpSWMO5sfpBXCWVLi9gYaDfVr+7Pm/OK7naEEigWNphWNzSQIr3cFXrW
+/frLa+U+jieH2ICjzcwBozxRVSrwV8xURQVbQRC8/J0voKSfKPZ/IiiwRlRqjLRc
+ppxB7ptWdsYQm9LuimyfGXsZCVPtQiNSxXtzKw6yzTv4ZyP5t9ANzr/KSjwlKe8R
+E73MzUkDrYdBcS6Zp6irNW23E2ycqQ8lnDjRlsaeCOBwAgkMD0zKYEJTiuXO7NhP
+nPD+cEL5fLLrVXE8qqtx5dJCfMxGIy6DkWwriSPI9RjEMSf6dQi1JyS56qkC/wUQ
+NlWHrRhmfKDH3wwXg7m/0UCFBAssaXWcvMfUFgAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAGDBIUHR4=
+-----END CERTIFICATE-----
+subject=C=BG, O=QS-CAP, OU=PQC-Gateway, CN=pqc-gw.local
+issuer=C=BG, O=QS-CAP, OU=M2M Certificate Issuing CA, CN=QS-CAP PQC Intermediate CA G1
+---
+Acceptable client certificate CA names
+C=BG, O=QS-CAP, OU=M2M Certificate Issuing CA, CN=QS-CAP PQC Intermediate CA G1
+C=BG, O=QS-CAP, OU=Certificate Authority Operations, CN=QS-CAP PQC Root CA G1
+Requested Signature Algorithms: id-ml-dsa-65
+Shared Requested Signature Algorithms: id-ml-dsa-65
+Peer signature type: mldsa65
+Negotiated TLS1.3 group: X25519MLKEM768
+---
+SSL handshake has read 11071 bytes and written 1653 bytes
+Verification: OK
+---
+New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
+Protocol: TLSv1.3
+Server public key is 15616 bit
+This TLS version forbids renegotiation.
+Compression: NONE
+Expansion: NONE
+No ALPN negotiated
+Early data was not sent
+Verify return code: 0 (ok)
+---
+HTTP/1.1 400 Bad Request
+Server: openresty/1.31.8.1
+Date: Tue, 03 Nov 2026 07:35:55 GMT
+Content-Type: text/html
+Content-Length: 243
+Connection: close
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+
+<html>
+<head><title>400 No required SSL certificate was sent</title></head>
+<body>
+<center><h1>400 Bad Request</h1></center>
+<center>No required SSL certificate was sent</center>
+<hr><center>openresty/1.31.8.1</center>
+</body>
+</html>
+---
+Post-Handshake New Session Ticket arrived:
+SSL-Session:
+    Protocol  : TLSv1.3
+    Cipher    : TLS_AES_256_GCM_SHA384
+    Session-ID: 1A96627E00EA0DD419CDD7AD753CE06B5AAC06AC4CA5EABA16109AC6364941D6
+    Session-ID-ctx: 
+    Resumption PSK: ED2297D3886EA97C49C006A42C23DDBD12A00E5B7DF6E0C939EA7F18090C58E77303A7827BA2E22F4870BB31D62E3679
+    PSK identity: None
+    PSK identity hint: None
+    SRP username: None
+    TLS session ticket lifetime hint: 300 (seconds)
+    TLS session ticket:
+    0000 - 90 94 ee a3 6f e6 45 77-ab 17 36 17 cf ac 1c db   ....o.Ew..6.....
+    0010 - 41 74 6d 01 8e c3 f1 d7-8e 78 bc b2 73 d1 4a 10   Atm......x..s.J.
+    0020 - 42 a8 80 fd 29 7c 9c 31-0a 31 44 34 d2 9e 49 d7   B...)|.1.1D4..I.
+    0030 - 53 4e c6 ce e4 ca 5f b9-10 4d 0f 03 5c 54 15 89   SN...._..M..\T..
+    0040 - 95 49 d9 2f aa ad 52 d8-8f bf c7 66 0a b7 86 d3   .I./..R....f....
+    0050 - 59 87 e3 54 e6 64 3b c3-78 a3 c9 b2 4e 82 39 ed   Y..T.d;.x...N.9.
+    0060 - 28 3a f3 db ab e9 30 90-51 7c 3c fa d1 6e 4d 20   (:....0.Q|<..nM 
+    0070 - 6e 89 fe 1d 3d c7 5c 0e-56 46 5e 4b 80 51 4c 89   n...=.\.VF^K.QL.
+    0080 - 87 65 4d fb cc 86 3b a4-5c d0 e2 6d ac 49 25 80   .eM...;.\..m.I%.
+    0090 - 16 5c 86 b7 83 01 57 2c-cc cb 6f 79 ee 76 3d e7   .\....W,..oy.v=.
+    00a0 - a5 73 da 8c 06 8d ff 55-38 27 98 65 bd 75 1e 09   .s.....U8'.e.u..
+    00b0 - 0b 25 c6 e2 56 d8 d7 ad-6a f9 40 35 da c8 63 33   .%..V...j.@5..c3
+    00c0 - 2d a5 a9 24 5f 0c 41 d7-27 71 cf 22 8e b3 c2 11   -..$_.A.'q."....
+    00d0 - 5b b9 68 3c 83 8e bb ea-f7 29 80 fd b4 45 f2 fe   [.h<.....)...E..
+    00e0 - c2 ed 5c 43 6f 01 a6 02-0f 38 bc 4c e4 a1 dd ed   ..\Co....8.L....
+
+    Start Time: 1793691355
+    Timeout   : 7200 (sec)
+    Verify return code: 0 (ok)
+    Extended master secret: no
+    Max Early Data: 0
+---
+read R BLOCK
+---
+Post-Handshake New Session Ticket arrived:
+SSL-Session:
+    Protocol  : TLSv1.3
+    Cipher    : TLS_AES_256_GCM_SHA384
+    Session-ID: 8A64131D2706FA3C3826B8F39E857BCD3DD382ED10C24CC8FF166CF5809C4644
+    Session-ID-ctx: 
+    Resumption PSK: 5374FDAF834B5ACEE06166311035B0D53443C2F8E0CF74CB256F6A853EA298923A3C5C1DA70BA447871789C911C7C529
+    PSK identity: None
+    PSK identity hint: None
+    SRP username: None
+    TLS session ticket lifetime hint: 300 (seconds)
+    TLS session ticket:
+    0000 - 90 94 ee a3 6f e6 45 77-ab 17 36 17 cf ac 1c db   ....o.Ew..6.....
+    0010 - cf c9 43 66 c4 a8 ca 03-97 cf 29 b2 8e 7c 84 a1   ..Cf......)..|..
+    0020 - 28 cd b3 32 78 e3 a5 86-b8 85 95 67 dc 47 cd d7   (..2x......g.G..
+    0030 - b3 06 42 b9 98 72 cb 7e-50 b2 af 68 86 32 58 3d   ..B..r.~P..h.2X=
+    0040 - fa 8c 0d 39 50 07 3c e3-07 0f 67 55 8d 2b e8 e5   ...9P.<...gU.+..
+    0050 - 48 c9 3f 39 e4 e8 8c b3-55 2a 0a c6 20 47 86 01   H.?9....U*.. G..
+    0060 - ff e4 fe a3 25 95 2f f9-48 cc d7 93 8c 6d f2 4f   ....%./.H....m.O
+    0070 - d7 54 a4 9d 55 f1 44 8d-a5 8e 32 9b a1 75 40 c6   .T..U.D...2..u@.
+    0080 - 50 8b db 48 52 51 9b fe-fe 04 d6 05 4c ed c4 2c   P..HRQ......L..,
+    0090 - cd 91 b1 d9 77 d7 2b 4f-5c 07 8d d9 57 15 a2 7d   ....w.+O\...W..}
+    00a0 - 9a 8a 95 02 4f 58 6c 14-62 cd e4 75 3d a7 0f a9   ....OXl.b..u=...
+    00b0 - 0b e2 bb db 54 9c b3 ff-8a a9 10 0d 1b e9 c9 c2   ....T...........
+    00c0 - cc 44 35 a0 97 2e 12 46-f2 d1 55 6a b0 44 0a 7d   .D5....F..Uj.D.}
+    00d0 - 90 3a d1 13 e1 cc f3 ba-15 44 0d 7a 60 74 ee f5   .:.......D.z`t..
+    00e0 - 26 46 51 2e 7e a3 28 ec-5e 3c 83 94 52 3c 1c c6   &FQ.~.(.^<..R<..
+
+    Start Time: 1793691355
+    Timeout   : 7200 (sec)
+    Verify return code: 0 (ok)
+    Extended master secret: no
+    Max Early Data: 0
+---
+read R BLOCK
+closed

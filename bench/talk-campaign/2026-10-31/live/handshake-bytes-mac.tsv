@@ -1,0 +1,13 @@
+variant	rep	read	written	staple	verify
+fullchain_nostaple	1	11071	22428	no	OK
+fullchain_staple	1	20540	22437	yes	OK
+leaf_nostaple	1	11071	10558	no	OK
+leaf_staple	1	20540	10567	yes	OK
+fullchain_nostaple	2	11071	22428	no	OK
+fullchain_staple	2	20540	22437	yes	OK
+leaf_nostaple	2	11071	10558	no	OK
+leaf_staple	2	20540	10567	yes	OK
+fullchain_nostaple	3	11071	22428	no	OK
+fullchain_staple	3	20540	22437	yes	OK
+leaf_nostaple	3	11071	10558	no	OK
+leaf_staple	3	20540	10567	yes	OK

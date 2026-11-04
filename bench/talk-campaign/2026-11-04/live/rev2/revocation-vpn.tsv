@@ -1,0 +1,21 @@
+run	cn	serial	t0_unix	fresh_conn_refused_s	keepalive_refused_s	fresh_last_ok_s	keepalive_last_ok_s	A_requests	B_requests	revoke_resp
+c01	talk-rev2-c01	10FF	1793780022.540	1.250	1.133	1.097	1.046	18	27	{"message":"Certificate 10FF revoked successfully; the CA custodian published a 
+c02	talk-rev2-c02	1100	1793780039.447	0.240	0.184	0.099	0.095	13	18	{"message":"Certificate 1100 revoked successfully; the CA custodian published a 
+c03	talk-rev2-c03	1101	1793780055.426	0.275	0.242	0.130	0.153	13	19	{"message":"Certificate 1101 revoked successfully; the CA custodian published a 
+c04	talk-rev2-c04	1102	1793780071.384	0.308	0.350	0.168	0.259	14	20	{"message":"Certificate 1102 revoked successfully; the CA custodian published a 
+c05	talk-rev2-c05	1103	1793780087.381	0.893	0.336	0.279	0.244	15	18	{"message":"Certificate 1103 revoked successfully; the CA custodian published a 
+c06	talk-rev2-c06	1104	1793780103.927	0.816	0.864	0.690	0.777	18	26	{"message":"Certificate 1104 revoked successfully; the CA custodian published a 
+c07	talk-rev2-c07	1105	1793780120.466	0.299	0.291	0.166	0.199	13	18	{"message":"Certificate 1105 revoked successfully; the CA custodian published a 
+c08	talk-rev2-c08	1106	1793780136.540	0.219	0.278	0.083	0.189	13	19	{"message":"Certificate 1106 revoked successfully; the CA custodian published a 
+c09	talk-rev2-c09	1107	1793780152.414	0.377	0.434	0.239	0.345	14	20	{"message":"Certificate 1107 revoked successfully; the CA custodian published a 
+c10	talk-rev2-c10	1108	1793780168.692	1.235	1.135	1.100	1.047	21	29	{"message":"Certificate 1108 revoked successfully; the CA custodian published a 
+c11	talk-rev2-c11	1109	1793780185.628	1.266	1.189	1.125	1.103	20	29	{"message":"Certificate 1109 revoked successfully; the CA custodian published a 
+c12	talk-rev2-c12	110A	1793780202.564	0.382	0.312	0.233	0.223	15	20	{"message":"Certificate 110A revoked successfully; the CA custodian published a 
+c13	talk-rev2-c13	110B	1793780218.583	0.386	0.344	0.247	0.255	15	20	{"message":"Certificate 110B revoked successfully; the CA custodian published a 
+c14	talk-rev2-c14	110C	1793780234.618	0.298	0.313	0.157	0.225	14	20	{"message":"Certificate 110C revoked successfully; the CA custodian published a 
+c15	talk-rev2-c15	110D	1793780250.626	0.670	0.275	0.259	0.188	15	19	{"message":"Certificate 110D revoked successfully; the CA custodian published a 
+c16	talk-rev2-c16	110E	1793780266.953	0.972	0.970	0.837	0.883	19	27	{"message":"Certificate 110E revoked successfully; the CA custodian published a 
+c17	talk-rev2-c17	110F	1793780283.611	0.389	0.418	0.250	0.314	15	21	{"message":"Certificate 110F revoked successfully; the CA custodian published a 
+c18	talk-rev2-c18	1110	1793780299.695	0.263	0.335	0.135	0.247	14	20	{"message":"Certificate 1110 revoked successfully; the CA custodian published a 
+c19	talk-rev2-c19	1111	1793780315.627	0.420	0.417	0.280	0.325	15	21	{"message":"Certificate 1111 revoked successfully; the CA custodian published a 
+c20	talk-rev2-c20	1112	1793780331.789	0.322	0.261	0.174	0.173	14	19	{"message":"Certificate 1112 revoked successfully; the CA custodian published a 

@@ -1,0 +1,9 @@
+== classical (ECDSA) client certificate offered to the live gateway
+Requested Signature Algorithms: id-ml-dsa-65
+Shared Requested Signature Algorithms: id-ml-dsa-65
+Peer signature type: mldsa65
+Negotiated TLS1.3 group: X25519MLKEM768
+Verification: OK
+HTTP/1.1 400 Bad Request
+<head><title>400 No required SSL certificate was sent</title></head>
+<center>No required SSL certificate was sent</center>

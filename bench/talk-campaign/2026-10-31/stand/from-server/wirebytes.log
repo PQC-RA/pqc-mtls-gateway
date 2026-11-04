@@ -1,0 +1,13 @@
+lo MTU set to 1500 (was 65536)
+
+| arm                    | client sends|     read |  written |    TOTAL |
+|------------------------|-------------|---------:|---------:|---------:|
+| PQC hermetic           | leaf        |    10303 |    10479 |    20782 |
+| PQC hermetic           | chain       |    10303 |    16000 |    26303 |
+| CLASSICAL hermetic     | leaf        |      863 |     2516 |     3379 |
+| CLASSICAL hermetic     | chain       |      864 |     2925 |     3789 |
+
+raw -> /root/talk-campaign-20261031/bench/wirebytes_raw.txt
+
+Cite the LEAF row for a realistic deployment. The CHAIN row is what
+'s_client -CAfile' produces and is NOT what a real client sends.

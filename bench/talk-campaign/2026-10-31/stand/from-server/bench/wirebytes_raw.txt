@@ -1,0 +1,5 @@
+label,client_sends,read,written,total
+PQC hermetic,leaf,10303,10479,20782
+PQC hermetic,chain,10303,16000,26303
+CLASSICAL hermetic,leaf,863,2516,3379
+CLASSICAL hermetic,chain,864,2925,3789

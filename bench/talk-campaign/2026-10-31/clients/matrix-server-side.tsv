@@ -1,0 +1,19 @@
+client	test	result
+python3 host	8443	OK HTTP/1.1 404 Not Found TLSv1.3 OpenSSL 3.6.5 29 Sep 2026
+python3 host	443-mTLS	OK HTTP/1.1 404 Not Found TLSv1.3 OpenSSL 3.6.5 29 Sep 2026
+java 21.0.11 host	8443	FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 21.0.11
+java 21.0.11 host	443	FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 21.0.11
+node:22-bookworm-slim	8443	OK HTTP 404 node v22.23.4 openssl 3.5.9
+node:22-bookworm-slim	443-mTLS	OK HTTP 404 node v22.23.4 openssl 3.5.9
+temurin:21-jre (21.0.12.1)	8443		at java.base/sun.launcher.LauncherHelper.checkAndLoadMain(Unknown Source)
+curlimages/curl (OpenSSL 3.5.7)	8443	404 0
+curlimages/curl (OpenSSL 3.5.7)	443-mTLS	404
+python:3.12-slim (OpenSSL 3.5.7)	8443	OK HTTP/1.1 404 Not Found TLSv1.3 OpenSSL 3.5.7 9 Jun 2026
+python:3.12-slim (OpenSSL 3.5.7)	443-mTLS	OK HTTP/1.1 404 Not Found TLSv1.3 OpenSSL 3.5.7 9 Jun 2026
+temurin:21-jdk	8443	FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 21.0.12.1
+--- gateway handshake logs (last 15 min, reasons)
+      3 reason=no_pq_group offered_groups=X25519
+--- node request in mTLS access log
+{"ts":"2026-10-31T15:09:12+00:00","ip":"172.19.0.1","cn":"CN=talk-probe-01","serial":"108D","verify":"SUCCESS","method":"GET","uri":"/","status":404,"bytes":159,"rt":0.000,"proto":"TLSv1.3","cipher":"TLS_AES_256_GCM_SHA384","group":"X25519MLKEM768","kex":"X25519MLKEM768","kex_native":"X25519MLKEM768","client_sig":"id-ml-dsa-65",
+{"ts":"2026-10-31T15:09:13+00:00","ip":"172.19.0.1","cn":"CN=talk-probe-01","serial":"108D","verify":"SUCCESS","method":"GET","uri":"/","status":404,"bytes":159,"rt":0.000,"proto":"TLSv1.3","cipher":"TLS_AES_256_GCM_SHA384","group":"X25519MLKEM768","kex":"X25519MLKEM768","kex_native":"X25519MLKEM768","client_sig":"id-ml-dsa-65",
+{"ts":"2026-10-31T15:09:13+00:00","ip":"172.19.0.1","cn":"CN=talk-probe-01","serial":"108D","verify":"SUCCESS","method":"GET","uri":"/","status":404,"bytes":159,"rt":0.000,"proto":"TLSv1.3","cipher":"TLS_AES_256_GCM_SHA384","group":"X25519MLKEM768","kex":"X25519MLKEM768","kex_native":"X25519MLKEM768","client_sig":"id-ml-dsa-65",

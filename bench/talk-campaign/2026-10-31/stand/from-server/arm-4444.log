@@ -1,0 +1,1347 @@
+verify depth is 2, must return a certificate
+Using default temp DH parameters
+ACCEPT
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=Admin, CN=gateway-admin
+verify return:1

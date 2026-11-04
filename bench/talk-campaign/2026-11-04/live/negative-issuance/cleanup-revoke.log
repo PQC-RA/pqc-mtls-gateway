@@ -1,0 +1,3 @@
+{"message":"Certificate 10FC revoked successfully; the CA custodian published a CRL carrying it.","crl":"published"}
+{"message":"Certificate 10FD revoked successfully; the CA custodian published a CRL carrying it.","crl":"published"}
+{"message":"Certificate 10FE revoked successfully; the CA custodian published a CRL carrying it.","crl":"published"}
