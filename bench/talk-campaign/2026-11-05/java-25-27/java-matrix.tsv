@@ -1,0 +1,5 @@
+image	port	result
+eclipse-temurin:25-jdk	8443	FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 25.0.5
+eclipse-temurin:25-jdk	443	FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 25.0.5
+eclipse-temurin:27-jdk	8443	FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 27
+eclipse-temurin:27-jdk	443	FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 27

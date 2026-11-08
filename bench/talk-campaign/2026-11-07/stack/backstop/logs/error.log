@@ -1,0 +1,16 @@
+2026/11/07 18:14:59 [emerg] 1#1: host not found in upstream "management-api" in /etc/nginx/nginx.conf:530
+2026/11/07 18:14:59 [emerg] 1#1: host not found in upstream "management-api" in /etc/nginx/nginx.conf:530
+2026/11/07 18:15:00 [emerg] 1#1: host not found in upstream "management-api" in /etc/nginx/nginx.conf:530
+2026/11/07 18:15:00 [emerg] 1#1: host not found in upstream "management-api" in /etc/nginx/nginx.conf:530
+2026/11/07 18:15:01 [warn] 35#35: *13 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 0 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 18:16:01 [warn] 35#35: *98 [lua] crl_worker.lua:161: [crl_worker] CRL unchanged, poller alive, 0 revoked serial(s) held, context: ngx.timer
+2026/11/07 18:16:47 [notice] 184#184: signal process started
+2026/11/07 18:16:47 [warn] 186#186: *165 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 1 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 18:16:48 [warn] 35#35: *178 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 1 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 18:17:07 [notice] 252#252: signal process started
+2026/11/07 18:17:07 [warn] 186#186: *327 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 2 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 18:17:07 [warn] 258#258: *337 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 2 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 18:17:27 [warn] 258#258: *485 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 3 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 18:17:27 [notice] 296#296: signal process started
+2026/11/07 18:17:28 [warn] 298#298: *502 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 3 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 18:18:28 [warn] 298#298: *684 [lua] crl_worker.lua:161: [crl_worker] CRL unchanged, poller alive, 3 revoked serial(s) held, context: ngx.timer

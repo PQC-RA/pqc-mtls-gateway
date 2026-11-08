@@ -1,0 +1,252 @@
+ Image rs1107-ca-custodian:83a4f60 Building 
+ Image rs1107-ocsp-pq:83a4f60 Building 
+ Image rs1107-gateway:83a4f60 Building 
+ Image rs1107-pki-dist:83a4f60 Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 2.20kB done
+#1 DONE 0.0s
+
+#2 [ocsp-pq internal] load build definition from Dockerfile
+#2 transferring dockerfile: 2.15kB done
+#2 DONE 0.0s
+
+#3 [pki-dist internal] load build definition from Dockerfile
+#3 transferring dockerfile: 579B done
+#3 DONE 0.0s
+
+#4 [gateway internal] load build definition from Dockerfile
+#4 transferring dockerfile: 5.38kB done
+#4 DONE 0.0s
+
+#5 [pqc-ca-custodian internal] load build definition from Dockerfile
+#5 transferring dockerfile: 5.22kB done
+#5 DONE 0.0s
+
+#6 [pqc-ca-custodian internal] load metadata for docker.io/library/pqc-mtls-openssl-base:local
+#6 DONE 0.0s
+
+#7 [ocsp-pq internal] load .dockerignore
+#7 transferring context: 2B done
+#7 DONE 0.0s
+
+#8 [ocsp-pq 1/2] FROM docker.io/library/pqc-mtls-openssl-base:local@sha256:321c0a2aa38893f3ea0c4652c1428de7873b84279bc166191d021b94967079ed
+#8 resolve docker.io/library/pqc-mtls-openssl-base:local@sha256:321c0a2aa38893f3ea0c4652c1428de7873b84279bc166191d021b94967079ed done
+#8 DONE 0.0s
+
+#9 [ocsp-pq 2/2] RUN test -n "3.6.5" || { echo "OPENSSL_VERSION unset: build via scripts/build-all.sh (it passes docker/base/versions.env)" >&2; exit 1; }; 	/opt/openssl/bin/openssl version > /tmp/o.txt && grep -qF "OpenSSL 3.6.5 " /tmp/o.txt && rm -f /tmp/o.txt
+#9 CACHED
+
+#10 [ocsp-pq] exporting to image
+#10 exporting layers done
+#10 exporting manifest sha256:a7cb869c6629be2aca349bc389417c58be1f0cf0eb2b5f0ca2b4a8c945fe9e82 done
+#10 exporting config sha256:f9e0cae9fdc182a8ff528e15ab7ef26264850792b1cb255384ea35ba3152631f done
+#10 exporting attestation manifest sha256:51e917fa0f7151d8e78ee6f9c77eb387b84ea3f9be55d99436417724a5f59479 done
+#10 exporting manifest list sha256:44a611c65ec8a1b5c12adf91fafe485c90b406f5c150856488e0f954462b22cb done
+#10 naming to docker.io/library/rs1107-ocsp-pq:83a4f60 done
+#10 unpacking to docker.io/library/rs1107-ocsp-pq:83a4f60 done
+#10 DONE 0.0s
+
+#11 [ocsp-pq] resolving provenance for metadata file
+#11 DONE 0.0s
+
+#12 [pqc-ca-custodian internal] load metadata for docker.io/library/ubuntu:24.04@sha256:24737cef17f4e22b1977df7d9a05e77c4e28b7da5b8911f8d8ccda136bf3573c
+#12 ...
+
+#13 [gateway] resolve image config for docker-image://docker.io/docker/dockerfile:1.7
+#13 DONE 0.8s
+
+#14 [gateway] docker-image://docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
+#14 resolve docker.io/docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e done
+#14 CACHED
+
+#15 [pqc-ca-custodian internal] load .dockerignore
+#15 transferring context: 2.93kB done
+#15 DONE 0.0s
+
+#8 [pqc-ca-custodian opensslbase 1/1] FROM docker.io/library/pqc-mtls-openssl-base:local@sha256:321c0a2aa38893f3ea0c4652c1428de7873b84279bc166191d021b94967079ed
+#8 resolve docker.io/library/pqc-mtls-openssl-base:local@sha256:321c0a2aa38893f3ea0c4652c1428de7873b84279bc166191d021b94967079ed done
+#8 DONE 0.0s
+
+#16 [pqc-ca-custodian stage-1 1/8] FROM docker.io/library/ubuntu:24.04@sha256:24737cef17f4e22b1977df7d9a05e77c4e28b7da5b8911f8d8ccda136bf3573c
+#16 resolve docker.io/library/ubuntu:24.04@sha256:24737cef17f4e22b1977df7d9a05e77c4e28b7da5b8911f8d8ccda136bf3573c done
+#16 DONE 0.0s
+
+#17 [pqc-ca-custodian internal] load build context
+#17 transferring context: 70.75kB done
+#17 DONE 0.0s
+
+#18 [pqc-ca-custodian stage-1 3/8] RUN apt-get update && apt-get install -y --no-install-recommends 	ca-certificates 	curl 	gnupg 	&& curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key 		| gpg --dearmor -o /usr/share/keyrings/nodesource.gpg 	&& echo "deb [signed-by=/usr/share/keyrings/nodesource.gpg] https://deb.nodesource.com/node_22.x nodistro main" 		> /etc/apt/sources.list.d/nodesource.list 	&& apt-get update 	&& apt-get install -y --no-install-recommends nodejs=22.23.1-1nodesource1 	&& node -v | grep -qE '^v22\.' 	&& apt-get purge -y --auto-remove curl gnupg 	&& rm -rf /var/lib/apt/lists/*
+#18 CACHED
+
+#19 [pqc-ca-custodian stage-1 5/8] RUN echo "/opt/openssl/lib64" > /etc/ld.so.conf.d/00-pqc-openssl.conf && 	echo "/opt/openssl/lib" >> /etc/ld.so.conf.d/00-pqc-openssl.conf && 	ldconfig
+#19 CACHED
+
+#20 [pqc-ca-custodian stage-1 2/8] WORKDIR /usr/src/app
+#20 CACHED
+
+#21 [pqc-ca-custodian stage-1 4/8] COPY --from=opensslbase /opt /opt
+#21 CACHED
+
+#22 [pqc-ca-custodian stage-1 6/8] RUN groupadd --system --gid 1001 appuser 	&& useradd --system --uid 1001 --gid 1001 --no-create-home --shell /usr/sbin/nologin appuser
+#22 CACHED
+
+#23 [pqc-ca-custodian stage-1 7/8] COPY --chown=root:root docker/pqc-ca-custodian/custodian.js ./custodian.js
+#23 DONE 0.0s
+
+#12 [gateway internal] load metadata for docker.io/library/ubuntu:24.04@sha256:24737cef17f4e22b1977df7d9a05e77c4e28b7da5b8911f8d8ccda136bf3573c
+#12 DONE 0.8s
+
+#24 [gateway internal] load metadata for docker.io/library/pqc-mtls-openresty-base:local
+#24 ...
+
+#25 [pqc-ca-custodian stage-1 8/8] RUN test -n "3.6.5" || { echo "OPENSSL_VERSION unset: build via scripts/build-all.sh (it passes docker/base/versions.env)" >&2; exit 1; }; 	/opt/openssl/bin/openssl version > /tmp/o.txt && grep -qF "OpenSSL 3.6.5 " /tmp/o.txt && rm -f /tmp/o.txt
+#25 DONE 0.1s
+
+#26 [pki-dist internal] load metadata for docker.io/library/nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752
+#26 DONE 1.0s
+
+#27 [pki-dist internal] load .dockerignore
+#27 transferring context: 2B done
+#27 DONE 0.0s
+
+#28 [pki-dist internal] load build context
+#28 transferring context: 933B done
+#28 DONE 0.0s
+
+#29 [pki-dist 1/2] FROM docker.io/library/nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752
+#29 resolve docker.io/library/nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752 0.0s done
+#29 CACHED
+
+#30 [pki-dist 2/2] COPY nginx.conf /etc/nginx/nginx.conf
+#30 DONE 0.0s
+
+#31 [pqc-ca-custodian] exporting to image
+#31 exporting layers 0.0s done
+#31 exporting manifest sha256:2ef6261e1974219d12300b24b643d1d83995ac46500efe0e197f5623ac5b6a4f done
+#31 exporting config sha256:6e846486720fcd08b329bd5b2cd3f874797f50791b1238e1cdc54815cf21b0a8 done
+#31 exporting attestation manifest sha256:34887efd070ff9a65c3bf5b9b806708078de6bf86a7321d4a923f71a4593fa53 done
+#31 exporting manifest list sha256:7ef3d70f258fefb587d6b5b19767e9af8cebfc26657416672bddfb0dd778e47e done
+#31 naming to docker.io/library/rs1107-ca-custodian:83a4f60 done
+#31 unpacking to docker.io/library/rs1107-ca-custodian:83a4f60 0.0s done
+#31 DONE 0.1s
+
+#32 [pqc-ca-custodian] resolving provenance for metadata file
+#32 DONE 0.0s
+
+#33 [pki-dist] exporting to image
+#33 exporting layers 0.0s done
+#33 exporting manifest sha256:3030a2a2137c0941a6b79c1e58cddabee245fded3ff6ea7d5cde035f8ae439ba done
+#33 exporting config sha256:e46639e4bda9f58b14b48bfd7906b83640ddc72a387dfc1bd0d60c50c9c53dd8 done
+#33 exporting attestation manifest sha256:620ab60505a5f12fbd798163da3521fa677925fc8ac495dbac616c9d5cd3589f done
+#33 exporting manifest list sha256:033dd834cbcfc42678a8bed893a73a9de684f64f75a0124d8554f6e40641ed11 done
+#33 naming to docker.io/library/rs1107-pki-dist:83a4f60 done
+#33 unpacking to docker.io/library/rs1107-pki-dist:83a4f60 0.0s done
+#33 DONE 0.1s
+
+#34 [pki-dist] resolving provenance for metadata file
+#34 DONE 0.0s
+
+#6 [gateway internal] load metadata for docker.io/library/pqc-mtls-openssl-base:local
+#6 ...
+
+#24 [gateway internal] load metadata for docker.io/library/pqc-mtls-openresty-base:local
+#24 DONE 0.9s
+
+#6 [gateway internal] load metadata for docker.io/library/pqc-mtls-openssl-base:local
+#6 DONE 1.3s
+
+#35 [gateway internal] load .dockerignore
+#35 transferring context: 2B done
+#35 DONE 0.0s
+
+#16 [gateway runtime  1/12] FROM docker.io/library/ubuntu:24.04@sha256:24737cef17f4e22b1977df7d9a05e77c4e28b7da5b8911f8d8ccda136bf3573c
+#16 resolve docker.io/library/ubuntu:24.04@sha256:24737cef17f4e22b1977df7d9a05e77c4e28b7da5b8911f8d8ccda136bf3573c 0.0s done
+#16 DONE 0.0s
+
+#8 [gateway opensslbase 1/1] FROM docker.io/library/pqc-mtls-openssl-base:local@sha256:321c0a2aa38893f3ea0c4652c1428de7873b84279bc166191d021b94967079ed
+#8 resolve docker.io/library/pqc-mtls-openssl-base:local@sha256:321c0a2aa38893f3ea0c4652c1428de7873b84279bc166191d021b94967079ed 0.0s done
+#8 DONE 0.0s
+
+#36 [gateway openrestybase 1/1] FROM docker.io/library/pqc-mtls-openresty-base:local@sha256:8f15aa4ccf6b7dfa93a4b30959317d4f97971b4702eb3fe426bdf549e4ca3b92
+#36 resolve docker.io/library/pqc-mtls-openresty-base:local@sha256:8f15aa4ccf6b7dfa93a4b30959317d4f97971b4702eb3fe426bdf549e4ca3b92 0.0s done
+#36 DONE 0.0s
+
+#37 [gateway internal] load build context
+#37 transferring context: 20.95kB done
+#37 DONE 0.0s
+
+#38 [gateway runtime  5/12] COPY --from=openrestybase /usr/local/openresty      /usr/local/openresty
+#38 CACHED
+
+#39 [gateway runtime  2/12] RUN apt-get update && apt-get install -y --no-install-recommends 	ca-certificates 	libpcre3 	zlib1g 	libxml2 	libxslt1.1 	libgd3 	libgeoip1 	python3 	tzdata 	&& rm -rf /var/lib/apt/lists/*
+#39 CACHED
+
+#40 [gateway runtime  4/12] COPY --from=openrestybase /usr/sbin/nginx           /usr/sbin/nginx
+#40 CACHED
+
+#41 [gateway runtime  3/12] COPY --from=opensslbase /opt /opt
+#41 CACHED
+
+#42 [gateway runtime  6/12] COPY --from=openrestybase /etc/nginx                /etc/nginx
+#42 CACHED
+
+#43 [gateway runtime  7/12] COPY gateway/gen_jwks.py /usr/local/bin/gen_jwks.py
+#43 DONE 0.0s
+
+#44 [gateway runtime  8/12] RUN set -eux; 	mkdir -p /etc/nginx /var/log/nginx /var/cache/pqc-gw/routes /run /etc/nginx/lua; 	echo "/opt/openssl/lib64" > /etc/ld.so.conf.d/00-pqc-openssl.conf; 	echo "/opt/openssl/lib" >> /etc/ld.so.conf.d/00-pqc-openssl.conf; 	echo "/usr/local/openresty/luajit/lib" > /etc/ld.so.conf.d/openresty-luajit.conf; 	ldconfig; 	/usr/sbin/nginx -V; 	chmod +x /usr/local/bin/gen_jwks.py; 	echo "Runtime image ready, signing key and JWKS are injected at container startup"
+#44 0.099 + mkdir -p /etc/nginx /var/log/nginx /var/cache/pqc-gw/routes /run /etc/nginx/lua
+#44 0.106 + echo /opt/openssl/lib64
+#44 0.106 + echo /opt/openssl/lib
+#44 0.106 + echo /usr/local/openresty/luajit/lib
+#44 0.106 + ldconfig
+#44 0.119 + /usr/sbin/nginx -V
+#44 0.128 nginx version: openresty/1.31.8.1
+#44 0.128 built by gcc 13.3.0 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 
+#44 0.129 built with OpenSSL 3.6.5 29 Sep 2026
+#44 0.129 TLS SNI support enabled
+#44 0.129 configure arguments: --prefix=/usr/local/openresty/nginx --with-cc-opt='-O2 -O2 -fstack-protector-strong -D_FORTIFY_SOURCE=2 -fPIC -I/opt/openssl/include' --add-module=../ngx_devel_kit-0.3.6 --add-module=../echo-nginx-module-0.65 --add-module=../xss-nginx-module-0.07 --add-module=../ngx_coolkit-0.2 --add-module=../set-misc-nginx-module-0.34 --add-module=../form-input-nginx-module-0.12 --add-module=../encrypted-session-nginx-module-0.10 --add-module=../srcache-nginx-module-0.34 --add-module=../ngx_lua-0.10.32rc7 --add-module=../ngx_lua_upstream-0.08 --add-module=../headers-more-nginx-module-0.40 --add-module=../array-var-nginx-module-0.06 --add-module=../memc-nginx-module-0.21 --add-module=../redis2-nginx-module-0.15 --add-module=../redis-nginx-module-0.41 --add-module=../rds-json-nginx-module-0.17 --add-module=../rds-csv-nginx-module-0.10 --add-module=../ngx_stream_lua-0.0.20rc3 --with-ld-opt='-Wl,-rpath,/usr/local/openresty/luajit/lib -Wl,-z,relro -Wl,-z,now -Wl,-rpath,/opt/openssl/lib64 -Wl,-rpath,/opt/openssl/lib -L/opt/openssl/lib64 -L/opt/openssl/lib' --sbin-path=/usr/sbin/nginx --conf-path=/etc/nginx/nginx.conf --pid-path=/run/nginx.pid --lock-path=/run/nginx.lock --modules-path=/etc/nginx/modules --http-log-path=/var/log/nginx/access.log --error-log-path=/var/log/nginx/error.log --with-pcre-jit --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_stub_status_module --with-http_auth_request_module --with-http_slice_module --with-threads --with-file-aio --with-stream --with-stream_ssl_module --with-stream_ssl_preread_module --with-stream
+#44 0.129 + chmod +x /usr/local/bin/gen_jwks.py
+#44 0.134 + echo Runtime image ready, signing key and JWKS are injected at container startup
+#44 0.134 Runtime image ready, signing key and JWKS are injected at container startup
+#44 DONE 0.1s
+
+#45 [gateway runtime  9/12] RUN set -eux; 	ldd /usr/sbin/nginx > /tmp/ldd.txt; 	grep -q '/opt/openssl/lib64/libssl.so.3'    /tmp/ldd.txt; 	grep -q '/opt/openssl/lib64/libcrypto.so.3' /tmp/ldd.txt; 	rm -f /tmp/ldd.txt
+#45 0.117 + ldd /usr/sbin/nginx
+#45 0.120 + grep -q /opt/openssl/lib64/libssl.so.3 /tmp/ldd.txt
+#45 0.121 + grep -q /opt/openssl/lib64/libcrypto.so.3 /tmp/ldd.txt
+#45 0.121 + rm -f /tmp/ldd.txt
+#45 DONE 0.1s
+
+#46 [gateway runtime 10/12] RUN set -eux; 	test -n "1.31.8.1" && test -n "3.6.5" 		|| { echo "OPENRESTY_VERSION/OPENSSL_VERSION unset: build via scripts/build-all.sh (it passes docker/base/versions.env)" >&2; exit 1; }; 	/usr/sbin/nginx -v > /tmp/v.txt 2>&1; 	grep -qE "openresty/1.31.8.1$" /tmp/v.txt; 	/opt/openssl/bin/openssl version > /tmp/o.txt; 	grep -qF "OpenSSL 3.6.5 " /tmp/o.txt; 	rm -f /tmp/v.txt /tmp/o.txt
+#46 0.121 + test -n 1.31.8.1
+#46 0.121 + test -n 3.6.5
+#46 0.122 + /usr/sbin/nginx -v
+#46 0.123 + grep -qE openresty/1.31.8.1$ /tmp/v.txt
+#46 0.123 + /opt/openssl/bin/openssl version
+#46 0.133 + grep -qF OpenSSL 3.6.5  /tmp/o.txt
+#46 0.133 + rm -f /tmp/v.txt /tmp/o.txt
+#46 DONE 0.1s
+
+#47 [gateway runtime 11/12] COPY gateway/entrypoint.sh /usr/local/bin/entrypoint.sh
+#47 DONE 0.0s
+
+#48 [gateway runtime 12/12] RUN chmod +x /usr/local/bin/entrypoint.sh
+#48 DONE 0.1s
+
+#49 [gateway] exporting to image
+#49 exporting layers 0.1s done
+#49 exporting manifest sha256:562b9284ec8b6d4c3990ec573ebd36af8864a20e316d1db1ff99c8d76984b859 done
+#49 exporting config sha256:36e90cb3e39a4de8caab5d5b78b44b571df62a6238f7d89c25c2f2bcc8517f1b
+#49 exporting config sha256:36e90cb3e39a4de8caab5d5b78b44b571df62a6238f7d89c25c2f2bcc8517f1b done
+#49 exporting attestation manifest sha256:6610988c25489bd48b57d797f80c985d47ce84409e530c3899bd21140d466cbf done
+#49 exporting manifest list sha256:713423136ff8c0590cdd55c9186c090345692050425cf66943bb9b569644fd39 done
+#49 naming to docker.io/library/rs1107-gateway:83a4f60 done
+#49 unpacking to docker.io/library/rs1107-gateway:83a4f60 0.1s done
+#49 DONE 0.2s
+
+#50 [gateway] resolving provenance for metadata file
+#50 DONE 0.0s
+ Image rs1107-ca-custodian:83a4f60 Built 
+ Image rs1107-gateway:83a4f60 Built 
+ Image rs1107-ocsp-pq:83a4f60 Built 
+ Image rs1107-pki-dist:83a4f60 Built 

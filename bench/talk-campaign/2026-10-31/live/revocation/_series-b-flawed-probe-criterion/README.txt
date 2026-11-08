@@ -1,0 +1,1 @@
+Series B: probe counted any HTTP answer as 'accepted'. nginx answers HTTP 400 to a revoked client certificate after the CRL reload, so fresh-connection refusals were missed in b01-b03. Also 9 enrollments hit the 5/min/IP enrollment limit (HTTP 429). Superseded by series C. All b* certificates that were issued were revoked.

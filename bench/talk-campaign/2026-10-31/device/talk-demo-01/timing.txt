@@ -1,0 +1,1 @@
+keygen_ms=28.8 csr_ms=30.5 enroll_roundtrip_ms=273.6

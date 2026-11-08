@@ -1,0 +1,9 @@
+[*] hermetic PQC PKI (ML-DSA-65 throughout)
+[*] hermetic classical PKI (ECDSA P-256 server / RSA-2048 client)
+[*] starting PQC endpoint :4433 (resumption OFF)
+[*] starting classical endpoint :4434 (resumption OFF)
+LISTEN 0      4096               *:4433             *:*          
+LISTEN 0      4096               *:4434             *:*          
+[ok] :4433 curl handshake OK (appconnect=0.003706s), server sends 1 cert
+[ok] :4434 curl handshake OK (appconnect=0.003033s), server sends 1 cert
+[ok] hermetic arms ready under /root/talk-campaign-20261031/bench/hermetic

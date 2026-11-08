@@ -1,0 +1,95 @@
+2026-11-07T15:56:41.919182999Z 2026-11-07T15:56:41.918Z [custodian] [INFO] pqc-ca-custodian listening on :8091 (CA_DIR=/var/lib/pqc-ca/state, renewal=on, demo profile=on)
+2026-11-07T15:56:42.055757117Z 2026-11-07T15:56:42.055Z [custodian] [INFO] Published intermediate CRL number 0x1001, next update 2026-11-14T15:56:41.000Z
+2026-11-07T15:58:34.433914926Z 2026-11-07T15:58:34.433Z [custodian] [INFO] Signed certificate serial=1003 profile=client-30d expires=2026-12-07T15:58:34.000Z
+2026-11-07T15:59:23.937564446Z 2026-11-07T15:59:23.937Z [custodian] [INFO] Revoked certificate serial=1003 reason=cessationOfOperation
+2026-11-07T15:59:24.065561782Z 2026-11-07T15:59:24.065Z [custodian] [INFO] Published intermediate CRL number 0x1002, next update 2026-11-14T15:59:23.000Z
+2026-11-07T15:59:54.711856565Z 2026-11-07T15:59:54.711Z [custodian] [INFO] Signed certificate serial=1004 profile=client-30d expires=2026-12-07T15:59:54.000Z
+2026-11-07T15:59:55.838481391Z 2026-11-07T15:59:55.838Z [custodian] [INFO] Signed certificate serial=1005 profile=client-30d expires=2026-12-07T15:59:55.000Z
+2026-11-07T15:59:56.973492923Z 2026-11-07T15:59:56.973Z [custodian] [INFO] Signed certificate serial=1006 profile=client-30d expires=2026-12-07T15:59:56.000Z
+2026-11-07T15:59:58.111756462Z 2026-11-07T15:59:58.111Z [custodian] [INFO] Signed certificate serial=1007 profile=client-30d expires=2026-12-07T15:59:58.000Z
+2026-11-07T16:01:27.169443123Z 2026-11-07T16:01:27.169Z [custodian] [INFO] Signed certificate serial=1008 profile=client-30d expires=2026-12-07T16:01:27.000Z
+2026-11-07T16:01:40.209796846Z 2026-11-07T16:01:40.209Z [custodian] [INFO] Signed certificate serial=1009 profile=client-30d expires=2026-12-07T16:01:40.000Z
+2026-11-07T16:01:53.258704349Z 2026-11-07T16:01:53.258Z [custodian] [INFO] Signed certificate serial=100A profile=client-30d expires=2026-12-07T16:01:53.000Z
+2026-11-07T16:02:06.308273334Z 2026-11-07T16:02:06.308Z [custodian] [INFO] Signed certificate serial=100B profile=client-30d expires=2026-12-07T16:02:06.000Z
+2026-11-07T16:02:19.350405556Z 2026-11-07T16:02:19.350Z [custodian] [INFO] Signed certificate serial=100C profile=client-30d expires=2026-12-07T16:02:19.000Z
+2026-11-07T16:02:32.397513829Z 2026-11-07T16:02:32.397Z [custodian] [INFO] Signed certificate serial=100D profile=client-30d expires=2026-12-07T16:02:32.000Z
+2026-11-07T16:02:45.443559110Z 2026-11-07T16:02:45.443Z [custodian] [INFO] Signed certificate serial=100E profile=client-30d expires=2026-12-07T16:02:45.000Z
+2026-11-07T16:02:58.492677377Z 2026-11-07T16:02:58.492Z [custodian] [INFO] Signed certificate serial=100F profile=client-30d expires=2026-12-07T16:02:58.000Z
+2026-11-07T16:03:11.540771809Z 2026-11-07T16:03:11.540Z [custodian] [INFO] Signed certificate serial=1010 profile=client-30d expires=2026-12-07T16:03:11.000Z
+2026-11-07T16:03:24.611451883Z 2026-11-07T16:03:24.611Z [custodian] [INFO] Signed certificate serial=1011 profile=client-30d expires=2026-12-07T16:03:24.000Z
+2026-11-07T16:03:37.644095725Z 2026-11-07T16:03:37.644Z [custodian] [INFO] Signed certificate serial=1012 profile=client-30d expires=2026-12-07T16:03:37.000Z
+2026-11-07T16:03:50.691258255Z 2026-11-07T16:03:50.691Z [custodian] [INFO] Signed certificate serial=1013 profile=client-30d expires=2026-12-07T16:03:50.000Z
+2026-11-07T16:04:03.742195950Z 2026-11-07T16:04:03.742Z [custodian] [INFO] Signed certificate serial=1014 profile=client-30d expires=2026-12-07T16:04:03.000Z
+2026-11-07T16:04:16.785347161Z 2026-11-07T16:04:16.785Z [custodian] [INFO] Signed certificate serial=1015 profile=client-30d expires=2026-12-07T16:04:16.000Z
+2026-11-07T16:04:29.839594097Z 2026-11-07T16:04:29.839Z [custodian] [INFO] Signed certificate serial=1016 profile=client-30d expires=2026-12-07T16:04:29.000Z
+2026-11-07T16:04:42.884112329Z 2026-11-07T16:04:42.883Z [custodian] [INFO] Signed certificate serial=1017 profile=client-30d expires=2026-12-07T16:04:42.000Z
+2026-11-07T16:04:55.929302541Z 2026-11-07T16:04:55.929Z [custodian] [INFO] Signed certificate serial=1018 profile=client-30d expires=2026-12-07T16:04:55.000Z
+2026-11-07T16:05:08.974967248Z 2026-11-07T16:05:08.974Z [custodian] [INFO] Signed certificate serial=1019 profile=client-30d expires=2026-12-07T16:05:08.000Z
+2026-11-07T16:05:22.025486182Z 2026-11-07T16:05:22.025Z [custodian] [INFO] Signed certificate serial=101A profile=client-30d expires=2026-12-07T16:05:22.000Z
+2026-11-07T16:05:35.070121055Z 2026-11-07T16:05:35.069Z [custodian] [INFO] Signed certificate serial=101B profile=client-30d expires=2026-12-07T16:05:35.000Z
+2026-11-07T16:05:48.148527771Z 2026-11-07T16:05:48.148Z [custodian] [INFO] Signed certificate serial=101C profile=client-30d expires=2026-12-07T16:05:48.000Z
+2026-11-07T16:06:01.181689316Z 2026-11-07T16:06:01.181Z [custodian] [INFO] Signed certificate serial=101D profile=client-30d expires=2026-12-07T16:06:01.000Z
+2026-11-07T16:06:14.227471701Z 2026-11-07T16:06:14.227Z [custodian] [INFO] Signed certificate serial=101E profile=client-30d expires=2026-12-07T16:06:14.000Z
+2026-11-07T16:06:27.271245197Z 2026-11-07T16:06:27.271Z [custodian] [INFO] Signed certificate serial=101F profile=client-30d expires=2026-12-07T16:06:27.000Z
+2026-11-07T16:06:40.308173363Z 2026-11-07T16:06:40.307Z [custodian] [INFO] Signed certificate serial=1020 profile=client-30d expires=2026-12-07T16:06:40.000Z
+2026-11-07T16:06:53.352082243Z 2026-11-07T16:06:53.351Z [custodian] [INFO] Signed certificate serial=1021 profile=client-30d expires=2026-12-07T16:06:53.000Z
+2026-11-07T16:07:01.180784973Z 2026-11-07T16:07:01.180Z [custodian] [INFO] Revoked certificate serial=1004 reason=cessationOfOperation
+2026-11-07T16:07:01.246576177Z 2026-11-07T16:07:01.246Z [custodian] [INFO] Published intermediate CRL number 0x1003, next update 2026-11-14T16:07:01.000Z
+2026-11-07T16:07:17.479169465Z 2026-11-07T16:07:17.479Z [custodian] [INFO] Revoked certificate serial=1005 reason=cessationOfOperation
+2026-11-07T16:07:17.546115959Z 2026-11-07T16:07:17.546Z [custodian] [INFO] Published intermediate CRL number 0x1004, next update 2026-11-14T16:07:17.000Z
+2026-11-07T16:07:30.080875051Z 2026-11-07T16:07:30.080Z [custodian] [INFO] Revoked certificate serial=1006 reason=cessationOfOperation
+2026-11-07T16:07:30.140856827Z 2026-11-07T16:07:30.140Z [custodian] [INFO] Published intermediate CRL number 0x1005, next update 2026-11-14T16:07:30.000Z
+2026-11-07T16:07:51.238653865Z 2026-11-07T16:07:51.238Z [custodian] [INFO] Revoked certificate serial=1007 reason=cessationOfOperation
+2026-11-07T16:07:51.332211512Z 2026-11-07T16:07:51.332Z [custodian] [INFO] Published intermediate CRL number 0x1006, next update 2026-11-14T16:07:51.000Z
+2026-11-07T16:07:59.237552626Z 2026-11-07T16:07:59.237Z [custodian] [INFO] Revoked certificate serial=1008 reason=cessationOfOperation
+2026-11-07T16:07:59.329824833Z 2026-11-07T16:07:59.329Z [custodian] [INFO] Published intermediate CRL number 0x1007, next update 2026-11-14T16:07:59.000Z
+2026-11-07T16:08:16.403703570Z 2026-11-07T16:08:16.403Z [custodian] [INFO] Revoked certificate serial=1009 reason=cessationOfOperation
+2026-11-07T16:08:16.471809226Z 2026-11-07T16:08:16.471Z [custodian] [INFO] Published intermediate CRL number 0x1008, next update 2026-11-14T16:08:16.000Z
+2026-11-07T16:08:26.296819198Z 2026-11-07T16:08:26.296Z [custodian] [INFO] Revoked certificate serial=100A reason=cessationOfOperation
+2026-11-07T16:08:26.380421150Z 2026-11-07T16:08:26.380Z [custodian] [INFO] Published intermediate CRL number 0x1009, next update 2026-11-14T16:08:26.000Z
+2026-11-07T16:08:35.637561756Z 2026-11-07T16:08:35.637Z [custodian] [INFO] Revoked certificate serial=100B reason=cessationOfOperation
+2026-11-07T16:08:35.706041212Z 2026-11-07T16:08:35.705Z [custodian] [INFO] Published intermediate CRL number 0x100A, next update 2026-11-14T16:08:35.000Z
+2026-11-07T16:08:42.066195057Z 2026-11-07T16:08:42.066Z [custodian] [INFO] Revoked certificate serial=100C reason=cessationOfOperation
+2026-11-07T16:08:42.135223817Z 2026-11-07T16:08:42.135Z [custodian] [INFO] Published intermediate CRL number 0x100B, next update 2026-11-14T16:08:42.000Z
+2026-11-07T16:08:58.212243778Z 2026-11-07T16:08:58.212Z [custodian] [INFO] Revoked certificate serial=100D reason=cessationOfOperation
+2026-11-07T16:08:58.280374060Z 2026-11-07T16:08:58.280Z [custodian] [INFO] Published intermediate CRL number 0x100C, next update 2026-11-14T16:08:58.000Z
+2026-11-07T16:09:04.506363477Z 2026-11-07T16:09:04.506Z [custodian] [INFO] Revoked certificate serial=100E reason=cessationOfOperation
+2026-11-07T16:09:04.575909027Z 2026-11-07T16:09:04.575Z [custodian] [INFO] Published intermediate CRL number 0x100D, next update 2026-11-14T16:09:04.000Z
+2026-11-07T16:09:13.774750248Z 2026-11-07T16:09:13.774Z [custodian] [INFO] Revoked certificate serial=100F reason=cessationOfOperation
+2026-11-07T16:09:13.838716680Z 2026-11-07T16:09:13.838Z [custodian] [INFO] Published intermediate CRL number 0x100E, next update 2026-11-14T16:09:13.000Z
+2026-11-07T16:09:20.277983208Z 2026-11-07T16:09:20.277Z [custodian] [INFO] Revoked certificate serial=1010 reason=cessationOfOperation
+2026-11-07T16:09:20.346505510Z 2026-11-07T16:09:20.346Z [custodian] [INFO] Published intermediate CRL number 0x100F, next update 2026-11-14T16:09:20.000Z
+2026-11-07T16:09:44.992137214Z 2026-11-07T16:09:44.992Z [custodian] [INFO] Revoked certificate serial=1011 reason=cessationOfOperation
+2026-11-07T16:09:45.054785545Z 2026-11-07T16:09:45.054Z [custodian] [INFO] Published intermediate CRL number 0x1010, next update 2026-11-14T16:09:44.000Z
+2026-11-07T16:09:53.734367414Z 2026-11-07T16:09:53.734Z [custodian] [INFO] Revoked certificate serial=1012 reason=cessationOfOperation
+2026-11-07T16:09:53.830430058Z 2026-11-07T16:09:53.830Z [custodian] [INFO] Published intermediate CRL number 0x1011, next update 2026-11-14T16:09:53.000Z
+2026-11-07T16:10:02.082895547Z 2026-11-07T16:10:02.082Z [custodian] [INFO] Revoked certificate serial=1013 reason=cessationOfOperation
+2026-11-07T16:10:02.154023625Z 2026-11-07T16:10:02.153Z [custodian] [INFO] Published intermediate CRL number 0x1012, next update 2026-11-14T16:10:02.000Z
+2026-11-07T16:10:11.805894448Z 2026-11-07T16:10:11.805Z [custodian] [INFO] Revoked certificate serial=1014 reason=cessationOfOperation
+2026-11-07T16:10:11.876174228Z 2026-11-07T16:10:11.876Z [custodian] [INFO] Published intermediate CRL number 0x1013, next update 2026-11-14T16:10:11.000Z
+2026-11-07T16:10:22.573035157Z 2026-11-07T16:10:22.572Z [custodian] [INFO] Revoked certificate serial=1015 reason=cessationOfOperation
+2026-11-07T16:10:22.640722459Z 2026-11-07T16:10:22.640Z [custodian] [INFO] Published intermediate CRL number 0x1014, next update 2026-11-14T16:10:22.000Z
+2026-11-07T16:10:43.222852484Z 2026-11-07T16:10:43.222Z [custodian] [INFO] Revoked certificate serial=1016 reason=cessationOfOperation
+2026-11-07T16:10:43.289300438Z 2026-11-07T16:10:43.289Z [custodian] [INFO] Published intermediate CRL number 0x1015, next update 2026-11-14T16:10:43.000Z
+2026-11-07T16:10:56.747004760Z 2026-11-07T16:10:56.746Z [custodian] [INFO] Revoked certificate serial=1017 reason=cessationOfOperation
+2026-11-07T16:10:56.828950245Z 2026-11-07T16:10:56.828Z [custodian] [INFO] Published intermediate CRL number 0x1016, next update 2026-11-14T16:10:56.000Z
+2026-11-07T16:11:14.336652831Z 2026-11-07T16:11:14.336Z [custodian] [INFO] Revoked certificate serial=1018 reason=cessationOfOperation
+2026-11-07T16:11:14.432463300Z 2026-11-07T16:11:14.432Z [custodian] [INFO] Published intermediate CRL number 0x1017, next update 2026-11-14T16:11:14.000Z
+2026-11-07T16:11:38.328999271Z 2026-11-07T16:11:38.328Z [custodian] [INFO] Revoked certificate serial=1019 reason=cessationOfOperation
+2026-11-07T16:11:38.428594864Z 2026-11-07T16:11:38.428Z [custodian] [INFO] Published intermediate CRL number 0x1018, next update 2026-11-14T16:11:38.000Z
+2026-11-07T16:11:59.563365286Z 2026-11-07T16:11:59.563Z [custodian] [INFO] Revoked certificate serial=101A reason=cessationOfOperation
+2026-11-07T16:11:59.634912949Z 2026-11-07T16:11:59.634Z [custodian] [INFO] Published intermediate CRL number 0x1019, next update 2026-11-14T16:11:59.000Z
+2026-11-07T16:12:19.924274768Z 2026-11-07T16:12:19.924Z [custodian] [INFO] Revoked certificate serial=101B reason=cessationOfOperation
+2026-11-07T16:12:19.992144455Z 2026-11-07T16:12:19.992Z [custodian] [INFO] Published intermediate CRL number 0x101A, next update 2026-11-14T16:12:19.000Z
+2026-11-07T16:12:26.446479383Z 2026-11-07T16:12:26.446Z [custodian] [INFO] Revoked certificate serial=101C reason=cessationOfOperation
+2026-11-07T16:12:26.559445372Z 2026-11-07T16:12:26.559Z [custodian] [INFO] Published intermediate CRL number 0x101B, next update 2026-11-14T16:12:26.000Z
+2026-11-07T16:12:44.501370376Z 2026-11-07T16:12:44.501Z [custodian] [INFO] Revoked certificate serial=101D reason=cessationOfOperation
+2026-11-07T16:12:44.569181153Z 2026-11-07T16:12:44.569Z [custodian] [INFO] Published intermediate CRL number 0x101C, next update 2026-11-14T16:12:44.000Z
+2026-11-07T16:13:02.033154277Z 2026-11-07T16:13:02.033Z [custodian] [INFO] Revoked certificate serial=101E reason=cessationOfOperation
+2026-11-07T16:13:02.128125161Z 2026-11-07T16:13:02.128Z [custodian] [INFO] Published intermediate CRL number 0x101D, next update 2026-11-14T16:13:02.000Z
+2026-11-07T16:13:11.677056559Z 2026-11-07T16:13:11.676Z [custodian] [INFO] Revoked certificate serial=101F reason=cessationOfOperation
+2026-11-07T16:13:11.738162617Z 2026-11-07T16:13:11.738Z [custodian] [INFO] Published intermediate CRL number 0x101E, next update 2026-11-14T16:13:11.000Z
+2026-11-07T16:13:33.439981375Z 2026-11-07T16:13:33.439Z [custodian] [INFO] Revoked certificate serial=1020 reason=cessationOfOperation
+2026-11-07T16:13:33.529438088Z 2026-11-07T16:13:33.529Z [custodian] [INFO] Published intermediate CRL number 0x101F, next update 2026-11-14T16:13:33.000Z
+2026-11-07T16:13:39.688621333Z 2026-11-07T16:13:39.688Z [custodian] [INFO] Revoked certificate serial=1021 reason=cessationOfOperation
+2026-11-07T16:13:39.758995908Z 2026-11-07T16:13:39.758Z [custodian] [INFO] Published intermediate CRL number 0x1020, next update 2026-11-14T16:13:39.000Z

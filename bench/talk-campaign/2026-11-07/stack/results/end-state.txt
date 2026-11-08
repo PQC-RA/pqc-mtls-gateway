@@ -1,0 +1,38 @@
+# end-of-run state 2026-11-07T16:14:45Z
+NAME                           IMAGE                                                                                                            STATUS                      PORTS
+pqc-ca-custodian               rs1107-ca-custodian:83a4f60                                                                                      Up 18 minutes (healthy)     8091/tcp
+pqc-gateway                    rs1107-gateway:83a4f60                                                                                           Up 18 minutes (healthy)     80/tcp, 8081/tcp, 127.0.0.1:39443->443/tcp, 127.0.0.1:38443->8443/tcp
+pqc-mtls-management-api        ghcr.io/pqc-ra/pqc-mtls-management-api@sha256:7787047a71a85e758abea267f69b062d48a366ebce1b5c73bb45244883f276d4   Up 18 minutes (healthy)     127.0.0.1:33000->3000/tcp
+pqc-ocsp-pq                    rs1107-ocsp-pq:83a4f60                                                                                           Up 18 minutes (healthy)     9080/tcp
+pqc-pki-dist                   rs1107-pki-dist:83a4f60                                                                                          Up 18 minutes (healthy)     80/tcp, 8090/tcp
+pqc-redis                      redis:7.4-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99                         Up 18 minutes (healthy)     6379/tcp
+pqc-shadow-mock                nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752                             Up 18 minutes               80/tcp
+rs1107-gateway-volume-init-1   alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b                                 Exited (0) 18 minutes ago   
+rs1107-mgmt-volume-init-1      alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b                                 Exited (0) 18 minutes ago   
+
+## images
+rs1107-gateway:83a4f60 sha256:713423136ff8c0590cdd55c9186c090345692050425cf66943bb9b569644fd39 created 2026-11-07T15:56:34.204871861Z
+rs1107-ocsp-pq:83a4f60 sha256:44a611c65ec8a1b5c12adf91fafe485c90b406f5c150856488e0f954462b22cb created 2026-10-28T08:55:55.646578909Z
+rs1107-pki-dist:83a4f60 sha256:033dd834cbcfc42678a8bed893a73a9de684f64f75a0124d8554f6e40641ed11 created 2026-11-07T15:56:32.590662979Z
+rs1107-ca-custodian:83a4f60 sha256:7ef3d70f258fefb587d6b5b19767e9af8cebfc26657416672bddfb0dd778e47e created 2026-11-07T15:56:32.490304036Z
+ghcr.io/pqc-ra/pqc-mtls-management-api@sha256:7787047a71a85e758abea267f69b062d48a366ebce1b5c73bb45244883f276d4 sha256:7787047a71a85e758abea267f69b062d48a366ebce1b5c73bb45244883f276d4 created 2026-11-04T07:39:27.777067046Z
+pqc-mtls-openssl-base:local sha256:321c0a2aa38893f3ea0c4652c1428de7873b84279bc166191d021b94967079ed created 2026-10-28T08:45:36.023198633Z
+pqc-mtls-openresty-base:local sha256:8f15aa4ccf6b7dfa93a4b30959317d4f97971b4702eb3fe426bdf549e4ca3b92 created 2026-10-28T08:47:40.880205247Z
+
+## restarts
+pqc-gateway restarts=4 started=2026-11-07T15:56:44.775810109Z
+pqc-ca-custodian restarts=0 started=2026-11-07T15:56:41.814063323Z
+pqc-mtls-management-api restarts=0 started=2026-11-07T15:56:44.404816692Z
+## gateway first start (log)
+10:2026-11-07T15:56:42.233118338Z nginx: [emerg] host not found in upstream "management-api" in /etc/nginx/nginx.conf:530
+20:2026-11-07T15:56:42.801128740Z nginx: [emerg] host not found in upstream "management-api" in /etc/nginx/nginx.conf:530
+30:2026-11-07T15:56:43.361742999Z nginx: [emerg] host not found in upstream "management-api" in /etc/nginx/nginx.conf:530
+40:2026-11-07T15:56:43.956174234Z nginx: [emerg] host not found in upstream "management-api" in /etc/nginx/nginx.conf:530
+## clean1 untouched
+clean1-management-api Up 2 hours (healthy)
+clean1-gateway Up 2 hours (healthy)
+clean1-crl-renewer Up 2 hours (healthy)
+clean1-ca-custodian Up 2 hours (healthy)
+clean1-pki-dist Up 2 hours (healthy)
+clean1-ocsp-pq Up 2 hours (healthy)
+clean1-redis Up 2 hours (healthy)

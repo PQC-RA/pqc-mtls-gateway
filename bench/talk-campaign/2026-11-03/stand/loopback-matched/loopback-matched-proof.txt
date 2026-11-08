@@ -1,0 +1,3 @@
+Peer signature type: mldsa65
+Negotiated TLS1.3 group: X25519MLKEM768
+Verification: OK

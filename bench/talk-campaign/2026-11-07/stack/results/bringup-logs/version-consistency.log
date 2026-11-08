@@ -1,0 +1,4 @@
+version-consistency OK: OPENSSL_VERSION=3.6.5
+  single source: docker/base/versions.env (Dockerfile carries no default)
+  stray /opt/openssl-<ver> literals outside bench/: none
+  bench/ exempt by design (pinned to the OpenSSL its numbers were measured against)

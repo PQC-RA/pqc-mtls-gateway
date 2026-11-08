@@ -1,0 +1,9 @@
+access.log
+error.log
+pqc-enroll-access.log
+pqc-enroll-error.log
+pqc-enroll-handshake.log
+pqc-mtls-access.log
+pqc-mtls-error.log
+pqc-mtls-handshake.log
+{"ts":"2026-11-04T08:12:11+00:00","ip":"203.0.113.10","cn":"CN=talk-probe-01","serial":"108D","verify":"SUCCESS","method":"GET","uri":"/","status":404,"bytes":159,"rt":0.000,"proto":"TLSv1.3","cipher":"TLS_AES_256_GCM_SHA384","group":"X25519MLKEM768","kex":"X25519MLKEM768","kex_native":"X25519MLKEM768","client_sig":"id-ml-dsa-65","server_sig":"id-ml-dsa-65","client_key":"ML-DSA-65","resumed":".","sni":"pqc-gw.local"}

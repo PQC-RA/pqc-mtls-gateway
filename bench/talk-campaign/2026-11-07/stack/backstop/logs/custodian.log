@@ -1,0 +1,11 @@
+2026-11-07T18:14:58.323341254Z 2026-11-07T18:14:58.322Z [custodian] [INFO] pqc-ca-custodian listening on :8091 (CA_DIR=/var/lib/pqc-ca/state, renewal=on, demo profile=on)
+2026-11-07T18:14:58.421837553Z 2026-11-07T18:14:58.421Z [custodian] [INFO] Published intermediate CRL number 0x1001, next update 2026-11-14T18:14:58.000Z
+2026-11-07T18:15:17.643445840Z 2026-11-07T18:15:17.643Z [custodian] [INFO] Signed certificate serial=1003 profile=client-30d expires=2026-12-07T18:15:17.000Z
+2026-11-07T18:15:30.669754303Z 2026-11-07T18:15:30.669Z [custodian] [INFO] Signed certificate serial=1004 profile=client-30d expires=2026-12-07T18:15:30.000Z
+2026-11-07T18:15:43.705290048Z 2026-11-07T18:15:43.705Z [custodian] [INFO] Signed certificate serial=1005 profile=client-30d expires=2026-12-07T18:15:43.000Z
+2026-11-07T18:16:47.284874984Z 2026-11-07T18:16:47.284Z [custodian] [INFO] Revoked certificate serial=1003 reason=cessationOfOperation
+2026-11-07T18:16:47.399552412Z 2026-11-07T18:16:47.399Z [custodian] [INFO] Published intermediate CRL number 0x1002, next update 2026-11-14T18:16:47.000Z
+2026-11-07T18:17:07.074696501Z 2026-11-07T18:17:07.074Z [custodian] [INFO] Revoked certificate serial=1004 reason=cessationOfOperation
+2026-11-07T18:17:07.138187216Z 2026-11-07T18:17:07.138Z [custodian] [INFO] Published intermediate CRL number 0x1003, next update 2026-11-14T18:17:07.000Z
+2026-11-07T18:17:26.895094648Z 2026-11-07T18:17:26.894Z [custodian] [INFO] Revoked certificate serial=1005 reason=cessationOfOperation
+2026-11-07T18:17:26.999250257Z 2026-11-07T18:17:26.999Z [custodian] [INFO] Published intermediate CRL number 0x1004, next update 2026-11-14T18:17:26.000Z

@@ -1,0 +1,131 @@
+# layout check 2026-11-07T15:58:20Z, repo 83a4f60c438f68268008fae5eebdf59e38efbf8f (cscn2026-155-g83a4f60)
+## compose ps
+NAME                           IMAGE                                                                                                            STATUS                          PORTS
+pqc-ca-custodian               rs1107-ca-custodian:83a4f60                                                                                      Up About a minute (healthy)     8091/tcp
+pqc-gateway                    rs1107-gateway:83a4f60                                                                                           Up About a minute (healthy)     80/tcp, 8081/tcp, 127.0.0.1:39443->443/tcp, 127.0.0.1:38443->8443/tcp
+pqc-mtls-management-api        ghcr.io/pqc-ra/pqc-mtls-management-api@sha256:7787047a71a85e758abea267f69b062d48a366ebce1b5c73bb45244883f276d4   Up About a minute (healthy)     127.0.0.1:33000->3000/tcp
+pqc-ocsp-pq                    rs1107-ocsp-pq:83a4f60                                                                                           Up About a minute (healthy)     9080/tcp
+pqc-pki-dist                   rs1107-pki-dist:83a4f60                                                                                          Up About a minute (healthy)     80/tcp, 8090/tcp
+pqc-redis                      redis:7.4-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99                         Up About a minute (healthy)     6379/tcp
+pqc-shadow-mock                nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752                             Up About a minute               80/tcp
+rs1107-gateway-volume-init-1   alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b                                 Exited (0) About a minute ago   
+rs1107-mgmt-volume-init-1      alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b                                 Exited (0) About a minute ago   
+## crl-renewer present?
+pqc-ca-custodian
+redis
+shadow-mock
+gateway-volume-init
+gateway
+mgmt-volume-init
+management-api
+ocsp-pq
+pki-dist
+containers named *crl-renewer* on the host (clean1 has one): 1
+## mounts (host source -> container path, mode)
+### pqc-gateway
+/root/rerun-stack-20261107/repo/config/enroll-ui -> /etc/nginx/enroll-ui rw=false
+/root/rerun-stack-20261107/repo/config/nginx/lua -> /etc/nginx/lua rw=false
+/root/rerun-stack-20261107/repo/config/nginx/migration -> /etc/nginx/migration rw=false
+/root/rerun-stack-20261107/repo/config/nginx/nginx.conf -> /etc/nginx/nginx.conf rw=false
+/root/rerun-stack-20261107/repo/config/nginx/security-headers.conf -> /etc/nginx/security-headers.conf rw=false
+/root/rerun-stack-20261107/repo/config/nginx/stream -> /etc/nginx/stream rw=false
+/root/rerun-stack-20261107/host/var-lib-pqc-ca-public -> /etc/pki/pqc-ca rw=false
+/root/rerun-stack-20261107/host/etc-pki-pqc-trust -> /etc/pki/pqc-trust rw=false
+/root/rerun-stack-20261107/host/etc-ssl-pqc -> /etc/ssl/pqc rw=false
+/root/rerun-stack-20261107/repo/secrets/control-plane-hmac.key -> /run/secrets/control-plane-hmac rw=false
+/root/rerun-stack-20261107/repo/secrets/enroll-hmac.key -> /run/secrets/enroll-hmac rw=false
+/root/rerun-stack-20261107/repo/secrets/gateway-signing.key -> /run/secrets/gateway-signing-key rw=false
+/root/rerun-stack-20261107/repo/secrets/gateway-signing-key-admin.key -> /run/secrets/gateway-signing-key-admin rw=false
+/root/rerun-stack-20261107/repo/secrets/gateway-signing-key-admin-v2.key -> /run/secrets/gateway-signing-key-admin-v2 rw=false
+/root/rerun-stack-20261107/repo/secrets/gateway-signing-key-lookup.key -> /run/secrets/gateway-signing-key-lookup rw=false
+/root/rerun-stack-20261107/repo/secrets/renew-hmac.key -> /run/secrets/renew-hmac rw=false
+/var/lib/docker/volumes/rs1107_pqc-logs-nginx/_data -> /var/log/nginx rw=true
+/var/lib/docker/volumes/rs1107_pqc-logs-audit/_data -> /var/log/pqc-gw rw=true
+/root/rerun-stack-20261107/repo/docker/gateway/entrypoint.sh -> /usr/local/bin/entrypoint.sh rw=false
+/var/lib/docker/volumes/rs1107_pqc-routes-cache/_data -> /var/cache/pqc-gw/routes rw=true
+### pqc-ca-custodian
+/root/rerun-stack-20261107/repo/secrets/custodian-hmac.key -> /run/secrets/custodian-hmac rw=false
+/root/rerun-stack-20261107/host/var-lib-pqc-ca-public -> /var/lib/pqc-ca-public rw=true
+/root/rerun-stack-20261107/host/var-lib-pqc-ca-status -> /var/lib/pqc-ca-status rw=true
+/root/rerun-stack-20261107/host/var-lib-pqc-ca/inbox -> /var/lib/pqc-ca/inbox rw=false
+/root/rerun-stack-20261107/host/var-lib-pqc-ca/key -> /var/lib/pqc-ca/key rw=false
+/root/rerun-stack-20261107/host/var-lib-pqc-ca/state -> /var/lib/pqc-ca/state rw=true
+### pqc-mtls-management-api
+/root/rerun-stack-20261107/host/etc-pki-pqc-trust -> /etc/pki/pqc-trust rw=false
+/root/rerun-stack-20261107/repo/secrets/control-plane-hmac.key -> /run/secrets/control-plane-hmac rw=false
+/root/rerun-stack-20261107/repo/secrets/custodian-hmac.key -> /run/secrets/custodian-hmac rw=false
+/root/rerun-stack-20261107/repo/secrets/enroll-hmac.key -> /run/secrets/enroll-hmac rw=false
+/root/rerun-stack-20261107/repo/secrets/renew-hmac.key -> /run/secrets/renew-hmac rw=false
+/var/lib/docker/volumes/rs1107_pqc-mgmt-data/_data -> /var/lib/pqc-mgmt rw=true
+/var/lib/docker/volumes/rs1107_pqc-logs-audit/_data -> /var/log/pqc-gw rw=false
+### pqc-ocsp-pq
+/root/rerun-stack-20261107/host/var-lib-pqc-ca-public -> /var/lib/pqc-ca-public rw=false
+/root/rerun-stack-20261107/host/var-lib-pqc-ca-status -> /var/lib/pqc-ca-status rw=false
+/root/rerun-stack-20261107/host/var-lib-pqc-ocsp -> /var/lib/pqc-ocsp rw=false
+### pqc-pki-dist
+/root/rerun-stack-20261107/host/var-lib-pqc-ca-public -> /var/www/pki rw=false
+## private key files visible inside each container
+### pqc-gateway
+/etc/ssl/pqc/enroll-classical.key
+/etc/ssl/pqc/internal-tls.key
+/etc/ssl/pqc/server-mldsa65.key
+/etc/ssl/pqc/internal-tls-mldsa.key
+### pqc-mtls-management-api
+### pqc-ocsp-pq
+/var/lib/pqc-ocsp/ocsp-pq.key
+### pqc-pki-dist
+### pqc-ca-custodian
+/var/lib/pqc-ca/key/intermediate-ca.key
+## gateway /etc/pki/pqc-ca
+total 88
+drwxr-xr-x 2 1003 1003  4096 Nov  7 15:56 .
+drwxr-xr-x 4 root root  4096 Nov  7 15:56 ..
+-rw-r--r-- 1 1003 1003 16144 Nov  7 15:56 ca-chain.crt
+-rw-r--r-- 1 1003 1003  9680 Nov  7 15:56 combined-crl.pem
+-rw-r--r-- 1 1003 1003 16144 Nov  7 15:56 hybrid-ca-chain.crt
+-rw-r--r-- 1 1003 1003  9680 Nov  7 15:56 hybrid-combined-crl.pem
+-rw-r--r-- 1 1003 1003  3539 Nov  7 15:56 intermediate-ca.crl
+-rw-r--r-- 1 1003 1003  6016 Nov  7 15:56 intermediate-ca.crt
+-rw-r--r-- 1 1003 1003  3537 Nov  7 15:56 root-ca.crl
+-rw-r--r-- 1 1003 1003  7940 Nov  7 15:56 root-ca.crt
+## crl_worker.lua delay (mounted config)
+34:local delay = 1 -- seconds; see the note above before raising this
+## entrypoint reload watcher interval
+63:RELOAD_POLL_INTERVAL="${NGINX_RELOAD_POLL_INTERVAL:-5}"
+## management-api custodian URL
+DEFAULT_ENROLLMENT_PROFILE=client-30d
+RENEWAL_ENABLED=1
+JWT_EXPECTED_KID=admin-v2
+CUSTODIAN_URL=http://pqc-ca-custodian:8091
+GATEWAY_TLS_LEAF_ALG=ML-DSA-65
+NODE_ENV=production
+REDIS_URL=redis://redis:6379
+## custodian env
+RENEWAL_ENABLED=1
+CUSTODIAN_DEMO_PROFILE=1
+CERT_VALIDITY_DAYS=365
+## gateway env
+ADMIN_JWKS_KIDS=admin-v2
+ADMIN_JWT_KID=admin-v2
+## versions
+OpenSSL 3.6.5 29 Sep 2026 (Library: OpenSSL 3.6.5 29 Sep 2026)
+nginx version: openresty/1.31.8.1
+built by gcc 13.3.0 (Ubuntu 13.3.0-6ubuntu2~24.04.1) 
+built with OpenSSL 3.6.5 29 Sep 2026
+TLS SNI support enabled
+configure arguments: --prefix=/usr/local/openresty/nginx --with-cc-opt='-O2 -O2 -fstack-protector-strong -D_FORTIFY_SOURCE=2 -fPIC -I/opt/openssl/include' --add-module=../ngx_devel_kit-0.3.6 --add-module=../echo-nginx-module-0.65 --add-module=../xss-nginx-module-0.07 --add-module=../ngx_coolkit-0.2 --add-module=../set-misc-nginx-module-0.34 --add-module=../form-input-nginx-module-0.12 --add-module=../encrypted-session-nginx-module-0.10 --add-module=../srcache-nginx-module-0.34 --add-module=../ngx_lua-0.10.32rc7 --add-module=../ngx_lua_upstream-0.08 --add-module=../headers-more-nginx-module-0.40 --add-module=../array-var-nginx-module-0.06 --add-module=../memc-nginx-module-0.21 --add-module=../redis2-nginx-module-0.15 --add-module=../redis-nginx-module-0.41 --add-module=../rds-json-nginx-module-0.17 --add-module=../rds-csv-nginx-module-0.10 --add-module=../ngx_stream_lua-0.0.20rc3 --with-ld-opt='-Wl,-rpath,/usr/local/openresty/luajit/lib -Wl,-z,relro -Wl,-z,now -Wl,-rpath,/opt/openssl/lib64 -Wl,-rpath,/opt/openssl/lib -L/opt/openssl/lib64 -L/opt/openssl/lib' --sbin-path=/usr/sbin/nginx --conf-path=/etc/nginx/nginx.conf --pid-path=/run/nginx.pid --lock-path=/run/nginx.lock --modules-path=/etc/nginx/modules --http-log-path=/var/log/nginx/access.log --error-log-path=/var/log/nginx/error.log --with-pcre-jit --with-http_ssl_module --with-http_v2_module --with-http_realip_module --with-http_stub_status_module --with-http_auth_request_module --with-http_slice_module --with-threads --with-file-aio --with-stream --with-stream_ssl_module --with-stream_ssl_preread_module --with-stream
+OpenSSL 3.6.5 29 Sep 2026 (Library: OpenSSL 3.6.5 29 Sep 2026)
+v22.23.1
+v22.23.4
+3.5.9
+## host client
+OpenSSL 3.6.5 29 Sep 2026 (Library: OpenSSL 3.6.5 29 Sep 2026)
+curl 8.5.0 (x86_64-pc-linux-gnu) libcurl/8.5.0 OpenSSL/3.6.5 zlib/1.3 brotli/1.1.0 zstd/1.5.5 libidn2/2.3.7 libpsl/0.21.2 (+libidn2/2.3.7) libssh/0.10.6/openssl/zlib nghttp2/1.59.0 librtmp/2.3 OpenLDAP/2.6.10
+3.12.3 OpenSSL 3.6.5 29 Sep 2026
+6.17.13-2-pve
+6
+## published CRL
+issuer=C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW PQC Intermediate CA G1
+crlNumber=0x1001
+lastUpdate=Nov  7 15:56:41 2026 GMT
+nextUpdate=Nov 14 15:56:41 2026 GMT

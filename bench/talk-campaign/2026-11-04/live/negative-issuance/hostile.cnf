@@ -1,0 +1,11 @@
+[req]
+distinguished_name = dn
+req_extensions = ext
+prompt = no
+[dn]
+CN = talk-neg-2
+[ext]
+basicConstraints = critical,CA:TRUE
+keyUsage = critical,keyCertSign,cRLSign,digitalSignature
+extendedKeyUsage = anyExtendedKeyUsage,serverAuth,clientAuth,OCSPSigning
+subjectAltName = DNS:pqc-gw.local

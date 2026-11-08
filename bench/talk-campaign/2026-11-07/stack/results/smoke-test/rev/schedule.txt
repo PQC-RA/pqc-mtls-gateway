@@ -1,0 +1,2 @@
+seed 1; gaps uniform [5.0, 25.0] s between consecutive T0; warm-up 1.5 s; deadline 15.0 s
+planned gaps: 

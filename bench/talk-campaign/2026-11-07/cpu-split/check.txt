@@ -1,0 +1,3 @@
+hybrid	X25519MLKEM768	mldsa65	OK	11071	10558
+pure	MLKEM768	mldsa65	OK	11039	10526
+classical		ecdsa_secp256r1_sha256	OK	1621	1016

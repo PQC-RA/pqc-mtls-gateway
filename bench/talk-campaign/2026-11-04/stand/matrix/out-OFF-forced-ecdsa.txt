@@ -1,0 +1,714 @@
+Connecting to 127.0.0.1
+depth=2 C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+verify return:1
+depth=1 C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+verify return:1
+depth=0 C=BG, O=PQC-GW, OU=PQC-Gateway, CN=pqc-gw.local
+verify return:1
+CONNECTED(00000003)
+---
+Certificate chain
+ 0 s:C=BG, O=PQC-GW, OU=PQC-Gateway, CN=pqc-gw.local
+   i:C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+   a:PKEY: ML-DSA-65, 15616 (bit); sigalg: ML-DSA-65
+   v:NotBefore: Nov  4 07:54:38 2026 GMT; NotAfter: Nov  1 07:54:38 2036 GMT
+---
+Server certificate
+-----BEGIN CERTIFICATE-----
+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
+-----END CERTIFICATE-----
+subject=C=BG, O=PQC-GW, OU=PQC-Gateway, CN=pqc-gw.local
+issuer=C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+---
+Acceptable client certificate CA names
+C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW Intermediate CA G1
+C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW Root CA G1
+Requested Signature Algorithms: id-ml-dsa-65:id-ml-dsa-87:id-ml-dsa-44:ECDSA+SHA256:ECDSA+SHA384:ECDSA+SHA512:ed25519:ed448:ecdsa_brainpoolP256r1_sha256:ecdsa_brainpoolP384r1_sha384:ecdsa_brainpoolP512r1_sha512:rsa_pss_pss_sha256:rsa_pss_pss_sha384:rsa_pss_pss_sha512:RSA-PSS+SHA256:RSA-PSS+SHA384:RSA-PSS+SHA512:RSA+SHA256:RSA+SHA384:RSA+SHA512
+Shared Requested Signature Algorithms: id-ml-dsa-65:id-ml-dsa-87:id-ml-dsa-44:ECDSA+SHA256:ECDSA+SHA384:ECDSA+SHA512:ed25519:ed448:ecdsa_brainpoolP256r1_sha256:ecdsa_brainpoolP384r1_sha384:ecdsa_brainpoolP512r1_sha512:rsa_pss_pss_sha256:rsa_pss_pss_sha384:rsa_pss_pss_sha512:RSA-PSS+SHA256:RSA-PSS+SHA384:RSA-PSS+SHA512:RSA+SHA256:RSA+SHA384:RSA+SHA512
+Peer signature type: mldsa65
+Negotiated TLS1.3 group: X25519MLKEM768
+---
+SSL handshake has read 10702 bytes and written 5475 bytes
+Verification: OK
+---
+New, TLSv1.3, Cipher is TLS_AES_256_GCM_SHA384
+Protocol: TLSv1.3
+Server public key is 15616 bit
+This TLS version forbids renegotiation.
+Compression: NONE
+Expansion: NONE
+No ALPN negotiated
+Early data was not sent
+Verify return code: 0 (ok)
+---
+---
+Post-Handshake New Session Ticket arrived:
+SSL-Session:
+    Protocol  : TLSv1.3
+    Cipher    : TLS_AES_256_GCM_SHA384
+    Session-ID: DEAC03488760E9EDEC4BCD78AAFD0F7750FCD1F01205DE497288E997AD159F79
+    Session-ID-ctx: 
+    Resumption PSK: <redacted 2026-11-08>
+    PSK identity: None
+    PSK identity hint: None
+    SRP username: None
+    TLS session ticket lifetime hint: 300 (seconds)
+    TLS session ticket:
+    0000 - 5d e4 83 05 51 15 f7 10-65 9e 17 a4 2a 61 39 03   ]...Q...e...*a9.
+    0010 - de 5c 37 08 7d 43 99 cf-d3 6b 18 df 82 4d 12 fc   .\7.}C...k...M..
+    0020 - 34 3b 8d e1 f3 20 db 5c-9d 91 41 5f ac ba 41 6d   4;... .\..A_..Am
+    0030 - b4 af 57 56 6d e6 9a 36-3e 7c 8c 85 3c 5a 62 58   ..WVm..6>|..<ZbX
+    0040 - 3c 86 2e 54 48 65 91 88-e7 0f 10 36 43 35 bf 4a   <..THe.....6C5.J
+    0050 - ec b8 c4 9e 1e 6c 95 fe-50 f7 d9 0f 04 c3 32 1e   .....l..P.....2.
+    0060 - 08 50 8e 89 2f 16 6a 66-df 09 b9 b9 2b 44 2c 15   .P../.jf....+D,.
+    0070 - 49 7e 59 f0 f3 75 77 39-47 c1 a4 ae 04 97 2d 3f   I~Y..uw9G.....-?
+    0080 - e4 ed f6 c0 ce ce e6 1c-0f 7e 19 88 13 cc a7 a3   .........~......
+    0090 - 91 f5 c8 49 50 17 97 e9-31 d8 00 ad 40 83 69 5f   ...IP...1...@.i_
+    00a0 - 9a 2b 8f 85 f4 5b e9 85-a6 60 32 26 b5 13 04 c9   .+...[...`2&....
+    00b0 - 27 58 49 47 c5 67 a0 f1-e3 e5 c9 bc 7b 84 db f2   'XIG.g......{...
+    00c0 - e0 a8 6c 9c f9 70 63 d6-e5 73 26 6e 9f 70 b6 00   ..l..pc..s&n.p..
+    00d0 - ce 5a c7 15 dd 29 e3 ee-e3 6b df 7b 74 5a 58 62   .Z...)...k.{tZXb
+    00e0 - ba 38 6a 08 83 2d 6c 77-13 26 dc 2d 4f f4 8f 57   .8j..-lw.&.-O..W
+    00f0 - 79 4d 87 88 d1 57 f7 04-b0 14 96 02 44 57 84 67   yM...W......DW.g
+    0100 - c7 70 4c 2c ba 4b 01 c3-4d 1a a1 23 38 3e b7 51   .pL,.K..M..#8>.Q
+    0110 - 34 59 7e 46 fa 1d 7b 54-01 7d 2b 7f d5 ff f5 94   4Y~F..{T.}+.....
+    0120 - 16 73 a8 c6 c4 ae 97 9f-86 a9 54 8d a4 79 66 d6   .s........T..yf.
+    0130 - 89 ae 4d 1e d1 06 be 55-19 85 fc fd 7e 79 2f 30   ..M....U....~y/0
+    0140 - 99 a1 ce a6 32 2c c7 b0-20 b2 fd 56 a5 72 75 3c   ....2,.. ..V.ru<
+    0150 - e4 99 a3 88 bb ca 9c e0-b2 64 5b 1a 38 1f f9 84   .........d[.8...
+    0160 - 52 a3 9b 38 b2 56 10 ea-a7 30 03 fc 67 7d 6d dc   R..8.V...0..g}m.
+    0170 - 0b 8d 40 ca 45 2e e7 e4-52 ff f6 45 00 11 f1 4d   ..@.E...R..E...M
+    0180 - 73 7f 81 74 4e 72 63 01-c3 c5 77 53 a4 44 fb 31   s..tNrc...wS.D.1
+    0190 - 16 3f 0c 31 b2 7b 5a 88-ac 2e 3e 82 bf 23 1f a4   .?.1.{Z...>..#..
+    01a0 - e8 fa 2a 7a fb 70 8a 6b-b1 28 f8 43 8b 43 9e 5c   ..*z.p.k.(.C.C.\
+    01b0 - 4b 3f c5 f9 f1 64 d1 73-f9 a7 9d 39 20 45 dd 91   K?...d.s...9 E..
+    01c0 - 59 4b 8e 36 ec f1 87 16-70 10 54 80 e7 67 af d5   YK.6....p.T..g..
+    01d0 - 82 58 28 17 33 ed dc f8-b7 28 77 e0 a9 82 d4 7c   .X(.3....(w....|
+    01e0 - e6 66 ea 31 2a a7 bf 83-f3 60 d3 d0 ae 44 da 10   .f.1*....`...D..
+    01f0 - 99 04 b0 c1 6b 05 bc 4b-c6 2c 88 13 88 fc 21 1c   ....k..K.,....!.
+    0200 - e3 59 82 42 a8 0a 5a 0f-a1 b2 be f2 da 8b 96 3a   .Y.B..Z........:
+    0210 - 76 1d 0a d9 4e a8 81 1d-df a4 e2 ce c5 5a cf 11   v...N........Z..
+    0220 - d8 78 5c b9 6c 94 c9 13-de f7 6e 25 b8 91 3b 56   .x\.l.....n%..;V
+    0230 - c8 de 18 8b ba 5f 41 43-29 8e c5 4b dd c7 3f 33   ....._AC)..K..?3
+    0240 - 05 ac 82 cd 0d d7 97 7c-6e 0c b2 91 f8 74 3b 2e   .......|n....t;.
+    0250 - 5f 58 c9 1e f0 a5 c9 28-9d 6f ca a4 17 ce 24 6d   _X.....(.o....$m
+    0260 - cc da 35 e3 4f 6c ff 27-36 c8 d1 b2 b9 25 a4 28   ..5.Ol.'6....%.(
+    0270 - 4c 1d 35 71 ff ff f1 2a-04 2b 76 5a 7b 96 b7 df   L.5q...*.+vZ{...
+    0280 - 27 b6 40 70 2b 89 81 88-99 30 88 b8 bd 13 4d 2c   '.@p+....0....M,
+    0290 - c8 54 8d bd 0a 88 31 79-b6 26 9b 3d 5b 31 9e 3c   .T....1y.&.=[1.<
+    02a0 - ad d5 bf 63 52 ac 1c cb-6e bd 2e b0 d4 24 b0 c5   ...cR...n....$..
+    02b0 - 89 a5 76 6d c2 fb e9 56-91 31 09 f2 f5 3c 2c 80   ..vm...V.1...<,.
+    02c0 - da ba 6f e4 13 ad 49 4d-61 4c 74 4e e0 1e a7 12   ..o...IMaLtN....
+    02d0 - 51 12 8a 00 28 7b 49 95-27 97 b9 a6 5b 4c 96 af   Q...({I.'...[L..
+    02e0 - 73 4f 8b dd 43 bc ff 87-22 31 c8 e9 6e bc 75 a6   sO..C..."1..n.u.
+    02f0 - b8 bd b9 3b e2 27 81 a1-44 3c e5 eb ad 04 7c cd   ...;.'..D<....|.
+    0300 - 32 ec d5 4b 4b 68 79 21-a1 2e 9a 48 86 8e b2 aa   2..KKhy!...H....
+    0310 - fa 39 36 a5 e4 e0 d0 df-d7 35 be 27 41 1d 82 19   .96......5.'A...
+    0320 - d9 ee 4e c5 3e 9b 37 fc-b9 c7 c1 f9 8a 2e 97 01   ..N.>.7.........
+    0330 - 2c 33 00 64 9b e7 4f c3-95 a9 51 c6 81 1b 49 f0   ,3.d..O...Q...I.
+    0340 - a2 ed 4d ef ae 2e 41 77-8d 25 f0 2d 74 72 1a 78   ..M...Aw.%.-tr.x
+    0350 - 15 42 88 e5 f3 33 b3 dd-8a 25 c7 18 93 28 64 c4   .B...3...%...(d.
+    0360 - a7 5d 5b 55 60 6d f6 9e-e2 ef a2 01 a8 52 1c 5a   .][U`m.......R.Z
+    0370 - 82 38 ce ae 45 29 84 3d-79 ab 92 fa 45 ce 21 b5   .8..E).=y...E.!.
+    0380 - 58 73 7d ea d8 f6 58 6b-94 e3 c4 72 da 86 8d 4a   Xs}...Xk...r...J
+    0390 - ff 8b e8 fa 69 ae 7e 7f-63 98 4d c2 ff 7b 77 a7   ....i.~.c.M..{w.
+    03a0 - d6 de 82 b4 5a 2c 30 09-cb b4 9e 54 d7 34 f8 8a   ....Z,0....T.4..
+    03b0 - 9c 7e e8 4e c4 0c f2 a3-c3 13 df d4 fd fb 8a 58   .~.N...........X
+    03c0 - 01 66 4b 68 cf 55 4a b3-cf 4a e4 19 10 61 a2 f5   .fKh.UJ..J...a..
+    03d0 - 89 3a 73 3b c3 13 00 3c-76 1e 48 46 74 b7 21 61   .:s;...<v.HFt.!a
+    03e0 - 90 d0 9f c3 2f f5 dc cd-5a 52 53 df 46 08 c8 bb   ..../...ZRS.F...
+    03f0 - 00 6d 43 f6 c3 ed 3b 33-9a 07 55 a5 62 8f a3 b2   .mC...;3..U.b...
+    0400 - 47 35 f8 88 2f df 82 85-99 aa 2d 4e 91 7c fd 68   G5../.....-N.|.h
+    0410 - 2c ad b7 45 bf 53 2e 7b-0e ff 63 9a 9e 1c 15 0e   ,..E.S.{..c.....
+    0420 - 78 8f c8 72 63 50 95 0e-5e ed 27 c8 07 10 81 17   x..rcP..^.'.....
+    0430 - ce 55 d5 de 76 92 10 2c-d9 f3 92 94 77 7d 1f ef   .U..v..,....w}..
+    0440 - 93 46 27 d6 65 76 8f 1a-fd b5 2f 51 23 36 87 cf   .F'.ev..../Q#6..
+    0450 - 7f 37 7f fb 67 a0 14 16-c8 82 ca ce e6 d9 23 8d   .7..g.........#.
+    0460 - c0 b3 cf bb 24 59 e1 80-63 3e 0a ff 43 9f 75 06   ....$Y..c>..C.u.
+    0470 - 8e 8b d8 65 fc 1e c8 4f-38 ef 98 de 48 13 47 ef   ...e...O8...H.G.
+    0480 - 84 d2 8a 83 c2 65 67 0b-cf 2f 84 06 62 b7 52 e0   .....eg../..b.R.
+    0490 - 28 00 18 3f 7a 32 0b 48-2a 44 93 61 9e d2 b9 55   (..?z2.H*D.a...U
+    04a0 - da 0f 4f fe 19 a5 17 7e-24 65 46 84 e0 a0 1b b1   ..O....~$eF.....
+    04b0 - c2 35 d7 86 88 7e b3 f8-fc f8 cd 15 91 1f 97 ff   .5...~..........
+    04c0 - 21 1a a1 85 92 ae 2a 92-08 7a f3 92 27 53 bb a0   !.....*..z..'S..
+    04d0 - e6 eb e1 b4 4a 46 ad 50-09 27 3f ea b5 da 2f 6b   ....JF.P.'?.../k
+    04e0 - c6 dd 3d c5 71 46 c7 77-60 a9 00 e1 e0 e0 ce 26   ..=.qF.w`......&
+    04f0 - 74 c2 37 1c f6 90 59 be-61 67 43 22 19 31 48 79   t.7...Y.agC".1Hy
+    0500 - 01 ba 4f 6a 47 43 3b c7-11 6e eb c1 1f a1 39 16   ..OjGC;..n....9.
+    0510 - 1f 24 29 36 92 5a 5e 45-c8 af dc 9e 0c 6e b1 84   .$)6.Z^E.....n..
+    0520 - 0c 16 14 64 ba 74 2f 42-e6 f2 00 84 b5 bc 5b 7b   ...d.t/B......[{
+    0530 - 76 4a a4 f5 33 1d dc 55-82 84 8b 05 6d 8b e0 2d   vJ..3..U....m..-
+    0540 - b7 2e 15 cc 2a 8f ac 1f-e4 40 a8 ad d3 46 78 e8   ....*....@...Fx.
+    0550 - 5b be e0 eb 25 e1 48 1c-6d f2 4f aa c4 26 ae ab   [...%.H.m.O..&..
+    0560 - ea d1 1a 39 98 59 a5 b8-d8 e4 e4 e8 73 1d dd d2   ...9.Y......s...
+    0570 - be df f4 e7 85 ba 15 93-30 24 6c 43 c0 1d 33 f1   ........0$lC..3.
+    0580 - 63 0b eb 47 ac 29 52 6c-29 84 c5 9d 55 3c aa db   c..G.)Rl)...U<..
+    0590 - dc cd 63 c1 cf a3 6f 8a-82 08 d3 3e 7f a3 4e 81   ..c...o....>..N.
+    05a0 - bc 7a b9 0a 5f 72 5f 8f-1f e3 8f 97 83 f4 0c e3   .z.._r_.........
+    05b0 - f0 fb 9d 69 27 e3 cb 10-4b 7c 8c d3 b4 6d 91 60   ...i'...K|...m.`
+    05c0 - 56 d7 db ce 3f 97 cc a8-3b 36 5a 1a 72 39 37 f6   V...?...;6Z.r97.
+    05d0 - 6c 16 33 e2 d5 18 e3 b6-d5 bd 92 39 86 ae 66 c8   l.3........9..f.
+    05e0 - 69 1d 2b 59 59 d1 6c 78-4c d8 d2 7b 44 a3 66 16   i.+YY.lxL..{D.f.
+    05f0 - e4 37 91 a3 e5 b9 f9 32-87 4d c2 0c 2e 3b 15 2e   .7.....2.M...;..
+    0600 - 7d b3 40 ca 1a 37 c4 28-bb 94 27 23 29 c3 3f a5   }.@..7.(..'#).?.
+    0610 - a0 b1 14 cd 8e 0e a4 c9-23 ea 6f 93 53 6c d3 af   ........#.o.Sl..
+    0620 - 1c b7 77 e1 91 90 12 90-ad 03 38 f4 20 8b 95 b9   ..w.......8. ...
+    0630 - 2e 28 42 65 46 40 89 68-95 f8 bb cd 1c 9e 85 c7   .(BeF@.h........
+    0640 - 1e fa e3 91 49 a8 98 8d-a2 d3 d4 bd 35 8d 18 a5   ....I.......5...
+    0650 - 9d 88 89 b4 a2 32 75 1d-67 17 63 03 03 9c 07 1b   .....2u.g.c.....
+    0660 - 19 33 91 80 e2 e3 1c 5b-2b d1 0b 3b 73 72 2b b3   .3.....[+..;sr+.
+    0670 - 38 08 74 a1 b7 a5 30 42-e8 1b c8 05 ed d8 12 23   8.t...0B.......#
+    0680 - 9e c0 95 f5 83 11 fd fb-e3 12 8d 83 3e 0a 14 19   ............>...
+    0690 - 98 39 ab 07 7f ee 4f d2-8c 56 12 e2 c7 86 8e d2   .9....O..V......
+    06a0 - 0f 25 16 ec 27 c6 9c f8-f8 5d ed 77 0b 12 db ff   .%..'....].w....
+    06b0 - 56 ea 62 d0 20 3f 1f f7-81 ad cf e5 e7 52 b6 90   V.b. ?.......R..
+    06c0 - 9b 19 15 bb e9 af e6 56-13 36 ac 33 13 49 42 c8   .......V.6.3.IB.
+    06d0 - 40 54 cc 40 77 1a 9c f3-2d 41 81 5a c8 0f 1f 67   @T.@w...-A.Z...g
+    06e0 - 5b d2 8d f2 de f9 99 c9-9e 17 26 70 cf 28 8c 6a   [.........&p.(.j
+    06f0 - 1a e5 dd 46 c9 2f a4 6e-32 01 d0 df 19 b8 86 8b   ...F./.n2.......
+    0700 - 55 ca f7 2f c2 3a d7 cf-fb df 36 55 8a 4d f0 28   U../.:....6U.M.(
+    0710 - 04 a0 a9 2f 26 8f 57 d1-66 06 aa 2e 84 19 ff c2   .../&.W.f.......
+    0720 - d0 e8 60 9f f8 af 61 ec-48 0f 77 dd 6e 24 4d 24   ..`...a.H.w.n$M$
+    0730 - b6 b2 00 a7 22 90 38 57-42 5c 8f bf 2d 10 e3 d5   ....".8WB\..-...
+    0740 - 32 e8 f8 d3 e3 bf 19 29-38 e8 b2 02 f6 d5 c6 13   2......)8.......
+    0750 - 18 ed 0a a5 5b 32 02 36-09 7c 8e ca 9a 54 ed 5d   ....[2.6.|...T.]
+    0760 - b6 a4 22 29 d1 ca a6 55-21 b7 91 b4 1b fa 29 dd   ..")...U!.....).
+    0770 - 4a 4c 4b b5 b4 4f 9f d7-ce 7a 77 e4 d7 b5 19 38   JLK..O...zw....8
+    0780 - 1d 50 93 8f 61 3c 5c 0a-e6 50 db fb 75 76 6f f6   .P..a<\..P..uvo.
+    0790 - cb d3 5e 76 34 3e 9c c2-b8 6b 77 89 59 c2 6d d4   ..^v4>...kw.Y.m.
+    07a0 - 40 42 a0 33 a2 e5 94 c8-47 ac f5 a2 f0 5c b5 de   @B.3....G....\..
+    07b0 - 98 50 fd dd 5d de 66 e3-62 f8 22 c0 4a 1a 67 f5   .P..].f.b.".J.g.
+    07c0 - cb 23 41 ce 9a f4 63 e6-23 95 10 97 2a 88 b6 11   .#A...c.#...*...
+    07d0 - b6 50 70 e4 cb 0c 15 e9-73 20 cf 18 63 a3 46 40   .Pp.....s ..c.F@
+    07e0 - 91 0f 6e 4f 4d c1 10 37-f6 a3 be 2f 6d b3 2a 1b   ..nOM..7.../m.*.
+    07f0 - 16 88 a3 c9 32 e2 33 a7-64 bd 31 27 ec 17 59 55   ....2.3.d.1'..YU
+    0800 - 81 43 6f b2 fe a0 20 0a-29 46 30 50 81 5b 74 68   .Co... .)F0P.[th
+    0810 - 9f 8d 08 a3 59 84 58 72-8a 85 5e 76 7c 2b d5 4b   ....Y.Xr..^v|+.K
+    0820 - 96 71 52 1a b3 7f 32 cb-a5 6b 9b 90 ac 15 aa a9   .qR...2..k......
+    0830 - 6f 2a 47 be ff 6a 6c 67-7b cb f3 2e cd 6e 4a e9   o*G..jlg{....nJ.
+    0840 - 07 fe ee 98 6e 02 14 e3-49 45 84 6a ee 97 9d 96   ....n...IE.j....
+    0850 - 73 24 1c f7 19 08 41 43-6b 66 7b 7d 18 3e a2 99   s$....ACkf{}.>..
+    0860 - 8d d5 65 08 8b 30 10 54-ec 64 b5 50 c4 6d 0a 4a   ..e..0.T.d.P.m.J
+    0870 - 6d 85 cb b9 80 d5 c5 48-8a e4 61 2a 9c 44 30 dd   m......H..a*.D0.
+    0880 - e0 dd 2e 4e b3 61 3e 33-0f 9f 6b 0d 71 96 20 f2   ...N.a>3..k.q. .
+    0890 - 7c ab 58 ba 1a da dc 6a-e9 49 fd 87 f6 2e 7f 3c   |.X....j.I.....<
+    08a0 - 29 ad 1d 9e db c1 2a 5c-bc d3 c6 da 4b 34 51 b7   ).....*\....K4Q.
+    08b0 - d1 32 ba b2 a6 9d 16 0a-8b 29 d5 83 45 ce 8d 1d   .2.......)..E...
+    08c0 - 07 97 6c 52 8a e4 7a b0-d6 dc d2 49 98 80 d6 1e   ..lR..z....I....
+    08d0 - f9 f0 5b d9 c4 1b b0 cd-51 bd 11 30 25 63 14 ab   ..[.....Q..0%c..
+    08e0 - 7f c8 b6 80 02 36 08 24-ac d9 8f 07 5c 4f d5 e2   .....6.$....\O..
+    08f0 - 1d f6 31 6c fd 1e 41 cb-da 35 e9 8a db 13 9b a0   ..1l..A..5......
+    0900 - b7 0b 3e 56 f1 89 90 d6-74 5a ec 77 fb 43 bc 9d   ..>V....tZ.w.C..
+    0910 - 1d 06 2c e9 e7 97 5f 79-9f b3 61 fd a4 58 3c ea   ..,..._y..a..X<.
+    0920 - b0 03 44 40 2a 88 29 3a-da 77 fd 82 f7 04 7b cd   ..D@*.):.w....{.
+    0930 - a7 16 f5 c2 6d 05 cf 43-a9 57 c2 79 e5 78 0d 55   ....m..C.W.y.x.U
+    0940 - 76 b9 e7 89 1a b8 fc 2e-f8 10 0c f8 11 0e 58 ba   v.............X.
+    0950 - e1 92 fa 09 59 ea 47 28-0f eb f2 cc 96 7a f8 fb   ....Y.G(.....z..
+    0960 - 1b 04 0a 92 8c 8a a6 d7-01 ff c1 16 da 19 62 70   ..............bp
+    0970 - f1 87 8d 17 ec 76 fb aa-b8 fc 7d f4 46 57 a2 93   .....v....}.FW..
+    0980 - 43 e5 a9 50 93 b7 03 94-b4 74 12 65 6f a7 6d 23   C..P.....t.eo.m#
+    0990 - a4 62 ff 73 54 44 9a ab-8a d4 7b a5 4f 1f 3d 63   .b.sTD....{.O.=c
+    09a0 - 83 3a 15 ca cd 2a f2 b4-33 3e ee ec 6c 04 db b5   .:...*..3>..l...
+    09b0 - e7 1e 03 5c fe 3a 44 c8-a7 a4 02 45 77 88 ad 02   ...\.:D....Ew...
+    09c0 - b2 ab 57 50 9c 25 29 75-51 73 31 ca d6 12 4d 1b   ..WP.%)uQs1...M.
+    09d0 - 28 5e a1 f9 a6 a1 27 b2-72 bb ce 50 ab 57 15 0c   (^....'.r..P.W..
+    09e0 - 9b cb ec 81 a0 1a 14 16-59 f9 b7 1a c5 37 f4 48   ........Y....7.H
+    09f0 - 3c 1d 92 5d 64 31 7a ea-fd 79 70 80 9f b7 69 cb   <..]d1z..yp...i.
+    0a00 - a7 e5 f6 ac ee 96 1d f3-96 c8 e4 92 d0 49 2d 97   .............I-.
+    0a10 - 00 e9 fc eb b0 57 28 4f-4e 9a df 13 4d 47 9f 98   .....W(ON...MG..
+    0a20 - 1d 7c 61 f0 c2 ac 4a bc-12 96 49 99 6d b8 c0 01   .|a...J...I.m...
+    0a30 - 42 db 9a 57 3f 49 96 fa-f7 9f 16 81 91 8d 49 18   B..W?I........I.
+    0a40 - bd 0b 91 bc f9 a7 8d 97-2f 2c 28 d2 4d 86 0e 18   ......../,(.M...
+    0a50 - f0 66 a1 2f 4a b2 5e c5-5e 99 5e ed 1f 77 c7 35   .f./J.^.^.^..w.5
+    0a60 - 24 5a 85 52 71 28 be bc-d4 e8 7f 3c 69 f2 1f 09   $Z.Rq(.....<i...
+    0a70 - 61 a0 71 f9 35 4b 32 e9-63 b1 2f 21 86 32 82 43   a.q.5K2.c./!.2.C
+    0a80 - 6c 87 89 fe c4 4a 40 96-34 99 49 41 a0 f3 0f e3   l....J@.4.IA....
+    0a90 - 05 2d 13 a9 41 b8 2d 92-97 da 74 07 65 85 9b 63   .-..A.-...t.e..c
+    0aa0 - 38 d1 1c 4c f1 62 68 f7-72 66 0f 85 e9 ed 53 9a   8..L.bh.rf....S.
+    0ab0 - d6 53 5b 54 ad 95 aa 3f-d3 80 6e 84 11 2a f5 ea   .S[T...?..n..*..
+    0ac0 - ac 6f 9e 55 e8 0c 93 69-9b 02 10 52 dc 88 b5 c4   .o.U...i...R....
+    0ad0 - 9a cf be c6 97 8f a3 17-96 39 5b fc df 7b d9 67   .........9[..{.g
+    0ae0 - 75 8f 4c d6 48 4e 54 b1-e6 6f b5 f6 34 80 23 31   u.L.HNT..o..4.#1
+    0af0 - c2 9d 2e fb b0 4c 65 19-ab 74 9e 99 ac 11 1b 17   .....Le..t......
+    0b00 - 0a c1 8e 6b 1e 86 e7 bf-ff bd ad 6d bd 2f e9 f6   ...k.......m./..
+    0b10 - 85 79 d6 85 8e 4b 33 db-46 72 06 36 eb 22 3d d5   .y...K3.Fr.6."=.
+    0b20 - 8e 51 05 23 10 d5 b2 44-b1 54 8a 1b 36 10 78 5a   .Q.#...D.T..6.xZ
+    0b30 - aa d7 64 07 d0 c7 10 fc-87 ac 17 45 e0 b5 10 55   ..d........E...U
+    0b40 - 0b 7e f6 13 11 b1 5c a7-82 8a 27 37 f0 55 2c e8   .~....\...'7.U,.
+    0b50 - 44 2a 71 cd 9d a6 6f a4-0e ed 72 4e 5e 17 d3 62   D*q...o...rN^..b
+    0b60 - 39 88 10 e3 5c 7e c2 0d-c6 59 e6 91 84 25 45 02   9...\~...Y...%E.
+    0b70 - db f1 d3 48 fb 9e c9 b4-21 39 dd 49 86 9e 6f f8   ...H....!9.I..o.
+    0b80 - cb 79 94 70 99 a7 21 14-ad 8c 09 1c bc 66 f5 af   .y.p..!......f..
+    0b90 - e7 6b 9f c8 7d e6 d0 4e-37 55 48 f2 be 54 70 53   .k..}..N7UH..TpS
+    0ba0 - e8 e1 ac 4d 36 f4 c4 94-2d 67 b2 e0 4c 7c 6f ff   ...M6...-g..L|o.
+    0bb0 - 85 4d 65 56 a6 0a c7 fc-9b 7e a4 61 b5 c7 a2 05   .MeV.....~.a....
+    0bc0 - b3 fd a6 af 7e 32 9a 10-f9 23 ac 0f db 26 57 86   ....~2...#...&W.
+    0bd0 - 37 9c 00 16 2f 4b 45 44-42 43 db c9 b1 4e 36 09   7.../KEDBC...N6.
+    0be0 - 04 84 01 f5 1f 5f d9 fe-32 5c ff 8a 61 02 b7 b3   ....._..2\..a...
+    0bf0 - 0d 89 4c 07 44 f2 e4 f6-7a 7b 10 67 ef 53 2b a8   ..L.D...z{.g.S+.
+    0c00 - 72 91 92 10 45 25 6e c7-e6 3d 00 d9 84 c9 71 42   r...E%n..=....qB
+    0c10 - ba bd 87 e6 74 8b 4c 16-9b 51 37 09 f8 45 aa da   ....t.L..Q7..E..
+    0c20 - f3 69 26 82 75 5b fc 48-2e 95 48 c4 11 77 d0 98   .i&.u[.H..H..w..
+    0c30 - 46 a0 89 53 99 24 b1 b3-6e 0a b5 62 e4 45 b9 d2   F..S.$..n..b.E..
+    0c40 - 34 fb cb 5e 9e 5f ff c1-ae df 66 86 d6 10 a0 cb   4..^._....f.....
+    0c50 - 0b 0c 2d 29 e8 03 10 7a-2c 8b 94 c5 01 a6 b1 93   ..-)...z,.......
+    0c60 - e6 21 44 20 35 bf ad 88-26 43 7d 1b e9 bb 38 1d   .!D 5...&C}...8.
+    0c70 - db d8 a0 44 25 27 71 c8-a8 99 39 fb 1a 08 56 d7   ...D%'q...9...V.
+    0c80 - e8 6d 5e 50 2a 8c 0f 93-54 6a 7a 93 71 5c f5 51   .m^P*...Tjz.q\.Q
+    0c90 - b7 63 e6 f3 86 e3 c6 13-77 c6 47 3c 29 e5 1d 0b   .c......w.G<)...
+    0ca0 - b5 31 b9 95 ec 9e f0 db-e6 e1 61 e5 f1 f5 48 d7   .1........a...H.
+    0cb0 - f1 63 fe ec b6 2a bc de-fb 0d 0b e3 08 8b 46 fc   .c...*........F.
+    0cc0 - b0 93 fb 08 af 5f 7f 47-e8 76 49 22 90 b2 f4 ac   ....._.G.vI"....
+    0cd0 - e8 84 22 0f dd bd 61 dc-d3 63 12 4c 0e 62 65 5d   .."...a..c.L.be]
+    0ce0 - f3 0c 2e 42 67 a3 09 c4-12 5e af d7 2c 85 c9 ba   ...Bg....^..,...
+    0cf0 - 12 79 74 22 ab 07 e4 3d-64 d9 d2 a7 d7 ab 36 2f   .yt"...=d.....6/
+    0d00 - cf ac ba 86 95 65 20 53-b2 a8 c6 58 2c ab ba de   .....e S...X,...
+    0d10 - 3d 52 a1 a5 5a ec 70 ec-08 43 dc 8e e9 6f 05 98   =R..Z.p..C...o..
+    0d20 - 74 b1 81 e4 7e 90 01 8b-7f b9 9d 1d 4e 0f 0d 09   t...~.......N...
+    0d30 - 73 19 30 93 c0 cf 6a 39-41 b1 74 05 52 c2 3d e7   s.0...j9A.t.R.=.
+    0d40 - ab e3 e9 a7 02 bf e7 26-d6 c0 9f e2 4a 11 3a d6   .......&....J.:.
+    0d50 - eb f2 cc ef ef 80 85 9f-d4 3c d9 84 ff a0 b0 d8   .........<......
+    0d60 - d7 6b 6d 75 d6 a2 8c 4e-fe 9e e4 c6 2f 13 44 e7   .kmu...N..../.D.
+    0d70 - f8 55 02 cd e7 b8 2d f7-4c fb b8 70 51 11 87 2f   .U....-.L..pQ../
+    0d80 - 34 ef b7 8e ad 6a c4 54-31 e3 70 53 3e e7 bc b7   4....j.T1.pS>...
+    0d90 - 25 15 05 a3 24 a0 d4 af-b1 8c 63 20 17 0d a3 56   %...$.....c ...V
+    0da0 - c7 62 4a 5d 9d 51 52 de-1d 14 a3 b4 61 b4 ce 58   .bJ].QR.....a..X
+    0db0 - a9 6e e3 2f e9 c2 21 8d-9b 7f 6d df b9 6a da 73   .n./..!...m..j.s
+    0dc0 - 20 aa 40 93 13 bd 8d e1-c9 e1 38 93 b4 31 88 a8    .@.......8..1..
+    0dd0 - 5b 8f 1f 80 1f 8b 66 34-a5 4c b1 a0 76 30 f2 2a   [.....f4.L..v0.*
+    0de0 - 68 18 f0 a3 72 4d ad 2c-51 7e aa 09 1c d4 a8 f8   h...rM.,Q~......
+    0df0 - da 5c 17 90 8f 2c f7 d5-2a 3c f7 5c 9a 3f 58 9c   .\...,..*<.\.?X.
+    0e00 - f1 da bc 8c c9 29 2b 88-b3 46 c4 cf 65 6e dd 2f   .....)+..F..en./
+    0e10 - 58 ad 73 72 09 b1 eb 4d-29 c0 6c be 47 90 55 b0   X.sr...M).l.G.U.
+    0e20 - 26 42 56 f9 dc 56 66 77-16 57 e2 4f 01 e3 f6 00   &BV..Vfw.W.O....
+    0e30 - 40 b9 29 f4 57 db a2 a4-ea 12 58 ae f5 00 03 76   @.).W.....X....v
+    0e40 - 04 e5 05 6d c8 64 6e f5-c2 64 3a a0 a2 e3 c4 4c   ...m.dn..d:....L
+    0e50 - 73 fe 1e 71 a3 94 c7 98-3e 05 6e 4d eb b2 18 42   s..q....>.nM...B
+    0e60 - fe 82 fc 63 cb c4 37 e6-35 c6 4a 73 0a ba af f7   ...c..7.5.Js....
+    0e70 - d1 0a ab 05 24 99 f0 ee-5d 21 75 cd d1 3a 75 1f   ....$...]!u..:u.
+    0e80 - e0 7f 41 0c 5b 0c 74 5e-82 eb 16 90 f5 28 89 e6   ..A.[.t^.....(..
+    0e90 - 85 30 e4 ba 27 fe 89 b0-20 16 90 dc ee 3c 68 19   .0..'... ....<h.
+    0ea0 - 03 59 eb c7 d2 36 6d 83-38 93 7f d9 7f 45 24 9e   .Y...6m.8....E$.
+    0eb0 - ee 57 ae df 0e c9 f8 05-8f e8 a6 98 82 6e 42 6d   .W...........nBm
+    0ec0 - 7b 80 b7 1c 4c 28 1b 6d-83 09 0e 4a 79 ef 39 9c   {...L(.m...Jy.9.
+    0ed0 - 47 ec f8 4a ab 68 40 63-8e c1 90 68 48 ea af 22   G..J.h@c...hH.."
+    0ee0 - d5 16 03 d0 8d 44 38 72-d9 05 43 34 cd 19 68 34   .....D8r..C4..h4
+    0ef0 - 9e fb 20 9e 47 08 72 76-00 2d 8c be a3 72 f7 2e   .. .G.rv.-...r..
+    0f00 - f0 43 84 54 bf 05 6a 24-ab 9e ff f7 f3 b4 c0 1b   .C.T..j$........
+    0f10 - e6 07 2d eb 98 ec c4 ac-b4 59 7a 0e 20 e5 61 c1   ..-......Yz. .a.
+    0f20 - 45 76 96 82 91 6f df 87-8d 79 59 1a d0 10 7d 0d   Ev...o...yY...}.
+    0f30 - 08 eb b9 f7 e3 dc 74 70-74 61 2d 20 b7 bb 32 5d   ......tpta- ..2]
+    0f40 - 25 02 5c e8 5a 09 6c c5-5a 3c 66 b7 b2 af fb e3   %.\.Z.l.Z<f.....
+    0f50 - 6b 4f ad a1 a5 c0 5a af-be 0d bf 38 c8 af fc a5   kO....Z....8....
+    0f60 - 9a bf 04 57 a6 e1 30 b1-44 94 8a 91 de b6 f3 ed   ...W..0.D.......
+    0f70 - 5d ca 98 d6 c6 38 66 37-61 b6 3d 5c 3f e2 bc 86   ]....8f7a.=\?...
+    0f80 - 8f cf e0 93 e0 07 4d d7-f5 6b ee 75 88 15 62 42   ......M..k.u..bB
+    0f90 - 93 cb c6 7f 94 26 7c a1-43 2b 7c 74 c3 79 f3 9e   .....&|.C+|t.y..
+    0fa0 - da 54 e0 f8 9d 92 49 0d-f5 8b 19 d4 07 5b 94 9a   .T....I......[..
+
+    Start Time: 1793785543
+    Timeout   : 7200 (sec)
+    Verify return code: 0 (ok)
+    Extended master secret: no
+    Max Early Data: 0
+---
+read R BLOCK
+---
+Post-Handshake New Session Ticket arrived:
+SSL-Session:
+    Protocol  : TLSv1.3
+    Cipher    : TLS_AES_256_GCM_SHA384
+    Session-ID: 54B3B6A9BF78DC35E8B5CB3A508500EBB8474E890DB374386F53DA4B4428DD0C
+    Session-ID-ctx: 
+    Resumption PSK: <redacted 2026-11-08>
+    PSK identity: None
+    PSK identity hint: None
+    SRP username: None
+    TLS session ticket lifetime hint: 300 (seconds)
+    TLS session ticket:
+    0000 - 5d e4 83 05 51 15 f7 10-65 9e 17 a4 2a 61 39 03   ]...Q...e...*a9.
+    0010 - 77 b8 30 b8 87 70 24 7a-ab ff 0b 2b a1 f3 de 0f   w.0..p$z...+....
+    0020 - 52 38 09 dd 23 04 39 5f-df 19 8b 0a 6f ae 7e 26   R8..#.9_....o.~&
+    0030 - 09 aa 03 20 ab 64 88 0c-5c df fe fc de 9a 4d 44   ... .d..\.....MD
+    0040 - 81 4c ca 6b 00 39 9c cf-7c ff 13 39 1b a9 52 9e   .L.k.9..|..9..R.
+    0050 - b5 72 20 5c a3 68 9a 3c-d0 d1 0a 34 2d 61 ef cd   .r \.h.<...4-a..
+    0060 - bf 3c d9 5f fb e1 ab 73-d9 b6 f9 b7 2b c3 01 3c   .<._...s....+..<
+    0070 - 9d 2e f2 2b 12 7a 62 d2-0a be ba cf a9 d9 fe 40   ...+.zb........@
+    0080 - ed 58 5d 2e d3 15 47 3c-a2 fb 03 58 97 3e 21 96   .X]...G<...X.>!.
+    0090 - a4 e7 34 6e be 4f d5 11-ae 3e 06 65 e9 dc 28 fd   ..4n.O...>.e..(.
+    00a0 - 5b 94 34 1d 04 25 b0 eb-31 c1 1e 74 93 ed df e1   [.4..%..1..t....
+    00b0 - 85 55 42 09 c2 ca 56 3f-db 5e 0a d2 42 d4 5b 39   .UB...V?.^..B.[9
+    00c0 - 5e ff 6c 41 36 d4 59 97-97 c6 11 20 25 61 3f 95   ^.lA6.Y.... %a?.
+    00d0 - 68 aa 84 61 16 d7 79 f6-ac c4 e8 82 d9 0b 51 bd   h..a..y.......Q.
+    00e0 - e8 db ec cb fe 67 a7 17-38 cd 74 e7 c6 0c a7 b7   .....g..8.t.....
+    00f0 - fe e7 b5 f7 bb 67 44 e7-de 94 a7 4f e0 22 f1 d3   .....gD....O."..
+    0100 - f5 ef d5 5c 83 9a b2 0d-32 cd 39 27 2a d1 00 21   ...\....2.9'*..!
+    0110 - 0f 05 be 29 ff 06 41 73-b3 5d 26 30 1f 05 6e fa   ...)..As.]&0..n.
+    0120 - a5 ff 9d 6d da f8 bd 0c-be 79 4d 52 15 d5 ec 6b   ...m.....yMR...k
+    0130 - 99 6a 8c 15 8b 8a 0f 0f-52 1c c2 8a fd 12 45 68   .j......R.....Eh
+    0140 - 44 64 65 23 29 76 7b 81-29 43 f2 a2 71 96 a6 6c   Dde#)v{.)C..q..l
+    0150 - bc 46 39 a0 49 04 fc 45-c1 07 23 11 9c 87 04 8a   .F9.I..E..#.....
+    0160 - 7b 90 9a ab 8b c1 5e da-f5 a7 8a 1c b7 67 fd 94   {.....^......g..
+    0170 - 7a b0 d7 09 2f 08 bc ce-c6 39 0b e7 7e 05 1d 82   z.../....9..~...
+    0180 - 00 b2 69 08 4a 23 19 3f-ff 3d af 3b 44 cb 83 45   ..i.J#.?.=.;D..E
+    0190 - c2 3c ef c2 f4 6e b6 a7-80 4e 96 ba 28 e9 c7 52   .<...n...N..(..R
+    01a0 - 86 fe fb 34 97 27 4d e7-5c 01 dc e0 48 c5 01 83   ...4.'M.\...H...
+    01b0 - 54 42 82 95 ec eb a4 d7-23 0a cb 18 ca 8d 3a 51   TB......#.....:Q
+    01c0 - 06 43 17 ba 27 c7 96 35-36 95 e6 e0 53 d4 3d 1c   .C..'..56...S.=.
+    01d0 - 50 7e 99 05 fc 27 5b 14-8b 05 22 a5 40 07 2e 87   P~...'[...".@...
+    01e0 - ac 05 ab 3b c5 0e 19 42-e0 ac 4b f2 dd 04 8c 5a   ...;...B..K....Z
+    01f0 - 04 1e 47 b5 a8 bc 80 5f-86 7b 0f 2a 99 55 89 3e   ..G...._.{.*.U.>
+    0200 - 89 06 06 f8 5d e2 65 2a-a3 41 c0 0d 93 08 b7 bc   ....].e*.A......
+    0210 - c1 a5 9c bc c1 a5 6c ce-30 cc 3d f5 57 67 e1 a1   ......l.0.=.Wg..
+    0220 - 6a 2b 00 4d 56 c5 11 94-b4 ad 8a 8d df e4 31 2d   j+.MV.........1-
+    0230 - 1e 6e 7d a4 50 ff d6 a0-87 70 df 8d 54 5d 72 24   .n}.P....p..T]r$
+    0240 - 2e 8b b5 18 0f 11 7d 91-a4 44 7f e9 46 e5 47 3c   ......}..D..F.G<
+    0250 - 23 ab 4d 3d 6e a4 bb 87-85 7b c8 28 a8 a2 43 9d   #.M=n....{.(..C.
+    0260 - bc 88 94 61 f0 bf 13 d8-eb 67 b5 23 43 66 b8 30   ...a.....g.#Cf.0
+    0270 - 7c 6d 50 99 f1 51 9f 64-b5 08 74 e1 f0 ac 5c c9   |mP..Q.d..t...\.
+    0280 - 1a 7b 52 3c 17 d8 f5 78-c8 be 0b e7 e8 cf 6d ea   .{R<...x......m.
+    0290 - a7 37 e8 9b e9 56 5f 6e-32 90 cc f9 0d 28 07 ef   .7...V_n2....(..
+    02a0 - 7d 9c b7 46 ea b3 ef c4-11 d0 56 c1 db 3a a8 ee   }..F......V..:..
+    02b0 - 60 5d 93 f3 cf c3 4d 0e-6c 59 7a 63 60 fe 54 26   `]....M.lYzc`.T&
+    02c0 - fb 17 05 a5 4a 04 a6 46-59 58 3f 00 6f c4 53 b0   ....J..FYX?.o.S.
+    02d0 - d9 04 e7 fc 2b 8f 1c c9-01 ef 45 9c 7e 20 84 da   ....+.....E.~ ..
+    02e0 - 11 96 78 d1 40 2c ab 3c-38 c3 77 b0 5f d7 b1 25   ..x.@,.<8.w._..%
+    02f0 - 96 c1 16 91 ae ea 69 32-04 d1 67 46 0d 67 d2 dd   ......i2..gF.g..
+    0300 - 2a 5e d9 f6 b1 cb 5a 34-12 06 5e 76 be 73 30 a8   *^....Z4..^v.s0.
+    0310 - a1 cb 65 0c 4d 9b a4 8d-96 46 66 31 9e a4 97 64   ..e.M....Ff1...d
+    0320 - c5 2a 14 c6 58 e1 93 61-5c df 74 17 bd 4b 4f 8e   .*..X..a\.t..KO.
+    0330 - 79 65 36 25 9b d0 01 ce-0d 2e ba 8e 30 1f dc 5f   ye6%........0.._
+    0340 - 13 69 89 58 a7 fb 5b 14-48 e3 72 5a e8 f5 92 75   .i.X..[.H.rZ...u
+    0350 - 29 6e 6e c6 83 74 64 37-ec 77 55 59 20 a7 c1 09   )nn..td7.wUY ...
+    0360 - af fb fd 0d 94 bb 02 51-f7 3f ee 4b 81 2c 96 a0   .......Q.?.K.,..
+    0370 - 74 b8 8b 5d 97 49 1e d8-e8 e3 40 d9 fb 23 9d 1a   t..].I....@..#..
+    0380 - a9 62 28 1f 77 38 62 5e-54 95 97 77 82 df cf b8   .b(.w8b^T..w....
+    0390 - 8e 86 97 26 d4 c4 a9 39-16 31 93 99 45 90 c6 7f   ...&...9.1..E...
+    03a0 - ed 8a 33 39 93 17 1f ac-d9 58 c6 63 df cc cb d6   ..39.....X.c....
+    03b0 - 17 94 71 c6 9f 02 f7 59-ba 2b 63 1a c7 c5 14 e5   ..q....Y.+c.....
+    03c0 - 26 4f 72 f5 64 0e 12 a1-81 42 c6 8b 7e a7 21 1e   &Or.d....B..~.!.
+    03d0 - 98 fb 19 df 07 5e a8 6e-15 a6 9c 2f b5 49 74 0e   .....^.n.../.It.
+    03e0 - 30 a8 0b e3 16 fc bb 83-a2 af d7 16 2e 37 86 95   0............7..
+    03f0 - f0 3b 94 72 46 2e 79 91-c1 88 82 50 aa 2c af 18   .;.rF.y....P.,..
+    0400 - 24 6f ad 90 aa b8 dd 56-85 38 39 e9 ed cf ee 03   $o.....V.89.....
+    0410 - ef 44 ef 9f df 2f 84 f1-63 9b a0 6d 38 29 fc c7   .D.../..c..m8)..
+    0420 - 31 54 e1 46 07 e1 c1 71-a2 03 af ba 79 a2 11 e4   1T.F...q....y...
+    0430 - ca c3 66 fd 29 75 f6 8c-e8 c6 49 53 24 76 0b 87   ..f.)u....IS$v..
+    0440 - 54 4e d9 03 0d 74 2f 94-12 a4 95 53 c4 e5 0e 9b   TN...t/....S....
+    0450 - 37 5c 51 09 60 5a 4d 81-1c 7d f0 18 6b 52 6a e8   7\Q.`ZM..}..kRj.
+    0460 - 55 c5 11 39 84 65 e9 4b-e2 92 ce 11 3a 89 24 6c   U..9.e.K....:.$l
+    0470 - 4c 10 54 75 4e 5e 7a 73-16 f5 b9 f4 11 3f a1 e4   L.TuN^zs.....?..
+    0480 - 86 95 2f 15 60 dd 19 e0-45 07 d6 11 d8 f9 a0 db   ../.`...E.......
+    0490 - af c7 41 c7 34 4f a1 39-d6 d3 78 a5 38 d2 f7 c2   ..A.4O.9..x.8...
+    04a0 - 7a 95 90 e3 9c 51 b5 b2-30 7b 48 f7 56 82 cf 9b   z....Q..0{H.V...
+    04b0 - 54 fa 38 ff 81 ca 1e bf-84 8f 71 21 1b 01 55 15   T.8.......q!..U.
+    04c0 - db 9e b8 3a ac 7b 17 5f-31 bb 8c 92 bf ea fa 78   ...:.{._1......x
+    04d0 - 55 d5 18 04 fd c2 42 df-89 4e ee 48 05 15 d3 e2   U.....B..N.H....
+    04e0 - 36 c4 f7 bb 4c bc 36 4e-f3 25 78 04 bd 05 34 94   6...L.6N.%x...4.
+    04f0 - 2a c5 44 ae c9 c3 20 1d-7d ac 43 7a 4c af 64 8c   *.D... .}.CzL.d.
+    0500 - e6 37 c1 a1 46 cf fd 23-eb c6 60 f9 ed 64 7d 2e   .7..F..#..`..d}.
+    0510 - ab 86 ea 4e 50 c7 e9 23-a8 f7 18 18 5a e0 78 62   ...NP..#....Z.xb
+    0520 - 74 a8 47 a6 14 89 fc fc-f8 45 e3 05 21 a5 bd ad   t.G......E..!...
+    0530 - f9 e7 02 8e 16 8c 25 35-1d a2 d5 e1 a6 87 e9 a1   ......%5........
+    0540 - 2f c6 ac 2b c1 c6 fa b8-6d df 94 5b 28 33 87 96   /..+....m..[(3..
+    0550 - e1 b2 4a b0 e7 d2 34 02-39 cf 46 ea e3 06 76 bc   ..J...4.9.F...v.
+    0560 - 70 4a 99 04 ab 16 35 cc-63 a5 3d c4 82 2f 5a 75   pJ....5.c.=../Zu
+    0570 - ce 57 ee b2 e5 35 68 81-10 b0 2a 7f af c2 91 2d   .W...5h...*....-
+    0580 - c5 14 37 ed 76 1e 81 ff-cf 15 56 1a dd 97 07 9f   ..7.v.....V.....
+    0590 - 9d ed 64 be 8a d9 9f 41-24 8f f5 b0 fc 62 2c e9   ..d....A$....b,.
+    05a0 - 1b 65 be 92 c2 f2 53 49-6f 8f 2c 83 81 ba d1 5f   .e....SIo.,...._
+    05b0 - 1b 13 dd 2f 6c d3 37 bf-16 de 16 fb da 4f ac 27   .../l.7......O.'
+    05c0 - 95 60 87 e0 46 c4 53 16-57 07 bd 82 58 de 03 5f   .`..F.S.W...X.._
+    05d0 - 53 73 61 e3 7b b6 ad ca-f0 d3 cb 1b da 84 4b 1e   Ssa.{.........K.
+    05e0 - 69 c0 ce a0 f4 33 97 93-fd b3 80 7f c7 55 c8 02   i....3.......U..
+    05f0 - e8 a8 80 e6 df e7 87 5f-48 2d d3 4f 1d 18 9c 8f   ......._H-.O....
+    0600 - 46 4c e6 f9 9f 69 c6 14-27 b7 d6 89 1f c7 06 46   FL...i..'......F
+    0610 - 29 c7 9b 6c b3 04 ab 4d-ac e1 ad 20 4b f3 c9 08   )..l...M... K...
+    0620 - 8a f0 09 c8 31 d1 09 76-ca e6 22 d1 be cb 9e 9d   ....1..v..".....
+    0630 - e9 9b 50 d3 c4 92 47 c6-be 2b d0 20 51 05 33 67   ..P...G..+. Q.3g
+    0640 - 94 30 24 08 73 4c 22 52-57 b5 87 ee 18 d8 3f 18   .0$.sL"RW.....?.
+    0650 - bc 0c 73 2e a9 c5 8e 55-5c 06 2a eb 9d d4 22 41   ..s....U\.*..."A
+    0660 - 80 01 bf 18 7a 71 a4 86-9c 36 c5 60 6d 9d b9 3f   ....zq...6.`m..?
+    0670 - a5 9d 17 8f 36 84 3e a7-8e 6d a5 0d fc c4 1e cf   ....6.>..m......
+    0680 - 7d bd 7a 18 b7 9a 8a ab-c4 7b f1 f9 59 ff 69 32   }.z......{..Y.i2
+    0690 - 99 62 be e0 08 2e b9 78-91 3c f0 59 f7 87 60 05   .b.....x.<.Y..`.
+    06a0 - b5 19 94 fb 14 ba f2 aa-b0 f0 e4 35 c9 27 f2 a6   ...........5.'..
+    06b0 - c7 be 00 ad d4 6a 09 29-e5 09 04 1e d9 8c 68 c5   .....j.)......h.
+    06c0 - 1b 2a 7d 30 27 f7 ca 0a-07 48 69 c5 bd 9e 33 88   .*}0'....Hi...3.
+    06d0 - 7c ec 27 8e 52 29 0b 70-82 81 d0 79 9d e1 74 6e   |.'.R).p...y..tn
+    06e0 - ce d3 1f 42 58 7a 48 c9-5b d6 a1 cd 52 c9 8d c2   ...BXzH.[...R...
+    06f0 - 04 a8 7b 17 8b 55 40 61-97 91 e2 6f c7 36 93 97   ..{..U@a...o.6..
+    0700 - e2 0f 84 36 35 28 22 27-30 18 76 d5 6f 83 b6 73   ...65("'0.v.o..s
+    0710 - 91 7f ae ba 9f ac 15 83-7b b5 f5 33 d3 53 4f 3b   ........{..3.SO;
+    0720 - 60 be cf 10 6b 77 e6 09-b9 4b fa 09 94 e5 82 12   `...kw...K......
+    0730 - 14 02 52 98 52 fa e8 ae-25 a1 91 eb 8c 58 a2 9e   ..R.R...%....X..
+    0740 - d4 a7 98 d6 5e 1e 68 46-f8 78 51 64 09 34 83 6f   ....^.hF.xQd.4.o
+    0750 - 4d c2 03 3f 43 97 00 fd-9c 89 e2 02 b3 45 d3 d7   M..?C........E..
+    0760 - 6d 15 2d 4f 4f c9 d6 91-c4 db 27 86 2f fb 66 95   m.-OO.....'./.f.
+    0770 - a5 f2 0f af 64 71 5b ca-61 47 72 0a 87 2d a0 31   ....dq[.aGr..-.1
+    0780 - e5 d3 12 14 70 98 78 f6-a9 8b 99 ef d3 86 ac 8a   ....p.x.........
+    0790 - e9 b9 b9 b2 c8 f6 50 c5-30 a2 e7 0b 46 c2 3a f0   ......P.0...F.:.
+    07a0 - 1a 8a 35 0c 40 17 49 18-a7 e1 46 b3 da ab 21 4a   ..5.@.I...F...!J
+    07b0 - 27 06 1c 2e 18 43 bf a1-d8 b3 dc 52 df 4d 7b f2   '....C.....R.M{.
+    07c0 - 9d 04 a1 5c 20 92 4d 8f-29 53 c9 39 f0 ca 6a 1a   ...\ .M.)S.9..j.
+    07d0 - b6 0c 62 d7 87 ac 9a 3e-89 57 0d 14 e6 27 88 3f   ..b....>.W...'.?
+    07e0 - d1 2d 89 3b 3d 8f 32 04-51 5e c2 02 09 b6 9e bd   .-.;=.2.Q^......
+    07f0 - 24 43 40 b2 b5 00 e7 c4-cf c0 09 2d 34 16 ec 72   $C@........-4..r
+    0800 - b5 52 12 c9 c0 ca 10 69-3a b9 1e d7 60 16 c7 08   .R.....i:...`...
+    0810 - 21 25 65 6d df d7 7d b1-1f 71 7a 83 f5 a0 a3 67   !%em..}..qz....g
+    0820 - f0 26 45 44 a2 07 ef 62-1f af 42 30 3d c2 a4 7b   .&ED...b..B0=..{
+    0830 - 94 f0 e2 c5 f9 3c 75 8d-f4 b8 80 69 6f 9a 09 83   .....<u....io...
+    0840 - ed d7 0a cd 36 0b 70 f9-c3 77 19 ef 6d f5 1a 8f   ....6.p..w..m...
+    0850 - 0a 6a 63 32 c4 71 35 59-cb fe ca e0 b0 f3 16 49   .jc2.q5Y.......I
+    0860 - e6 fe 51 7c f8 d2 fc 7c-d0 64 76 d7 f7 86 b7 ac   ..Q|...|.dv.....
+    0870 - b3 ae ca b8 47 6d ca 1a-c3 d2 11 2d 84 e3 17 7a   ....Gm.....-...z
+    0880 - 59 3b f0 71 62 03 43 f8-f9 0b a6 89 f6 3c 7a 16   Y;.qb.C......<z.
+    0890 - bf 67 11 92 b8 f9 48 c6-25 96 76 5a 17 0b 5e 77   .g....H.%.vZ..^w
+    08a0 - 28 06 cc 78 3f 73 56 7a-c7 ab b6 bc 07 29 42 46   (..x?sVz.....)BF
+    08b0 - 3d 55 aa fc c9 2f 11 3a-84 1e f6 18 ea ae 4a b5   =U.../.:......J.
+    08c0 - 37 9c f1 96 80 f7 df 3c-1c 68 58 ab d0 61 c2 e0   7......<.hX..a..
+    08d0 - de 2e 9b eb 2f 34 56 36-9a 35 3d 08 2d 7f 13 f8   ..../4V6.5=.-...
+    08e0 - d2 9d ab f5 50 6a de 77-67 ad 62 16 2d 83 c8 86   ....Pj.wg.b.-...
+    08f0 - c3 af a1 a0 0c 59 05 d0-51 20 86 58 79 4c 57 46   .....Y..Q .XyLWF
+    0900 - eb 3a b8 1d 7d bd cb 82-df 29 97 26 5a f9 3f 0c   .:..}....).&Z.?.
+    0910 - 89 56 d2 c3 0a 68 49 1d-9f 17 cf c5 79 e7 41 81   .V...hI.....y.A.
+    0920 - 22 09 71 bc f1 52 e2 51-a2 61 ca 8c fe 57 19 2d   ".q..R.Q.a...W.-
+    0930 - 3c 92 f1 ac f5 fb 6b ee-a6 14 7b 59 32 54 43 26   <.....k...{Y2TC&
+    0940 - 52 27 ec a0 24 24 f0 b2-cb db 8b d4 de 3c fe 5f   R'..$$.......<._
+    0950 - f3 46 65 65 46 4c 68 3e-5c ab a9 79 4e b0 f4 e8   .FeeFLh>\..yN...
+    0960 - 97 5d 85 7e f5 5f 11 f3-9c fb b6 06 55 69 7f 78   .].~._......Ui.x
+    0970 - d5 15 c1 a3 4c bc e9 ae-91 79 a0 45 66 56 ae 3a   ....L....y.EfV.:
+    0980 - 8b ee b0 60 dd 42 e3 9d-c6 85 c6 4d 50 bb 08 e3   ...`.B.....MP...
+    0990 - 7f a7 10 d0 f8 3a 8e b6-f9 d5 07 d9 dc ee 59 44   .....:........YD
+    09a0 - 28 20 e8 b4 ae f7 fc 83-c4 b1 ae 4f fe a4 ae 4f   ( .........O...O
+    09b0 - 83 5c 1c 24 dd 1d ee 74-df 05 e2 f4 0c 2f 13 c6   .\.$...t...../..
+    09c0 - 42 bf ea 3d ac c3 29 71-56 47 91 97 ce c4 a8 e6   B..=..)qVG......
+    09d0 - e6 48 84 4b fa 7c 2d b3-08 18 2e 6d d0 c4 f6 11   .H.K.|-....m....
+    09e0 - 58 0b 01 b8 98 7c a1 58-e8 a6 fa 97 31 3e 86 0b   X....|.X....1>..
+    09f0 - 92 72 ff 08 aa ea bd ed-11 bc 4c 89 da 6a 65 78   .r........L..jex
+    0a00 - c7 a0 71 8b 45 89 ce 8c-6f fb 97 84 a3 a9 4f d1   ..q.E...o.....O.
+    0a10 - 72 cc 86 36 6a 70 d3 cd-93 fa 34 ed 5c 93 5a fc   r..6jp....4.\.Z.
+    0a20 - ce 7d 46 e5 4d 6c ed 1a-b3 a0 d4 0a 05 87 af 82   .}F.Ml..........
+    0a30 - cf 16 c8 57 79 91 96 ac-d2 ad 59 07 16 51 a5 97   ...Wy.....Y..Q..
+    0a40 - 11 1f b1 be 98 50 83 4a-9d 14 75 07 0b 07 a7 51   .....P.J..u....Q
+    0a50 - 01 3a ad e6 b2 4e 5a b2-90 24 3f 72 e1 a5 ae 8b   .:...NZ..$?r....
+    0a60 - 64 0b 02 e8 20 f8 5e 16-ba 85 43 c5 5d 52 30 1b   d... .^...C.]R0.
+    0a70 - 16 22 5c d8 17 43 19 7f-7a 7d f5 15 1b f0 2c 08   ."\..C..z}....,.
+    0a80 - 1a 23 55 d8 7e 9e 17 9c-f0 44 34 ec 44 d4 c9 d1   .#U.~....D4.D...
+    0a90 - 46 ba 3e 31 ef 4b 89 1a-12 a0 3d 25 02 c1 0d 65   F.>1.K....=%...e
+    0aa0 - 89 fd 10 5b c2 54 8f 4d-d4 40 09 43 a7 53 03 ec   ...[.T.M.@.C.S..
+    0ab0 - 73 b3 74 9b bc 9a 5b b7-ab ec 59 8a 17 db 7e ea   s.t...[...Y...~.
+    0ac0 - 2c 0e e1 0c 92 da 14 90-cf 89 b0 08 7c 9c 17 04   ,...........|...
+    0ad0 - 67 7e 02 8d dc 16 0e 6e-b1 24 d1 c6 f0 a5 41 54   g~.....n.$....AT
+    0ae0 - 60 14 75 84 ff 99 25 14-d7 0e 84 a5 0e 03 ed 21   `.u...%........!
+    0af0 - 99 55 64 8f e7 d1 2a d8-10 2e fd 6e 1b c8 2a 3e   .Ud...*....n..*>
+    0b00 - 44 8a 4a 3c 4b e2 42 5f-e3 63 7a d7 f3 47 49 fa   D.J<K.B_.cz..GI.
+    0b10 - 04 71 97 dd e4 33 56 15-dd d0 f2 be fa a2 f3 fd   .q...3V.........
+    0b20 - af 3d 78 f2 54 ee 66 b7-af 22 47 2d d6 5a a8 49   .=x.T.f.."G-.Z.I
+    0b30 - 88 9b 18 c5 9d 2c 58 e4-33 29 46 34 98 5a 8a 9f   .....,X.3)F4.Z..
+    0b40 - 5c 53 0b b7 ae 96 c4 da-fd 73 0a 7b cf fc 31 6d   \S.......s.{..1m
+    0b50 - 46 1a 52 52 b0 8e 0c 1f-ac 95 c8 2c 6e c4 36 05   F.RR.......,n.6.
+    0b60 - 6b 9c 44 b8 44 1a 2c 24-5b bd 1e eb 5d 4b b7 78   k.D.D.,$[...]K.x
+    0b70 - 86 7a 70 22 00 da 84 8f-64 27 bd 2c bf 43 71 c7   .zp"....d'.,.Cq.
+    0b80 - d9 3d 9b 85 b5 97 35 3a-da 64 71 49 e5 1c 39 a9   .=....5:.dqI..9.
+    0b90 - 63 f8 3a 75 dd 2e 26 3b-c8 57 77 53 d7 ff 19 35   c.:u..&;.WwS...5
+    0ba0 - 0d ce 12 3e a5 f6 ce 58-66 24 a7 9f e0 03 51 06   ...>...Xf$....Q.
+    0bb0 - c7 14 e7 18 14 89 de a2-99 d3 82 41 6a 3b b6 0a   ...........Aj;..
+    0bc0 - 2d e2 ac f1 18 76 fa 57-3f 69 34 b0 82 ce 73 c7   -....v.W?i4...s.
+    0bd0 - 42 38 16 66 77 ea ab 18-e2 ef db 25 f1 a9 6b 39   B8.fw......%..k9
+    0be0 - 6f 0b 7d 38 d0 f3 2d e5-18 9d a4 c6 c2 de a8 40   o.}8..-........@
+    0bf0 - 76 c3 d2 fe b3 96 43 ac-03 5a 0e 7d 5b 1e 03 f9   v.....C..Z.}[...
+    0c00 - 46 14 d6 29 cc ae 18 89-72 74 3c 3a c0 fb 01 14   F..)....rt<:....
+    0c10 - 8e 30 6a 27 3f 0d fa 6f-47 5c 29 06 10 42 b1 2d   .0j'?..oG\)..B.-
+    0c20 - d9 cd 05 cd 53 18 ae b2-9e 2c 68 68 78 95 8b c4   ....S....,hhx...
+    0c30 - 13 9c c6 6e 81 09 d5 3f-3d c4 18 d3 3c 20 ff 84   ...n...?=...< ..
+    0c40 - 05 ec e6 82 7f c0 3f b8-09 76 52 cc 72 63 c1 88   ......?..vR.rc..
+    0c50 - 1e f8 f0 36 22 e6 b6 44-30 de 50 84 45 de 90 5b   ...6"..D0.P.E..[
+    0c60 - 83 18 6d e0 84 dd 42 a8-e6 0b a3 73 52 67 c4 9d   ..m...B....sRg..
+    0c70 - d1 6c 12 95 7f e3 9d f6-15 27 b7 04 2f 36 3a cb   .l.......'../6:.
+    0c80 - 22 63 18 cf 71 e4 d4 cc-83 f0 5a 27 87 07 3e a1   "c..q.....Z'..>.
+    0c90 - 56 44 dc ab c6 7b d7 3f-57 1a d6 94 96 2c b0 9b   VD...{.?W....,..
+    0ca0 - 04 0b aa 00 89 53 32 5e-7e b3 82 a1 8c ad e2 67   .....S2^~......g
+    0cb0 - e5 74 09 38 1b 9d 3c d7-cb 1c d4 36 90 35 76 f3   .t.8..<....6.5v.
+    0cc0 - 59 15 1b 1b b1 62 46 a7-bb 1e 60 49 e7 b2 3c 2e   Y....bF...`I..<.
+    0cd0 - 1d 08 fc 5d af 67 71 97-76 25 33 8c 79 88 60 aa   ...].gq.v%3.y.`.
+    0ce0 - 85 fb 88 c4 29 e3 2e 10-e8 00 0e 7d 34 e9 3a 1c   ....)......}4.:.
+HTTP/1.1 200 OK
+Server: openresty/1.31.8.1
+Date: Wed, 04 Nov 2026 09:45:43 GMT
+Content-Type: text/plain
+Content-Length: 11
+Connection: close
+
+OK noguard
+    0cf0 - 17 e9 c9 4c 10 8c 96 8f-6b aa 2a fb b5 b5 2b 21   ...L....k.*...+!
+    0d00 - a3 6a 2d 52 b5 a2 7f 07-b1 a3 5b 1a 31 46 84 d6   .j-R......[.1F..
+    0d10 - 0a 07 77 64 7f e2 60 fd-7e 9e 6f f9 05 42 fe 3c   ..wd..`.~.o..B.<
+    0d20 - 49 e9 11 05 cc a4 79 a9-9d 13 b3 6e 42 e1 c1 9b   I.....y....nB...
+    0d30 - ba 21 b5 1e e7 b0 bf 26-30 a8 c7 b4 db 91 0f 6a   .!.....&0......j
+    0d40 - 8e ec 41 89 01 17 77 03-ea b6 9f 83 8c 49 6c 35   ..A...w......Il5
+    0d50 - 07 41 d3 5b b7 d0 7a e6-64 4e d1 8d 17 c4 97 a3   .A.[..z.dN......
+    0d60 - ed 39 df be f5 cf 5f 0f-48 ab 96 18 46 3c 81 84   .9...._.H...F<..
+    0d70 - 40 da 84 dc 8b 82 86 71-43 69 52 28 1e d0 71 cc   @......qCiR(..q.
+    0d80 - 65 3b 28 d1 88 da aa 3c-d8 d1 e9 9d 0e 11 fe a3   e;(....<........
+    0d90 - 58 bd 38 74 f8 49 d5 d4-0b 24 3f a9 ba 3c 67 1d   X.8t.I...$?..<g.
+    0da0 - a9 9f cb 9d 0f ec 92 a2-43 27 86 b5 e7 fa 25 a1   ........C'....%.
+    0db0 - 5e c5 56 e5 9e b4 99 ab-fc 57 f0 62 c0 ab 29 fa   ^.V......W.b..).
+    0dc0 - 14 39 c7 31 a6 91 49 ce-7e 9f 46 b0 8b df 02 86   .9.1..I.~.F.....
+    0dd0 - 11 b9 11 2e af f5 aa 12-0c 8e fa c2 ab c9 ab 8c   ................
+    0de0 - f5 e9 17 1c 74 21 4f 12-41 f1 e0 2a a7 c5 2f dd   ....t!O.A..*../.
+    0df0 - cf 98 9c 6c f7 55 7f 15-a3 16 60 56 34 46 89 be   ...l.U....`V4F..
+    0e00 - 1b ac 75 b6 e2 bf 42 2a-97 19 5d 03 c9 7f be dc   ..u...B*..].....
+    0e10 - 91 5c 8c de 63 b0 f6 ec-07 3f 6f 18 f4 ec 99 fb   .\..c....?o.....
+    0e20 - 17 a8 c5 6e 5d 48 f9 e6-bc 67 db d3 e8 b6 09 b4   ...n]H...g......
+    0e30 - 83 10 99 ab 55 39 10 d7-62 21 a9 5f e2 eb c5 13   ....U9..b!._....
+    0e40 - 09 9f ee 77 6d 06 63 83-66 62 f5 49 6c dc 91 96   ...wm.c.fb.Il...
+    0e50 - 1c 4d ca db eb 3c d3 58-45 57 48 2c 46 10 5a 87   .M...<.XEWH,F.Z.
+    0e60 - b6 5d 53 85 fc 05 3f 8e-31 c1 c3 5f c0 9e 88 f3   .]S...?.1.._....
+    0e70 - 1f 47 2e f7 5d a4 98 b8-38 42 89 73 99 2b a5 5c   .G..]...8B.s.+.\
+    0e80 - de 3e 57 a6 cb 6a d3 96-86 9e 3c 53 99 7a 3d eb   .>W..j....<S.z=.
+    0e90 - 05 14 a9 46 8a 21 93 d3-0e 6a 30 15 3b 72 6c 2d   ...F.!...j0.;rl-
+    0ea0 - 67 f0 f0 3a 3a 4c 38 db-67 1c 31 23 5b c1 15 2d   g..::L8.g.1#[..-
+    0eb0 - bd 6b 79 9a 2f c2 c1 85-3c 2e 7a 6d ec c2 0b 01   .ky./...<.zm....
+    0ec0 - 65 4b b7 81 9e 36 e8 fa-0b be c1 9d e2 a0 d8 d0   eK...6..........
+    0ed0 - 76 0d 0c f3 52 20 85 dd-80 47 80 14 f2 df ae 72   v...R ...G.....r
+    0ee0 - 18 53 e6 25 c0 9b 5e dd-f6 7b 88 58 42 67 2f 1c   .S.%..^..{.XBg/.
+    0ef0 - 7c 43 d3 85 e1 7d 9a c7-1f c4 3c fe fe 0b e5 df   |C...}....<.....
+    0f00 - 25 8b ca 67 09 cd 22 57-0a 5f 1a ef 3c 29 3d 02   %..g.."W._..<)=.
+    0f10 - c3 85 d0 26 04 fd 47 4c-f2 0f 75 9d 0f 90 05 03   ...&..GL..u.....
+    0f20 - 7f 2d 5a be f9 d4 a7 57-fb 97 c8 98 47 8f 73 ee   .-Z....W....G.s.
+    0f30 - ce e2 c5 f4 26 4d 44 16-22 a8 33 33 9c e9 52 05   ....&MD.".33..R.
+    0f40 - 41 8c cf 2a 11 11 23 f7-c9 5a b4 25 84 5f e1 79   A..*..#..Z.%._.y
+    0f50 - ee 34 53 ce f8 d4 26 32-ce b2 b0 31 a4 15 ec 62   .4S...&2...1...b
+    0f60 - 9e 7b 20 d2 99 14 5c af-bc 27 7d 03 d4 4b 7e c9   .{ ...\..'}..K~.
+    0f70 - ac 16 37 ba 1b 00 9f 98-e8 5e bd 47 8e 1c b5 2b   ..7......^.G...+
+    0f80 - 7e ff 58 95 d9 6a 1a 3e-4d dc 2e a1 e5 7c cd 74   ~.X..j.>M....|.t
+    0f90 - 6f 45 42 2d 65 ce ea 93-db d4 45 8c c0 86 26 8b   oEB-e.....E...&.
+    0fa0 - ea 1e 56 10 fc cf 6b fb-31 a5 4a 22 26 29 6c ca   ..V...k.1.J"&)l.
+
+    Start Time: 1793785543
+    Timeout   : 7200 (sec)
+    Verify return code: 0 (ok)
+    Extended master secret: no
+    Max Early Data: 0
+---
+read R BLOCK
+closed

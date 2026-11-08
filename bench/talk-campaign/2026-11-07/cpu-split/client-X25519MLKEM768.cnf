@@ -1,0 +1,7 @@
+openssl_conf = openssl_init
+[openssl_init]
+ssl_conf = ssl_sect
+[ssl_sect]
+system_default = sys
+[sys]
+Groups = X25519MLKEM768

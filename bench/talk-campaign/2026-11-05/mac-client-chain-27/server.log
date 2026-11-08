@@ -1,0 +1,1263 @@
+verify depth is 2, must return a certificate
+Using default temp DH parameters
+ACCEPT
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x
+depth=2 O=Test, CN=Mac Chain Root
+verify return:1
+depth=1 O=Test, CN=Mac Chain Intermediate
+verify return:1
+depth=0 O=Test, CN=mac-chain-client
+verify return:1
+FILE:x

@@ -1,0 +1,13 @@
+port	arm	client_auth	tickets	ticket_bytes_each	session_der_bytes
+31443	pq	on	2	6242	12128
+31443	pq	on	2	6241	12128
+31443	pq	on	2	6246	12129
+31444	cl	on	2	784	1881
+31444	cl	on	2	784	1882
+31444	cl	on	2	785	1882
+31445	pq	off	2	255	6510
+31445	pq	off	2	256	6510
+31445	pq	off	2	255	6511
+31446	cl	off	2	255	1383
+31446	cl	off	2	259	1384
+31446	cl	off	2	255	1384

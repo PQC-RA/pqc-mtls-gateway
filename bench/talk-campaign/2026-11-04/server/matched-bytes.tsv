@@ -1,0 +1,7 @@
+arm	rep	read	written	total	certs_from_server	group	peer_sig
+pqc	1	10480	10600	21080	1	X25519MLKEM768	mldsa65
+classical	1	1029	1060	2089	1		ecdsa_secp256r1_sha256
+pqc	2	10480	10600	21080	1	X25519MLKEM768	mldsa65
+classical	2	1027	1059	2086	1		ecdsa_secp256r1_sha256
+pqc	3	10480	10600	21080	1	X25519MLKEM768	mldsa65
+classical	3	1027	1058	2085	1		ecdsa_secp256r1_sha256

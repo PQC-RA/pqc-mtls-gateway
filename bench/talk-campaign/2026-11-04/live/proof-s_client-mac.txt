@@ -1,0 +1,7 @@
+== valid ML-DSA-65 client (talk-probe-01)
+Requested Signature Algorithms: id-ml-dsa-65
+Shared Requested Signature Algorithms: id-ml-dsa-65
+Peer signature type: mldsa65
+Negotiated TLS1.3 group: X25519MLKEM768
+Verification: OK
+    0f90 - 72 65 c5 06 e9 8e 71 98-ea e0 9HTTP/1.1 404 Not Found

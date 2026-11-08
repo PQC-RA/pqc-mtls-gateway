@@ -1,0 +1,125 @@
+{"seq": 1, "ts": "2026-11-07T15:58:34.348Z", "action": "enrollment-token.create", "target": "cn=rs1107-smoke-1", "status": "ok", "httpStatus": 201}
+{"seq": 2, "ts": "2026-11-07T15:58:34.404Z", "action": "token.reserve", "target": "cn=rs1107-smoke-1", "status": "ok", "httpStatus": 200}
+{"seq": 3, "ts": "2026-11-07T15:58:34.444Z", "action": "cert.enroll", "target": "cn=rs1107-smoke-1 serial=1003", "status": "ok", "httpStatus": 201}
+{"seq": 4, "ts": "2026-11-07T15:59:24.067Z", "action": "cert.revoke", "target": "serial=1003", "status": "ok", "httpStatus": 200}
+{"seq": 5, "ts": "2026-11-07T15:59:54.651Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-01", "status": "ok", "httpStatus": 201}
+{"seq": 6, "ts": "2026-11-07T15:59:54.693Z", "action": "token.reserve", "target": "cn=rs1107-dev-01", "status": "ok", "httpStatus": 200}
+{"seq": 7, "ts": "2026-11-07T15:59:54.720Z", "action": "cert.enroll", "target": "cn=rs1107-dev-01 serial=1004", "status": "ok", "httpStatus": 201}
+{"seq": 8, "ts": "2026-11-07T15:59:55.778Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-02", "status": "ok", "httpStatus": 201}
+{"seq": 9, "ts": "2026-11-07T15:59:55.820Z", "action": "token.reserve", "target": "cn=rs1107-dev-02", "status": "ok", "httpStatus": 200}
+{"seq": 10, "ts": "2026-11-07T15:59:55.845Z", "action": "cert.enroll", "target": "cn=rs1107-dev-02 serial=1005", "status": "ok", "httpStatus": 201}
+{"seq": 11, "ts": "2026-11-07T15:59:56.912Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-03", "status": "ok", "httpStatus": 201}
+{"seq": 12, "ts": "2026-11-07T15:59:56.956Z", "action": "token.reserve", "target": "cn=rs1107-dev-03", "status": "ok", "httpStatus": 200}
+{"seq": 13, "ts": "2026-11-07T15:59:56.980Z", "action": "cert.enroll", "target": "cn=rs1107-dev-03 serial=1006", "status": "ok", "httpStatus": 201}
+{"seq": 14, "ts": "2026-11-07T15:59:58.050Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-04", "status": "ok", "httpStatus": 201}
+{"seq": 15, "ts": "2026-11-07T15:59:58.094Z", "action": "token.reserve", "target": "cn=rs1107-dev-04", "status": "ok", "httpStatus": 200}
+{"seq": 16, "ts": "2026-11-07T15:59:58.118Z", "action": "cert.enroll", "target": "cn=rs1107-dev-04 serial=1007", "status": "ok", "httpStatus": 201}
+{"seq": 17, "ts": "2026-11-07T15:59:59.186Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-05", "status": "ok", "httpStatus": 201}
+{"seq": 18, "ts": "2026-11-07T16:01:27.107Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-05", "status": "ok", "httpStatus": 201}
+{"seq": 19, "ts": "2026-11-07T16:01:27.151Z", "action": "token.reserve", "target": "cn=rs1107-dev-05", "status": "ok", "httpStatus": 200}
+{"seq": 20, "ts": "2026-11-07T16:01:27.176Z", "action": "cert.enroll", "target": "cn=rs1107-dev-05 serial=1008", "status": "ok", "httpStatus": 201}
+{"seq": 21, "ts": "2026-11-07T16:01:40.149Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-06", "status": "ok", "httpStatus": 201}
+{"seq": 22, "ts": "2026-11-07T16:01:40.192Z", "action": "token.reserve", "target": "cn=rs1107-dev-06", "status": "ok", "httpStatus": 200}
+{"seq": 23, "ts": "2026-11-07T16:01:40.217Z", "action": "cert.enroll", "target": "cn=rs1107-dev-06 serial=1009", "status": "ok", "httpStatus": 201}
+{"seq": 24, "ts": "2026-11-07T16:01:53.199Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-07", "status": "ok", "httpStatus": 201}
+{"seq": 25, "ts": "2026-11-07T16:01:53.241Z", "action": "token.reserve", "target": "cn=rs1107-dev-07", "status": "ok", "httpStatus": 200}
+{"seq": 26, "ts": "2026-11-07T16:01:53.265Z", "action": "cert.enroll", "target": "cn=rs1107-dev-07 serial=100A", "status": "ok", "httpStatus": 201}
+{"seq": 27, "ts": "2026-11-07T16:02:06.246Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-08", "status": "ok", "httpStatus": 201}
+{"seq": 28, "ts": "2026-11-07T16:02:06.290Z", "action": "token.reserve", "target": "cn=rs1107-dev-08", "status": "ok", "httpStatus": 200}
+{"seq": 29, "ts": "2026-11-07T16:02:06.315Z", "action": "cert.enroll", "target": "cn=rs1107-dev-08 serial=100B", "status": "ok", "httpStatus": 201}
+{"seq": 30, "ts": "2026-11-07T16:02:19.288Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-09", "status": "ok", "httpStatus": 201}
+{"seq": 31, "ts": "2026-11-07T16:02:19.333Z", "action": "token.reserve", "target": "cn=rs1107-dev-09", "status": "ok", "httpStatus": 200}
+{"seq": 32, "ts": "2026-11-07T16:02:19.356Z", "action": "cert.enroll", "target": "cn=rs1107-dev-09 serial=100C", "status": "ok", "httpStatus": 201}
+{"seq": 33, "ts": "2026-11-07T16:02:32.337Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-10", "status": "ok", "httpStatus": 201}
+{"seq": 34, "ts": "2026-11-07T16:02:32.379Z", "action": "token.reserve", "target": "cn=rs1107-dev-10", "status": "ok", "httpStatus": 200}
+{"seq": 35, "ts": "2026-11-07T16:02:32.404Z", "action": "cert.enroll", "target": "cn=rs1107-dev-10 serial=100D", "status": "ok", "httpStatus": 201}
+{"seq": 36, "ts": "2026-11-07T16:02:45.384Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-11", "status": "ok", "httpStatus": 201}
+{"seq": 37, "ts": "2026-11-07T16:02:45.426Z", "action": "token.reserve", "target": "cn=rs1107-dev-11", "status": "ok", "httpStatus": 200}
+{"seq": 38, "ts": "2026-11-07T16:02:45.450Z", "action": "cert.enroll", "target": "cn=rs1107-dev-11 serial=100E", "status": "ok", "httpStatus": 201}
+{"seq": 39, "ts": "2026-11-07T16:02:58.432Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-12", "status": "ok", "httpStatus": 201}
+{"seq": 40, "ts": "2026-11-07T16:02:58.475Z", "action": "token.reserve", "target": "cn=rs1107-dev-12", "status": "ok", "httpStatus": 200}
+{"seq": 41, "ts": "2026-11-07T16:02:58.499Z", "action": "cert.enroll", "target": "cn=rs1107-dev-12 serial=100F", "status": "ok", "httpStatus": 201}
+{"seq": 42, "ts": "2026-11-07T16:03:11.480Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-13", "status": "ok", "httpStatus": 201}
+{"seq": 43, "ts": "2026-11-07T16:03:11.522Z", "action": "token.reserve", "target": "cn=rs1107-dev-13", "status": "ok", "httpStatus": 200}
+{"seq": 44, "ts": "2026-11-07T16:03:11.548Z", "action": "cert.enroll", "target": "cn=rs1107-dev-13 serial=1010", "status": "ok", "httpStatus": 201}
+{"seq": 45, "ts": "2026-11-07T16:03:24.530Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-14", "status": "ok", "httpStatus": 201}
+{"seq": 46, "ts": "2026-11-07T16:03:24.587Z", "action": "token.reserve", "target": "cn=rs1107-dev-14", "status": "ok", "httpStatus": 200}
+{"seq": 47, "ts": "2026-11-07T16:03:24.627Z", "action": "cert.enroll", "target": "cn=rs1107-dev-14 serial=1011", "status": "ok", "httpStatus": 201}
+{"seq": 48, "ts": "2026-11-07T16:03:37.584Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-15", "status": "ok", "httpStatus": 201}
+{"seq": 49, "ts": "2026-11-07T16:03:37.627Z", "action": "token.reserve", "target": "cn=rs1107-dev-15", "status": "ok", "httpStatus": 200}
+{"seq": 50, "ts": "2026-11-07T16:03:37.651Z", "action": "cert.enroll", "target": "cn=rs1107-dev-15 serial=1012", "status": "ok", "httpStatus": 201}
+{"seq": 51, "ts": "2026-11-07T16:03:50.633Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-16", "status": "ok", "httpStatus": 201}
+{"seq": 52, "ts": "2026-11-07T16:03:50.673Z", "action": "token.reserve", "target": "cn=rs1107-dev-16", "status": "ok", "httpStatus": 200}
+{"seq": 53, "ts": "2026-11-07T16:03:50.698Z", "action": "cert.enroll", "target": "cn=rs1107-dev-16 serial=1013", "status": "ok", "httpStatus": 201}
+{"seq": 54, "ts": "2026-11-07T16:04:03.681Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-17", "status": "ok", "httpStatus": 201}
+{"seq": 55, "ts": "2026-11-07T16:04:03.723Z", "action": "token.reserve", "target": "cn=rs1107-dev-17", "status": "ok", "httpStatus": 200}
+{"seq": 56, "ts": "2026-11-07T16:04:03.748Z", "action": "cert.enroll", "target": "cn=rs1107-dev-17 serial=1014", "status": "ok", "httpStatus": 201}
+{"seq": 57, "ts": "2026-11-07T16:04:16.728Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-18", "status": "ok", "httpStatus": 201}
+{"seq": 58, "ts": "2026-11-07T16:04:16.768Z", "action": "token.reserve", "target": "cn=rs1107-dev-18", "status": "ok", "httpStatus": 200}
+{"seq": 59, "ts": "2026-11-07T16:04:16.791Z", "action": "cert.enroll", "target": "cn=rs1107-dev-18 serial=1015", "status": "ok", "httpStatus": 201}
+{"seq": 60, "ts": "2026-11-07T16:04:29.774Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-19", "status": "ok", "httpStatus": 201}
+{"seq": 61, "ts": "2026-11-07T16:04:29.820Z", "action": "token.reserve", "target": "cn=rs1107-dev-19", "status": "ok", "httpStatus": 200}
+{"seq": 62, "ts": "2026-11-07T16:04:29.846Z", "action": "cert.enroll", "target": "cn=rs1107-dev-19 serial=1016", "status": "ok", "httpStatus": 201}
+{"seq": 63, "ts": "2026-11-07T16:04:42.824Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-20", "status": "ok", "httpStatus": 201}
+{"seq": 64, "ts": "2026-11-07T16:04:42.866Z", "action": "token.reserve", "target": "cn=rs1107-dev-20", "status": "ok", "httpStatus": 200}
+{"seq": 65, "ts": "2026-11-07T16:04:42.891Z", "action": "cert.enroll", "target": "cn=rs1107-dev-20 serial=1017", "status": "ok", "httpStatus": 201}
+{"seq": 66, "ts": "2026-11-07T16:04:55.869Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-21", "status": "ok", "httpStatus": 201}
+{"seq": 67, "ts": "2026-11-07T16:04:55.911Z", "action": "token.reserve", "target": "cn=rs1107-dev-21", "status": "ok", "httpStatus": 200}
+{"seq": 68, "ts": "2026-11-07T16:04:55.936Z", "action": "cert.enroll", "target": "cn=rs1107-dev-21 serial=1018", "status": "ok", "httpStatus": 201}
+{"seq": 69, "ts": "2026-11-07T16:05:08.916Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-22", "status": "ok", "httpStatus": 201}
+{"seq": 70, "ts": "2026-11-07T16:05:08.957Z", "action": "token.reserve", "target": "cn=rs1107-dev-22", "status": "ok", "httpStatus": 200}
+{"seq": 71, "ts": "2026-11-07T16:05:08.981Z", "action": "cert.enroll", "target": "cn=rs1107-dev-22 serial=1019", "status": "ok", "httpStatus": 201}
+{"seq": 72, "ts": "2026-11-07T16:05:21.964Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-23", "status": "ok", "httpStatus": 201}
+{"seq": 73, "ts": "2026-11-07T16:05:22.008Z", "action": "token.reserve", "target": "cn=rs1107-dev-23", "status": "ok", "httpStatus": 200}
+{"seq": 74, "ts": "2026-11-07T16:05:22.034Z", "action": "cert.enroll", "target": "cn=rs1107-dev-23 serial=101A", "status": "ok", "httpStatus": 201}
+{"seq": 75, "ts": "2026-11-07T16:05:35.011Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-24", "status": "ok", "httpStatus": 201}
+{"seq": 76, "ts": "2026-11-07T16:05:35.052Z", "action": "token.reserve", "target": "cn=rs1107-dev-24", "status": "ok", "httpStatus": 200}
+{"seq": 77, "ts": "2026-11-07T16:05:35.078Z", "action": "cert.enroll", "target": "cn=rs1107-dev-24 serial=101B", "status": "ok", "httpStatus": 201}
+{"seq": 78, "ts": "2026-11-07T16:05:48.064Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-25", "status": "ok", "httpStatus": 201}
+{"seq": 79, "ts": "2026-11-07T16:05:48.124Z", "action": "token.reserve", "target": "cn=rs1107-dev-25", "status": "ok", "httpStatus": 200}
+{"seq": 80, "ts": "2026-11-07T16:05:48.155Z", "action": "cert.enroll", "target": "cn=rs1107-dev-25 serial=101C", "status": "ok", "httpStatus": 201}
+{"seq": 81, "ts": "2026-11-07T16:06:01.121Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-26", "status": "ok", "httpStatus": 201}
+{"seq": 82, "ts": "2026-11-07T16:06:01.163Z", "action": "token.reserve", "target": "cn=rs1107-dev-26", "status": "ok", "httpStatus": 200}
+{"seq": 83, "ts": "2026-11-07T16:06:01.188Z", "action": "cert.enroll", "target": "cn=rs1107-dev-26 serial=101D", "status": "ok", "httpStatus": 201}
+{"seq": 84, "ts": "2026-11-07T16:06:14.167Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-27", "status": "ok", "httpStatus": 201}
+{"seq": 85, "ts": "2026-11-07T16:06:14.209Z", "action": "token.reserve", "target": "cn=rs1107-dev-27", "status": "ok", "httpStatus": 200}
+{"seq": 86, "ts": "2026-11-07T16:06:14.234Z", "action": "cert.enroll", "target": "cn=rs1107-dev-27 serial=101E", "status": "ok", "httpStatus": 201}
+{"seq": 87, "ts": "2026-11-07T16:06:27.212Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-28", "status": "ok", "httpStatus": 201}
+{"seq": 88, "ts": "2026-11-07T16:06:27.254Z", "action": "token.reserve", "target": "cn=rs1107-dev-28", "status": "ok", "httpStatus": 200}
+{"seq": 89, "ts": "2026-11-07T16:06:27.278Z", "action": "cert.enroll", "target": "cn=rs1107-dev-28 serial=101F", "status": "ok", "httpStatus": 201}
+{"seq": 90, "ts": "2026-11-07T16:06:40.249Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-29", "status": "ok", "httpStatus": 201}
+{"seq": 91, "ts": "2026-11-07T16:06:40.290Z", "action": "token.reserve", "target": "cn=rs1107-dev-29", "status": "ok", "httpStatus": 200}
+{"seq": 92, "ts": "2026-11-07T16:06:40.316Z", "action": "cert.enroll", "target": "cn=rs1107-dev-29 serial=1020", "status": "ok", "httpStatus": 201}
+{"seq": 93, "ts": "2026-11-07T16:06:53.294Z", "action": "enrollment-token.create", "target": "cn=rs1107-dev-30", "status": "ok", "httpStatus": 201}
+{"seq": 94, "ts": "2026-11-07T16:06:53.335Z", "action": "token.reserve", "target": "cn=rs1107-dev-30", "status": "ok", "httpStatus": 200}
+{"seq": 95, "ts": "2026-11-07T16:06:53.359Z", "action": "cert.enroll", "target": "cn=rs1107-dev-30 serial=1021", "status": "ok", "httpStatus": 201}
+{"seq": 96, "ts": "2026-11-07T16:07:01.247Z", "action": "cert.revoke", "target": "serial=1004", "status": "ok", "httpStatus": 200}
+{"seq": 97, "ts": "2026-11-07T16:07:17.547Z", "action": "cert.revoke", "target": "serial=1005", "status": "ok", "httpStatus": 200}
+{"seq": 98, "ts": "2026-11-07T16:07:30.141Z", "action": "cert.revoke", "target": "serial=1006", "status": "ok", "httpStatus": 200}
+{"seq": 99, "ts": "2026-11-07T16:07:51.333Z", "action": "cert.revoke", "target": "serial=1007", "status": "ok", "httpStatus": 200}
+{"seq": 100, "ts": "2026-11-07T16:07:59.330Z", "action": "cert.revoke", "target": "serial=1008", "status": "ok", "httpStatus": 200}
+{"seq": 101, "ts": "2026-11-07T16:08:16.472Z", "action": "cert.revoke", "target": "serial=1009", "status": "ok", "httpStatus": 200}
+{"seq": 102, "ts": "2026-11-07T16:08:26.381Z", "action": "cert.revoke", "target": "serial=100A", "status": "ok", "httpStatus": 200}
+{"seq": 103, "ts": "2026-11-07T16:08:35.706Z", "action": "cert.revoke", "target": "serial=100B", "status": "ok", "httpStatus": 200}
+{"seq": 104, "ts": "2026-11-07T16:08:42.136Z", "action": "cert.revoke", "target": "serial=100C", "status": "ok", "httpStatus": 200}
+{"seq": 105, "ts": "2026-11-07T16:08:58.281Z", "action": "cert.revoke", "target": "serial=100D", "status": "ok", "httpStatus": 200}
+{"seq": 106, "ts": "2026-11-07T16:09:04.576Z", "action": "cert.revoke", "target": "serial=100E", "status": "ok", "httpStatus": 200}
+{"seq": 107, "ts": "2026-11-07T16:09:13.839Z", "action": "cert.revoke", "target": "serial=100F", "status": "ok", "httpStatus": 200}
+{"seq": 108, "ts": "2026-11-07T16:09:20.347Z", "action": "cert.revoke", "target": "serial=1010", "status": "ok", "httpStatus": 200}
+{"seq": 109, "ts": "2026-11-07T16:09:45.055Z", "action": "cert.revoke", "target": "serial=1011", "status": "ok", "httpStatus": 200}
+{"seq": 110, "ts": "2026-11-07T16:09:53.831Z", "action": "cert.revoke", "target": "serial=1012", "status": "ok", "httpStatus": 200}
+{"seq": 111, "ts": "2026-11-07T16:10:02.154Z", "action": "cert.revoke", "target": "serial=1013", "status": "ok", "httpStatus": 200}
+{"seq": 112, "ts": "2026-11-07T16:10:11.876Z", "action": "cert.revoke", "target": "serial=1014", "status": "ok", "httpStatus": 200}
+{"seq": 113, "ts": "2026-11-07T16:10:22.641Z", "action": "cert.revoke", "target": "serial=1015", "status": "ok", "httpStatus": 200}
+{"seq": 114, "ts": "2026-11-07T16:10:43.290Z", "action": "cert.revoke", "target": "serial=1016", "status": "ok", "httpStatus": 200}
+{"seq": 115, "ts": "2026-11-07T16:10:56.829Z", "action": "cert.revoke", "target": "serial=1017", "status": "ok", "httpStatus": 200}
+{"seq": 116, "ts": "2026-11-07T16:11:14.433Z", "action": "cert.revoke", "target": "serial=1018", "status": "ok", "httpStatus": 200}
+{"seq": 117, "ts": "2026-11-07T16:11:38.429Z", "action": "cert.revoke", "target": "serial=1019", "status": "ok", "httpStatus": 200}
+{"seq": 118, "ts": "2026-11-07T16:11:59.635Z", "action": "cert.revoke", "target": "serial=101A", "status": "ok", "httpStatus": 200}
+{"seq": 119, "ts": "2026-11-07T16:12:19.992Z", "action": "cert.revoke", "target": "serial=101B", "status": "ok", "httpStatus": 200}
+{"seq": 120, "ts": "2026-11-07T16:12:26.560Z", "action": "cert.revoke", "target": "serial=101C", "status": "ok", "httpStatus": 200}
+{"seq": 121, "ts": "2026-11-07T16:12:44.570Z", "action": "cert.revoke", "target": "serial=101D", "status": "ok", "httpStatus": 200}
+{"seq": 122, "ts": "2026-11-07T16:13:02.128Z", "action": "cert.revoke", "target": "serial=101E", "status": "ok", "httpStatus": 200}
+{"seq": 123, "ts": "2026-11-07T16:13:11.738Z", "action": "cert.revoke", "target": "serial=101F", "status": "ok", "httpStatus": 200}
+{"seq": 124, "ts": "2026-11-07T16:13:33.530Z", "action": "cert.revoke", "target": "serial=1020", "status": "ok", "httpStatus": 200}
+{"seq": 125, "ts": "2026-11-07T16:13:39.759Z", "action": "cert.revoke", "target": "serial=1021", "status": "ok", "httpStatus": 200}

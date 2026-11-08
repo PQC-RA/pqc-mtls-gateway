@@ -1,0 +1,578 @@
+name: rs1107
+services:
+  gateway:
+    deploy:
+      resources:
+        limits:
+          cpus: 1
+          memory: "536870912"
+        reservations:
+          cpus: 0.25
+          memory: "134217728"
+    restart: unless-stopped
+    container_name: pqc-gateway
+    cap_add:
+      - NET_BIND_SERVICE
+      - SETGID
+      - SETUID
+      - SYS_RESOURCE
+      - CHOWN
+      - DAC_OVERRIDE
+    cap_drop:
+      - ALL
+    environment:
+      ADMIN_JWKS_KIDS: admin-v2
+      ADMIN_JWT_KID: admin-v2
+    extra_hosts:
+      - host.docker.internal=host-gateway
+    image: rs1107-gateway:83a4f60
+    networks:
+      pqc-edge: null
+      pqc-internal: null
+      pqc-mgmt: null
+      pqc-pki: null
+    read_only: true
+    secrets:
+      - source: gateway-signing-key
+        target: /run/secrets/gateway-signing-key
+      - source: gateway-signing-key-admin
+        target: /run/secrets/gateway-signing-key-admin
+      - source: gateway-signing-key-admin-v2
+        target: /run/secrets/gateway-signing-key-admin-v2
+      - source: gateway-signing-key-lookup
+        target: /run/secrets/gateway-signing-key-lookup
+      - source: control-plane-hmac
+        target: /run/secrets/control-plane-hmac
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+      - /run
+      - /var/cache/nginx
+      - /etc/nginx/logs
+    volumes:
+      - type: bind
+        source: /root/rerun-stack-20261107/host/var-lib-pqc-ca-public
+        target: /etc/pki/pqc-ca
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/host/etc-pki-pqc-trust
+        target: /etc/pki/pqc-trust
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/host/etc-ssl-pqc
+        target: /etc/ssl/pqc
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/repo/config/nginx/nginx.conf
+        target: /etc/nginx/nginx.conf
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/repo/config/nginx/security-headers.conf
+        target: /etc/nginx/security-headers.conf
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/repo/config/nginx/lua
+        target: /etc/nginx/lua
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/repo/config/nginx/migration
+        target: /etc/nginx/migration
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/repo/config/nginx/stream
+        target: /etc/nginx/stream
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/repo/config/enroll-ui
+        target: /etc/nginx/enroll-ui
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/repo/docker/gateway/entrypoint.sh
+        target: /usr/local/bin/entrypoint.sh
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/repo/secrets/enroll-hmac.key
+        target: /run/secrets/enroll-hmac
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/repo/secrets/renew-hmac.key
+        target: /run/secrets/renew-hmac
+        read_only: true
+        bind: {}
+      - type: volume
+        source: pqc-logs-audit
+        target: /var/log/pqc-gw
+        volume: {}
+      - type: volume
+        source: pqc-routes-cache
+        target: /var/cache/pqc-gw/routes
+        volume: {}
+      - type: volume
+        source: pqc-logs-nginx
+        target: /var/log/nginx
+        volume: {}
+    build:
+      context: /root/rerun-stack-20261107/repo/docker
+      dockerfile: gateway/Dockerfile
+      args:
+        OPENRESTY_VERSION: 1.31.8.1
+        OPENSSL_VERSION: 3.6.5
+    depends_on:
+      gateway-volume-init:
+        condition: service_completed_successfully
+        required: true
+    expose:
+      - "8081"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "printf 'GET /healthz HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n'
+          | /opt/openssl/bin/openssl s_client -connect 127.0.0.1:8081 -CAfile /etc/pki/pqc-trust/internal-tls-ca.crt
+          -verify_return_error -quiet 2>/dev/null | grep -q '200 OK'"
+      timeout: 5s
+      interval: 30s
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
+    ports:
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 443
+        published: "39443"
+        protocol: tcp
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 8443
+        published: "38443"
+        protocol: tcp
+  gateway-volume-init:
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: "134217728"
+        reservations:
+          cpus: 0.125
+          memory: "33554432"
+    restart: 'no'
+    command:
+      - sh
+      - -c
+      - touch /var/log/audit/enroll-audit.log && chown 65534:65534 /var/log/audit/enroll-audit.log
+        && chmod 644 /var/log/audit/enroll-audit.log
+    image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    networks:
+      default: null
+    volumes:
+      - type: volume
+        source: pqc-logs-audit
+        target: /var/log/audit
+        volume: {}
+  management-api:
+    deploy:
+      resources:
+        limits:
+          cpus: 1
+          memory: "536870912"
+        reservations:
+          cpus: 0.25
+          memory: "134217728"
+    restart: unless-stopped
+    container_name: pqc-mtls-management-api
+    cap_drop:
+      - ALL
+    environment:
+      ADMIN_AUDIT_LOG: /var/lib/pqc-mgmt/admin-actions.log
+      ADMIN_CERT_FINGERPRINTS: 8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4
+      ADMIN_V2_PUB_SHA256: b394a828670aff514f4517ad51b8f82af0411019fa593f33e887e6277a1dfa86
+      AUDIT_LOG_PATH: /var/log/pqc-gw/enroll-audit.log
+      AUDITOR_CERT_FINGERPRINTS: ""
+      CONSOLE_ORIGIN: https://127.0.0.1
+      CORS_ALLOWED_ORIGINS: https://127.0.0.1
+      CUSTODIAN_URL: http://pqc-ca-custodian:8091
+      DEFAULT_ENROLLMENT_PROFILE: client-30d
+      GATEWAY_CONTROL_URL: https://gateway:8081/update-routes
+      GATEWAY_JWKS_URI: https://gateway:8081/.well-known/jwks.json
+      GATEWAY_TLS_LEAF_ALG: ML-DSA-65
+      HOST: 0.0.0.0
+      JWT_EXPECTED_AUDIENCE: pqc-mtls-management-api
+      JWT_EXPECTED_ISSUER: pqc-gateway
+      JWT_EXPECTED_KID: admin-v2
+      NODE_ENV: production
+      NODE_EXTRA_CA_CERTS: /etc/pki/pqc-trust/internal-tls-ca.crt
+      OPENSSL_CONF: /etc/ssl/openssl.cnf
+      PORT: "3000"
+      REDIS_URL: redis://redis:6379
+      RENEWAL_ENABLED: "1"
+      ROUTES_FILE: /var/lib/pqc-mgmt/routes.json
+    image: ghcr.io/pqc-ra/pqc-mtls-management-api@sha256:7787047a71a85e758abea267f69b062d48a366ebce1b5c73bb45244883f276d4
+    networks:
+      pqc-mgmt: null
+      pqc-pki: null
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    user: 1001:1001
+    volumes:
+      - type: volume
+        source: pqc-mgmt-data
+        target: /var/lib/pqc-mgmt
+        volume: {}
+      - type: volume
+        source: pqc-logs-audit
+        target: /var/log/pqc-gw
+        read_only: true
+        volume: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/repo/secrets/control-plane-hmac.key
+        target: /run/secrets/control-plane-hmac
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/repo/secrets/custodian-hmac.key
+        target: /run/secrets/custodian-hmac
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/repo/secrets/enroll-hmac.key
+        target: /run/secrets/enroll-hmac
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/repo/secrets/renew-hmac.key
+        target: /run/secrets/renew-hmac
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/host/etc-pki-pqc-trust
+        target: /etc/pki/pqc-trust
+        read_only: true
+        bind: {}
+    depends_on:
+      mgmt-volume-init:
+        condition: service_completed_successfully
+        required: true
+      pqc-ca-custodian:
+        condition: service_healthy
+        required: true
+      redis:
+        condition: service_healthy
+        required: true
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -sS -o /dev/null -w '%{http_code}' http://127.0.0.1:3000/api/admin/health
+          | grep -qE '^(200|401)'
+      timeout: 5s
+      interval: 30s
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
+    ports:
+      - mode: ingress
+        host_ip: 127.0.0.1
+        target: 3000
+        published: "33000"
+        protocol: tcp
+  mgmt-volume-init:
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: "134217728"
+        reservations:
+          cpus: 0.125
+          memory: "33554432"
+    restart: 'no'
+    command:
+      - sh
+      - -c
+      - chown -R 1001:1001 /var/lib/pqc-mgmt && chmod 775 /var/lib/pqc-mgmt
+    image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    networks:
+      default: null
+    volumes:
+      - type: volume
+        source: pqc-mgmt-data
+        target: /var/lib/pqc-mgmt
+        volume: {}
+  ocsp-pq:
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: "134217728"
+        reservations:
+          cpus: 0.125
+          memory: "33554432"
+    restart: unless-stopped
+    container_name: pqc-ocsp-pq
+    cap_drop:
+      - ALL
+    image: rs1107-ocsp-pq:83a4f60
+    networks:
+      pqc-pki: null
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    user: 1002:1002
+    volumes:
+      - type: bind
+        source: /root/rerun-stack-20261107/host/var-lib-pqc-ocsp
+        target: /var/lib/pqc-ocsp
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/host/var-lib-pqc-ca-status
+        target: /var/lib/pqc-ca-status
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/host/var-lib-pqc-ca-public
+        target: /var/lib/pqc-ca-public
+        read_only: true
+        bind: {}
+    build:
+      context: /root/rerun-stack-20261107/repo/docker/ocsp-pq
+      dockerfile: Dockerfile
+      args:
+        OPENSSL_VERSION: 3.6.5
+  pki-dist:
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: "134217728"
+        reservations:
+          cpus: 0.125
+          memory: "33554432"
+    restart: unless-stopped
+    container_name: pqc-pki-dist
+    cap_drop:
+      - ALL
+    image: rs1107-pki-dist:83a4f60
+    networks:
+      pqc-pki: null
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    user: 101:101
+    volumes:
+      - type: bind
+        source: /root/rerun-stack-20261107/host/var-lib-pqc-ca-public
+        target: /var/www/pki
+        read_only: true
+        bind: {}
+    build:
+      context: /root/rerun-stack-20261107/repo/docker/pki-dist
+      dockerfile: Dockerfile
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - curl -fsS -o /dev/null http://127.0.0.1:8090/
+      timeout: 5s
+      interval: 30s
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
+  pqc-ca-custodian:
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: "268435456"
+        reservations:
+          cpus: 0.125
+          memory: "67108864"
+    restart: unless-stopped
+    container_name: pqc-ca-custodian
+    cap_drop:
+      - ALL
+    environment:
+      CERT_VALIDITY_DAYS: "365"
+      CUSTODIAN_DEMO_PROFILE: "1"
+      RENEWAL_ENABLED: "1"
+    image: rs1107-ca-custodian:83a4f60
+    networks:
+      pqc-pki: null
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp
+    user: 1003:1003
+    volumes:
+      - type: bind
+        source: /root/rerun-stack-20261107/host/var-lib-pqc-ca/key
+        target: /var/lib/pqc-ca/key
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/host/var-lib-pqc-ca/state
+        target: /var/lib/pqc-ca/state
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/host/var-lib-pqc-ca/inbox
+        target: /var/lib/pqc-ca/inbox
+        read_only: true
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/host/var-lib-pqc-ca-public
+        target: /var/lib/pqc-ca-public
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/host/var-lib-pqc-ca-status
+        target: /var/lib/pqc-ca-status
+        bind: {}
+      - type: bind
+        source: /root/rerun-stack-20261107/repo/secrets/custodian-hmac.key
+        target: /run/secrets/custodian-hmac
+        read_only: true
+        bind: {}
+    build:
+      context: /root/rerun-stack-20261107/repo
+      dockerfile: docker/pqc-ca-custodian/Dockerfile
+      args:
+        OPENSSL_VERSION: 3.6.5
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - node -e "require('http').get('http://127.0.0.1:8091/healthz',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
+      timeout: 5s
+      interval: 30s
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
+  redis:
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: "268435456"
+    restart: unless-stopped
+    container_name: pqc-redis
+    cap_add:
+      - SETUID
+      - SETGID
+      - CHOWN
+      - DAC_OVERRIDE
+    cap_drop:
+      - ALL
+    command:
+      - redis-server
+      - --appendonly
+      - 'yes'
+      - --save
+      - ""
+      - --maxmemory
+      - 128mb
+      - --maxmemory-policy
+      - noeviction
+    image: redis:7.4-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99
+    networks:
+      pqc-mgmt: null
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - type: volume
+        source: pqc-redis-data
+        target: /data
+        volume: {}
+    healthcheck:
+      test:
+        - CMD
+        - redis-cli
+        - ping
+      timeout: 3s
+      interval: 30s
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
+  shadow-mock:
+    deploy:
+      resources:
+        limits:
+          cpus: 0.5
+          memory: "134217728"
+        reservations:
+          cpus: 0.125
+          memory: "33554432"
+    container_name: pqc-shadow-mock
+    cap_add:
+      - NET_BIND_SERVICE
+      - SETGID
+      - SETUID
+      - CHOWN
+    cap_drop:
+      - ALL
+    command:
+      - sh
+      - -c
+      - |-
+        mkdir -p /usr/share/nginx/html/api/v1 &&
+               echo '{"status": "pqc-shadow-success", "pqc": "ML-DSA-65"}' > /usr/share/nginx/html/api/v1/status &&
+               echo 'server { listen 80; large_client_header_buffers 4 32k; location / { root /usr/share/nginx/html; default_type application/json; } }' > /etc/nginx/conf.d/default.conf &&
+               nginx -g 'daemon off;'
+    image: nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752
+    networks:
+      pqc-internal: null
+    security_opt:
+      - no-new-privileges:true
+networks:
+  default:
+    name: rs1107_default
+  pqc-edge:
+    name: rs1107_pqc-edge
+    driver: bridge
+  pqc-internal:
+    name: rs1107_pqc-internal
+    driver: bridge
+  pqc-mgmt:
+    name: rs1107_pqc-mgmt
+    driver: bridge
+  pqc-pki:
+    name: rs1107_pqc-pki
+    driver: bridge
+volumes:
+  pqc-logs-audit:
+    name: rs1107_pqc-logs-audit
+  pqc-logs-nginx:
+    name: rs1107_pqc-logs-nginx
+  pqc-mgmt-data:
+    name: rs1107_pqc-mgmt-data
+  pqc-redis-data:
+    name: rs1107_pqc-redis-data
+  pqc-routes-cache:
+    name: rs1107_pqc-routes-cache
+secrets:
+  control-plane-hmac:
+    name: rs1107_control-plane-hmac
+    file: /root/rerun-stack-20261107/repo/secrets/control-plane-hmac.key
+  gateway-signing-key:
+    name: rs1107_gateway-signing-key
+    file: /root/rerun-stack-20261107/repo/secrets/gateway-signing.key
+  gateway-signing-key-admin:
+    name: rs1107_gateway-signing-key-admin
+    file: /root/rerun-stack-20261107/repo/secrets/gateway-signing-key-admin.key
+  gateway-signing-key-admin-v2:
+    name: rs1107_gateway-signing-key-admin-v2
+    file: /root/rerun-stack-20261107/repo/secrets/gateway-signing-key-admin-v2.key
+  gateway-signing-key-lookup:
+    name: rs1107_gateway-signing-key-lookup
+    file: /root/rerun-stack-20261107/repo/secrets/gateway-signing-key-lookup.key

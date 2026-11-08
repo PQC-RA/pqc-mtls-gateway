@@ -1,0 +1,17 @@
+client	test	result
+node:22-bookworm-slim	8443	OK HTTP 404 node v22.23.4 openssl 3.5.9
+node:22-bookworm-slim	443-mTLS	OK HTTP 404 node v22.23.4 openssl 3.5.9
+python:3.12-slim	8443	OK HTTP/1.1 404 Not Found TLSv1.3 OpenSSL 3.5.7 9 Jun 2026
+python:3.12-slim	443-mTLS	OK HTTP/1.1 404 Not Found TLSv1.3 OpenSSL 3.5.7 9 Jun 2026
+python:3.11-slim-bookworm	8443	FAIL SSLError [SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] sslv3 alert handshake failure (_ssl.c:1016) OpenSSL 3.0.22 25 Aug 2026
+python:3.11-slim-bookworm	443-mTLS	FAIL SSLError [SSL: EE_KEY_TOO_SMALL] ee key too small (_ssl.c:3930) OpenSSL 3.0.22 25 Aug 2026
+python:3.9-slim-bullseye	8443	FAIL SSLError [SSL: SSLV3_ALERT_HANDSHAKE_FAILURE] sslv3 alert handshake failure (_ssl.c:1147) OpenSSL 1.1.1w  11 Sep 2023
+python:3.9-slim-bullseye	443-mTLS	FAIL SSLError [SSL: EE_KEY_TOO_SMALL] ee key too small (_ssl.c:4062) OpenSSL 1.1.1w  11 Sep 2023
+curlimages/curl:latest	8443(-k)	404 curl 8.21.0 (x86_64-pc-linux-musl) libcurl/8.21.0 OpenSSL/3.5.7 zlib/1.3.2 brotli/1.2.0 zstd/1.5.7 libidn2/2.3.8 libpsl/0.21.5 libssh2/1.11.1 nghttp2/1.69.0 mit-krb5/1.22.2 
+curlimages/curl:latest	443-mTLS	000
+eclipse-temurin:21-jre	8443		at java.base/sun.launcher.LauncherHelper.checkAndLoadMain(Unknown Source)
+eclipse-temurin:21-jre	443		at java.base/sun.launcher.LauncherHelper.checkAndLoadMain(Unknown Source)
+eclipse-temurin:21-jdk	8443	FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 21.0.12.1
+eclipse-temurin:21-jdk	443	FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 21.0.12.1
+--- gateway handshake refusal reasons (last 15 min)
+404

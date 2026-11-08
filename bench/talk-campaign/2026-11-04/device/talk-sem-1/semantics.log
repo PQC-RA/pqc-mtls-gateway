@@ -1,0 +1,6 @@
+08:41:37Z S1=111A notBefore=1793781637 notAfter=1793781817 renew window opens at 1793781777 (in 80 s)
+08:43:01Z T1a first renewal: HTTP 201 successor serial 111B replay=None
+08:43:04Z T1b retry, same CSR/key: HTTP 201 serial 111B replay=True -> SAME certificate
+08:43:05Z T2 second, different key from the same certificate: HTTP 409 {"ok":false,"error":{"code":409,"message":"This identity was renewed with a different key; it is frozen and both certificates are revoked","
+08:43:40Z T3 keep-alive on old cert: first non-404 = ERR:ConnectionError at notAfter-30.72 s; last 404 at -31.00 s; requests 272
+08:43:40Z T4 new connection with the expired old cert: HTTP 400 (curl exit 0)

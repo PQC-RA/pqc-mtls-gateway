@@ -1,0 +1,106 @@
+2026/11/07 15:56:42 [emerg] 1#1: host not found in upstream "management-api" in /etc/nginx/nginx.conf:530
+2026/11/07 15:56:42 [emerg] 1#1: host not found in upstream "management-api" in /etc/nginx/nginx.conf:530
+2026/11/07 15:56:43 [emerg] 1#1: host not found in upstream "management-api" in /etc/nginx/nginx.conf:530
+2026/11/07 15:56:43 [emerg] 1#1: host not found in upstream "management-api" in /etc/nginx/nginx.conf:530
+2026/11/07 15:56:45 [warn] 37#37: *8 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 0 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 15:57:45 [warn] 37#37: *79 [lua] crl_worker.lua:161: [crl_worker] CRL unchanged, poller alive, 0 revoked serial(s) held, context: ngx.timer
+2026/11/07 15:58:45 [warn] 37#37: *156 [lua] crl_worker.lua:161: [crl_worker] CRL unchanged, poller alive, 0 revoked serial(s) held, context: ngx.timer
+2026/11/07 15:59:24 [warn] 37#37: *592 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 1 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 15:59:26 [notice] 298#298: signal process started
+2026/11/07 15:59:26 [warn] 300#300: *606 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 1 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:00:26 [warn] 300#300: *709 [lua] crl_worker.lua:161: [crl_worker] CRL unchanged, poller alive, 1 revoked serial(s) held, context: ngx.timer
+2026/11/07 16:01:26 [warn] 300#300: *771 [lua] crl_worker.lua:161: [crl_worker] CRL unchanged, poller alive, 1 revoked serial(s) held, context: ngx.timer
+2026/11/07 16:02:26 [warn] 300#300: *863 [lua] crl_worker.lua:161: [crl_worker] CRL unchanged, poller alive, 1 revoked serial(s) held, context: ngx.timer
+2026/11/07 16:03:26 [warn] 300#300: *955 [lua] crl_worker.lua:161: [crl_worker] CRL unchanged, poller alive, 1 revoked serial(s) held, context: ngx.timer
+2026/11/07 16:04:26 [warn] 300#300: *1041 [lua] crl_worker.lua:161: [crl_worker] CRL unchanged, poller alive, 1 revoked serial(s) held, context: ngx.timer
+2026/11/07 16:05:26 [warn] 300#300: *1133 [lua] crl_worker.lua:161: [crl_worker] CRL unchanged, poller alive, 1 revoked serial(s) held, context: ngx.timer
+2026/11/07 16:06:26 [warn] 300#300: *1219 [lua] crl_worker.lua:161: [crl_worker] CRL unchanged, poller alive, 1 revoked serial(s) held, context: ngx.timer
+2026/11/07 16:07:01 [notice] 882#882: signal process started
+2026/11/07 16:07:01 [warn] 884#884: *1692 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 2 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:07:18 [warn] 884#884: *2303 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 3 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:07:21 [notice] 931#931: signal process started
+2026/11/07 16:07:21 [warn] 933#933: *2329 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 3 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:07:30 [warn] 933#933: *2779 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 4 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:07:31 [notice] 965#965: signal process started
+2026/11/07 16:07:31 [warn] 967#967: *2803 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 4 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:07:51 [warn] 967#967: *3226 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 5 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:07:56 [notice] 1036#1036: signal process started
+2026/11/07 16:07:56 [warn] 1038#1038: *3265 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 5 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:07:59 [warn] 1038#1038: *3687 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 6 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:08:01 [notice] 1067#1067: signal process started
+2026/11/07 16:08:01 [warn] 1069#1069: *3714 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 6 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:08:17 [warn] 1069#1069: *4349 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 7 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:08:21 [notice] 1116#1116: signal process started
+2026/11/07 16:08:21 [warn] 1118#1118: *4381 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 7 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:08:26 [warn] 1118#1118: *4747 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 8 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:08:26 [notice] 1143#1143: signal process started
+2026/11/07 16:08:26 [warn] 1149#1149: *4756 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 8 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:08:36 [notice] 1177#1177: signal process started
+2026/11/07 16:08:36 [warn] 1149#1149: *5348 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 9 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:08:36 [warn] 1183#1183: *5356 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 9 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:08:42 [warn] 1183#1183: *5847 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 10 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:08:46 [notice] 1234#1234: signal process started
+2026/11/07 16:08:46 [warn] 1236#1236: *5878 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 10 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:08:58 [warn] 1236#1236: *6337 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 11 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:09:01 [notice] 1280#1280: signal process started
+2026/11/07 16:09:01 [warn] 1282#1282: *6379 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 11 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:09:05 [warn] 1282#1282: *7001 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 12 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:09:06 [notice] 1311#1311: signal process started
+2026/11/07 16:09:06 [warn] 1313#1313: *7039 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 12 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:09:14 [warn] 1313#1313: *7595 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 13 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:09:16 [notice] 1345#1345: signal process started
+2026/11/07 16:09:16 [warn] 1347#1347: *7622 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 13 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:09:20 [warn] 1347#1347: *8061 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 14 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:09:21 [notice] 1385#1385: signal process started
+2026/11/07 16:09:21 [warn] 1387#1387: *8095 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 14 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:09:45 [warn] 1387#1387: *8616 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 15 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:09:46 [notice] 1447#1447: signal process started
+2026/11/07 16:09:46 [warn] 1449#1449: *8651 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 15 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:09:54 [warn] 1449#1449: *9236 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 16 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:09:56 [notice] 1490#1490: signal process started
+2026/11/07 16:09:56 [warn] 1492#1492: *9262 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 16 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:10:02 [warn] 1492#1492: *9767 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 17 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:10:06 [notice] 1524#1524: signal process started
+2026/11/07 16:10:06 [warn] 1526#1526: *9796 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 17 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:10:12 [warn] 1526#1526: *10370 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 18 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:10:16 [notice] 1558#1558: signal process started
+2026/11/07 16:10:16 [warn] 1560#1560: *10400 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 18 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:10:23 [warn] 1560#1560: *11018 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 19 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:10:26 [notice] 1601#1601: signal process started
+2026/11/07 16:10:26 [warn] 1603#1603: *11041 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 19 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:10:43 [warn] 1603#1603: *11537 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 20 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:10:46 [notice] 1660#1660: signal process started
+2026/11/07 16:10:46 [warn] 1662#1662: *11572 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 20 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:10:57 [warn] 1662#1662: *12180 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 21 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:11:01 [notice] 1706#1706: signal process started
+2026/11/07 16:11:01 [warn] 1708#1708: *12215 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 21 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:11:14 [warn] 1708#1708: *12688 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 22 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:11:16 [notice] 1743#1743: signal process started
+2026/11/07 16:11:16 [warn] 1745#1745: *12722 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 22 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:11:38 [warn] 1745#1745: *13212 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 23 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:11:41 [notice] 1795#1795: signal process started
+2026/11/07 16:11:41 [warn] 1797#1797: *13256 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 23 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:11:59 [warn] 1797#1797: *13679 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 24 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:12:01 [notice] 1863#1863: signal process started
+2026/11/07 16:12:01 [warn] 1865#1865: *13724 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 24 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:12:20 [warn] 1865#1865: *14308 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 25 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:12:21 [notice] 1912#1912: signal process started
+2026/11/07 16:12:21 [warn] 1914#1914: *14342 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 25 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:12:26 [notice] 1939#1939: signal process started
+2026/11/07 16:12:26 [warn] 1914#1914: *14687 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 26 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:12:26 [warn] 1945#1945: *14697 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 26 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:12:44 [warn] 1945#1945: *15180 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 27 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:12:46 [notice] 2002#2002: signal process started
+2026/11/07 16:12:46 [warn] 2004#2004: *15208 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 27 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:13:02 [warn] 2004#2004: *15788 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 28 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:13:06 [notice] 2051#2051: signal process started
+2026/11/07 16:13:06 [warn] 2053#2053: *15827 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 28 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:13:11 [notice] 2078#2078: signal process started
+2026/11/07 16:13:11 [warn] 2053#2053: *16236 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 29 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:13:11 [warn] 2084#2084: *16245 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 29 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:13:33 [warn] 2084#2084: *16761 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 30 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:13:36 [notice] 2134#2134: signal process started
+2026/11/07 16:13:36 [warn] 2136#2136: *16790 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 30 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:13:39 [warn] 2136#2136: *17211 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 31 revoked serial(s) loaded, context: ngx.timer
+2026/11/07 16:13:41 [notice] 2165#2165: signal process started
+2026/11/07 16:13:41 [warn] 2167#2167: *17242 [lua] crl_worker.lua:256: [crl_worker] CRL poll OK, 31 revoked serial(s) loaded, context: ngx.timer

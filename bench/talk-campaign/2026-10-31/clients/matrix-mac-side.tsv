@@ -1,0 +1,12 @@
+client	test	result
+macOS curl 8.7.1 (LibreSSL 3.3.6)	8443	000 exit=35
+macOS curl 8.7.1 (LibreSSL 3.3.6)	443-mTLS	000 exit=58
+macOS python3 (LibreSSL 2.8.3)	8443	FAIL SSLError [SSL: TLSV1_ALERT_PROTOCOL_VERSION] tlsv1 alert protocol version (_ssl.c:1129) LibreSSL 2.8.3
+Homebrew curl 8.21 (OpenSSL 3.6.2)	443-mTLS	404
+Homebrew python (OpenSSL 3.6.2)	443-mTLS	OK HTTP/1.1 404 Not Found TLSv1.3 OpenSSL 3.6.2 7 Apr 2026
+node v25.6.0 (OpenSSL 3.5.5)	8443	OK HTTP 404 node v25.6.0 openssl 3.5.5
+node v25.6.0 (OpenSSL 3.5.5)	443-mTLS	OK HTTP 404 node v25.6.0 openssl 3.5.5
+OpenJDK 26	8443	FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 26
+OpenJDK 26	443	FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 26
+      4 reason=no_pq_group offered_groups=X25519,secp256r1,secp384r1,secp521r1
+      2 reason=no_pq_group offered_groups=X25519,secp256r1,secp384r1,secp521r1,X448,ffdhe2048,ffdhe3072,ffdhe4096,ffdhe6144,ffdhe8192

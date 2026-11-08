@@ -1,0 +1,77 @@
+==> Bootstrapping PQC PKI (ML-DSA-65) at /root/rerun-stack-20261107/host/etc-pki-pqc-ca (server certs at /root/rerun-stack-20261107/host/etc-ssl-pqc)
+    Server cert SAN will include IP: 203.0.113.27
+==> Root CA
+==> Intermediate CA
+Using configuration from /root/rerun-stack-20261107/host/etc-pki-pqc-ca/root/openssl-root.cnf
+Check that the request matches the signature
+Signature ok
+The Subject's Distinguished Name is as follows
+countryName           :PRINTABLE:'BG'
+organizationName      :ASN.1 12:'PQC-GW'
+organizationalUnitName:ASN.1 12:'M2M Certificate Issuing CA'
+commonName            :ASN.1 12:'PQC-GW PQC Intermediate CA G1'
+Certificate is to be certified until Nov  6 15:56:30 2031 GMT (1825 days)
+
+Write out database with 1 new entries
+Database updated
+==> Gateway server certificate
+Using configuration from /root/rerun-stack-20261107/host/etc-pki-pqc-ca/intermediate/openssl-intermediate.cnf
+Check that the request matches the signature
+Signature ok
+The Subject's Distinguished Name is as follows
+countryName           :PRINTABLE:'BG'
+organizationName      :ASN.1 12:'PQC-GW'
+organizationalUnitName:ASN.1 12:'PQC-Gateway'
+commonName            :ASN.1 12:'pqc-gw.local'
+Certificate is to be certified until Nov  7 15:56:30 2027 GMT (365 days)
+
+Write out database with 1 new entries
+Database updated
+==> Enrollment classical server certificate (:8443)
+==> Enrollment classical CA + leaf (ECDSA P-256); leaf SAN IP: 203.0.113.27
+Certificate request self-signature ok
+subject=C=BG, O=PQC-GW, OU=Enroll-Bootstrap, CN=pqc-gw.local
+    Leaf : /root/rerun-stack-20261107/host/etc-ssl-pqc/enroll-classical.crt
+    CA   : /root/rerun-stack-20261107/host/etc-pki-pqc-ca/enroll-classical-ca.crt  (import into the operator's browser trust store to reach :8443)
+    subject=C=BG, O=PQC-GW, OU=Enroll-Bootstrap, CN=pqc-gw.local
+    X509v3 Subject Alternative Name: 
+        DNS:pqc-gw.local, DNS:localhost, IP Address:127.0.0.1, IP Address:203.0.113.27
+==> OCSP responder certificate
+==> OCSP responder key /root/rerun-stack-20261107/host/etc-pki-pqc-ca/ocsp/ocsp-pq.key: 640 root:1002 (readable by the ocsp-pq container's gid)
+Using configuration from /root/rerun-stack-20261107/host/etc-pki-pqc-ca/intermediate/openssl-intermediate.cnf
+Check that the request matches the signature
+Signature ok
+The Subject's Distinguished Name is as follows
+countryName           :PRINTABLE:'BG'
+organizationName      :ASN.1 12:'PQC-GW'
+organizationalUnitName:ASN.1 12:'OCSP Responder'
+commonName            :ASN.1 12:'ocsp.pqc-gw.local'
+Certificate is to be certified until Nov  7 15:56:30 2027 GMT (365 days)
+
+Write out database with 1 new entries
+Database updated
+==> Internal service-mesh TLS CA and :8081 leaf (ML-DSA-65)
+Certificate request self-signature ok
+subject=C=BG, O=PQC-GW, OU=Internal Service Mesh, CN=gateway
+    trust file /root/rerun-stack-20261107/host/etc-pki-pqc-trust/internal-tls-ca.crt: 1 CA(s); :8081 serves ML-DSA-65
+==> Generating CRLs
+Using configuration from /root/rerun-stack-20261107/host/etc-pki-pqc-ca/root/openssl-root.cnf
+Using configuration from /root/rerun-stack-20261107/host/etc-pki-pqc-ca/intermediate/openssl-intermediate.cnf
+==> Assembling trust chain + combined CRL
+==> Moving the intermediate CA into the custodian's layout (/root/rerun-stack-20261107/host/var-lib-pqc-ca)
+==> checking the source tree /root/rerun-stack-20261107/host/etc-pki-pqc-ca
+==> creating the layout
+==> copying (nothing in /root/rerun-stack-20261107/host/etc-pki-pqc-ca changes)
+==> verifying
+    15 file(s) match the manifest
+    index: 2 rows, 0 revoked; serial 1002; next CRL number 1001; last published intermediate CRL 1000
+==> forward done; /root/rerun-stack-20261107/host/etc-pki-pqc-ca is unchanged. Next: start the custodian on the new layout and check CRL N+1.
+==> retiring the old copies in /root/rerun-stack-20261107/host/etc-pki-pqc-ca (renamed, not deleted)
+    /root/rerun-stack-20261107/host/etc-pki-pqc-ca/intermediate.migrated-20261107T155630Z holds the old copy of the intermediate key: destroy it when the rollback window ends, and record that.
+
+==> PKI bootstrap complete.
+    Root CA      : C=BG, O=PQC-GW, OU=Certificate Authority Operations, CN=PQC-GW PQC Root CA G1
+    Intermediate : C=BG, O=PQC-GW, OU=M2M Certificate Issuing CA, CN=PQC-GW PQC Intermediate CA G1
+    Server cert  : C=BG, O=PQC-GW, OU=PQC-Gateway, CN=pqc-gw.local
+
+Next: scripts/generate-gateway-secrets.sh  (JWT signing key + control-plane HMAC)

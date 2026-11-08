@@ -1,0 +1,12 @@
+run	cn	serial	t0_unix	fresh_conn_refused_s	keepalive_refused_s	fresh_last_ok_s	keepalive_last_ok_s	A_requests	B_requests	revoke_resp
+b01	talk-rev-b01	1092	1793459104.114	nan	1.195	15.138	1.081	70	25	{"message":"Certificate 1092 revoked successfully; CRL regeneration signaled to 
+b02	talk-rev-b02	1093	1793459124.104	nan	1.258	15.021	1.156	71	27	{"message":"Certificate 1093 revoked successfully; CRL regeneration signaled to 
+b03	talk-rev-b03	1094	1793459143.840	nan	1.559	15.220	1.457	71	29	{"message":"Certificate 1094 revoked successfully; CRL regeneration signaled to 
+b04	talk-rev-b04	1095	1793459164.113	1.253	1.290	1.511	1.190	13	27	{"message":"Certificate 1095 revoked successfully; CRL regeneration signaled to 
+b05	talk-rev-b05	1096	1793459170.309	1.230	1.119	0.941	1.032	13	26	{"message":"Certificate 1096 revoked successfully; CRL regeneration signaled to 
+b06	talk-rev-b06	1097	1793459176.516	nan	nan	0	0	11	3	EXCLUDED probes not healthy before revoke; {"message":"Certificate 1097 revoked successfully;
+b07	talk-rev-b07	1098	1793459182.473	1.033	1.026	0.757	0.848	12	21	{"message":"Certificate 1098 revoked successfully; CRL regeneration signaled to 
+b08	talk-rev-b08	1099	1793459188.432	1.152	1.080	0.881	0.975	13	26	{"message":"Certificate 1099 revoked successfully; CRL regeneration signaled to 
+b09	talk-rev-b09	109A	1793459194.563	2.104	1.918	1.824	1.789	17	33	{"message":"Certificate 109A revoked successfully; CRL regeneration signaled to 
+b10	talk-rev-b10	109B	1793459201.638	nan	nan	0	0	16	3	EXCLUDED probes not healthy before revoke; {"message":"Certificate 109B revoked successfully;
+b15	talk-rev-b15	109C	1793459212.884	1.690	1.649	1.457	1.565	15	32	{"message":"Certificate 109C revoked successfully; CRL regeneration signaled to 

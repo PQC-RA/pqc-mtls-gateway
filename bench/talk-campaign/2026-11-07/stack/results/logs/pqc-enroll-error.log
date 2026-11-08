@@ -1,0 +1,1 @@
+2026/11/07 15:59:59 [error] 300#300: *680 limiting requests, excess: 3.625 by zone "pqc_enroll", client: 172.23.0.1, server: pqc-gw.local, request: "POST /enroll HTTP/2.0", host: "127.0.0.1:38443"

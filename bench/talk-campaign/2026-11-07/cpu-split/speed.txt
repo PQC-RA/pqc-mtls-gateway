@@ -1,0 +1,24 @@
+=== run 1 2026-11-07T17:07:26Z
+                              sign    verify    sign/s verify/s
+ 256 bits ecdsa (nistp256)   0.0000s   0.0001s  52255.9  17670.2
+                              op      op/s
+ 253 bits ecdh (X25519)   0.0000s  34723.4
+                 ML-KEM-768 0.000033s 0.000020s 0.000029s   30322.5   49990.9   34615.2
+                               keygen     signs    verify keygens/s    sign/s  verify/s
+                  ML-DSA-65 0.000164s 0.000816s 0.000155s    6083.0    1226.0    6458.8
+=== run 2 2026-11-07T17:08:11Z
+                              sign    verify    sign/s verify/s
+ 256 bits ecdsa (nistp256)   0.0000s   0.0001s  54615.5  17903.0
+                              op      op/s
+ 253 bits ecdh (X25519)   0.0000s  32361.0
+                 ML-KEM-768 0.000033s 0.000018s 0.000029s   30566.9   54322.5   34355.4
+                               keygen     signs    verify keygens/s    sign/s  verify/s
+                  ML-DSA-65 0.000165s 0.000896s 0.000157s    6043.1    1116.2    6355.4
+=== run 3 2026-11-07T17:08:56Z
+                              sign    verify    sign/s verify/s
+ 256 bits ecdsa (nistp256)   0.0000s   0.0001s  54173.8  17687.6
+                              op      op/s
+ 253 bits ecdh (X25519)   0.0000s  35656.0
+                 ML-KEM-768 0.000033s 0.000018s 0.000032s   30702.2   54637.6   31509.6
+                               keygen     signs    verify keygens/s    sign/s  verify/s
+                  ML-DSA-65 0.000165s 0.000827s 0.000158s    6060.2    1208.6    6312.2

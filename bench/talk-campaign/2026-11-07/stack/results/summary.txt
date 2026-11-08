@@ -1,0 +1,57 @@
+Throwaway stack rs1107 on the test stand (.27), public main 83a4f60, 2026-11-07. Client on the stand,
+loopback, no added delay, no netem. One clock (the stand's; containers share its kernel clock).
+Percentiles: linear interpolation (type 7). Times in ms unless stated.
+
+== 1. Enrollment, N = 30 devices (CN rs1107-dev-01..30, profile client-30d, ML-DSA-65) ==
+Device side: openssl 3.6.5 genpkey / req (one process each, start-up included).
+Request: curl 8.5.0 (libcurl on OpenSSL 3.6.5), POST /enroll on the enrollment port, timers from curl -w.
+                                                             n       min      p10   median      p90      max     mean
+key generation (genpkey ML-DSA-65)                          30       2.8      2.8      2.9      3.1      4.4      3.0  ms
+CSR (openssl req)                                           30       3.5      3.7      4.2      5.2      6.2      4.3  ms
+request: time_connect (TCP)                                 30       0.1      0.1      0.1      0.1      0.1      0.1  ms
+request: TLS handshake (appconnect - connect)               30       2.4      2.8      3.0      3.8      4.7      3.3  ms
+request: time_appconnect                                    30       2.5      2.9      3.1      3.9      4.8      3.3  ms
+request: after TLS (upload, API checks, signature, reply)   30      36.9     38.8     40.0     41.6     60.4     40.9  ms
+request: time_total                                         30      39.8     42.0     43.4     44.5     64.1     44.2  ms
+admin token call (curl time_total, mTLS :443)               30       9.1      9.5     18.5     20.7     22.1     17.0  ms
+Server side, same clock, from the request start (curl started):
+gateway $request_time for /enroll (nginx, ms resolution)    30      36.0     38.9     39.0     41.1     60.0     40.5  ms
+management-api logs "Received CSR signing request"          30       6.9      7.5      8.2      9.0     11.4      8.3  ms
+management-api audit token.reserve                          30      18.2     18.7     19.6     20.5     28.2     20.1  ms
+custodian logs "Signed certificate"                         30      35.0     35.8     37.3     38.5     52.2     38.0  ms
+management-api audit cert.enroll (done)                     30      41.2     43.2     44.4     46.3     66.7     45.6  ms
+API received -> custodian signed                            30      27.7     28.2     29.0     30.2     40.9     29.7  ms
+custodian signed -> reply complete at the device            30       8.2      8.9      9.7     11.2     18.5     10.1  ms
+(management-api line times are docker's receipt times of its stdout lines; the custodian and the
+ audit log carry their own millisecond timestamps.)
+
+== 2. Revocation, N = 30 certificates (30 with both probes healthy before T0; statistics over those) ==
+Schedule: seed 20261107; gaps uniform [5.0, 25.0] s between consecutive T0; warm-up 1.5 s; deadline 15.0 s
+Actual gaps between consecutive T0 (s): min 6.25, max 24.71; largest |actual - planned| 0.003 s
+T0 = immediately before the admin revoke call. Refusal time = end of the first request that started
+after T0 and was not answered 404. A = new connection per request (curl, back to back);
+B = one keep-alive connection, a GET every 50 ms (Python ssl).
+                                                             n       min      p10   median      p90      max     mean
+A, new connection per request: T0 -> first refusal          30     130.0    154.8    414.5    930.1   1066.0    512.2  ms
+B, open keep-alive connection: T0 -> first refusal          30     155.0    162.0    414.5    970.1   1066.0    527.8  ms
+A: T0 -> start of the refused request                       30     122.0    142.0    404.5    922.1   1046.0    500.8  ms
+B: T0 -> start of the refused request                       30     155.0    161.0    414.5    970.0   1065.0    527.1  ms
+A: T0 -> end of the last accepted request                   30     122.0    142.0    404.5    922.1   1046.0    500.8  ms
+B: T0 -> end of the last accepted request                   30     105.0    110.9    364.5    920.0   1015.0    476.9  ms
+revoke call: T0 -> reply at the admin client                30      85.8     91.0     96.8    124.8    148.4    104.3  ms
+T0 -> custodian logs "Revoked certificate" (index)          30      21.9     22.9     24.3     27.0     38.1     25.1  ms
+T0 -> custodian logs "Published intermediate CRL"           30      82.9     88.2     93.7    122.1    145.0    101.4  ms
+custodian: revoked -> CRL published                         30      60.0     63.8     69.0     96.0    113.0     76.3  ms
+T0 -> new CRL file on disk (mtime of the published file)    30      81.1     86.2     91.9    119.5    143.5     99.3  ms
+gateway $request_time of the revoke call                    30      79.0     82.9     90.0    115.0    138.0     96.1  ms
+CRL on disk -> A refused (gateway pick-up, 1 s poll)        30      16.4     60.9    312.9    827.2    976.4    412.9  ms
+CRL on disk -> B refused                                    30      41.4     68.1    312.9    867.3    976.4    428.4  ms
+T0 -> gateway reload-watcher reload (ssl_crl refreshed)     30     130.4    312.3   2551.3   4821.3   5129.7   2707.1  ms
+
+Refusal kinds (first refusal per run):
+  A  30 x  curl exit 92: curl: (92) HTTP/2 stream 1 was not closed cleanly: PROTOCOL_ERROR (err 1)
+  B  30 x  ConnectionError: closed by the gateway (EOF, no response); reconnect: ConnectionError: closed by the gateway (EOF, no response)
+Reload (ssl_crl refreshed) before the first refusal of A: 5 of 30 runs; B reconnects (a close answered 404 on reconnect): 0
+HTTP 400 (TLS-layer ssl_crl refusal) anywhere in the mTLS access log: 0; HTTP 444 (Lua per-request check, connection closed without a response): 355
+Revoke answers: 200 x 30
+CRL number before -> after, per run: 0x1002->0x1003 0x1003->0x1004 0x1004->0x1005 0x1005->0x1006 0x1006->0x1007 0x1007->0x1008 0x1008->0x1009 0x1009->0x100A 0x100A->0x100B 0x100B->0x100C 0x100C->0x100D 0x100D->0x100E 0x100E->0x100F 0x100F->0x1010 0x1010->0x1011 0x1011->0x1012 0x1012->0x1013 0x1013->0x1014 0x1014->0x1015 0x1015->0x1016 0x1016->0x1017 0x1017->0x1018 0x1018->0x1019 0x1019->0x101A 0x101A->0x101B 0x101B->0x101C 0x101C->0x101D 0x101D->0x101E 0x101E->0x101F 0x101F->0x1020
