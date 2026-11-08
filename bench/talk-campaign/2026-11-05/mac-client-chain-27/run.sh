@@ -2,7 +2,7 @@
 # Mac client chain against the test stand .27 (s_server, OpenSSL 3.6.5, tickets off), 2026-11-05.
 # Delay only on the test server's packets (sport 44330) on .27; arms interleaved; N per arm per phase.
 cd "$(dirname "$0")"; CURL=/opt/homebrew/opt/curl/bin/curl; N=${N:-20}
-H=203.0.113.27; S="ssh -o BatchMode=yes root@$H"
+H=192.168.1.27; S="ssh -o BatchMode=yes root@$H"
 setdelay() { $S "tc qdisc del dev eth0 root 2>/dev/null; if [ $1 -gt 0 ]; then tc qdisc add dev eth0 root handle 1: prio && tc qdisc add dev eth0 parent 1:3 handle 30: netem delay ${1}ms && tc filter add dev eth0 protocol ip parent 1:0 prio 1 u32 match ip sport 44330 0xffff flowid 1:3; fi; tc qdisc show dev eth0 | head -2"; }
 arm() { case $1 in
   leaf) $CURL -s -k --cert arm-leaf.pem --key mac.key https://$H:44330/x -o /dev/null -w "%{http_code}\t%{time_connect}\t%{time_appconnect}\t%{time_starttransfer}" ;;

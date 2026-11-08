@@ -36,7 +36,7 @@ basicConstraints=critical,CA:FALSE
 keyUsage=critical,digitalSignature
 extendedKeyUsage=serverAuth
 certificatePolicies=@pol_srv
-subjectAltName=DNS:pqc-gw.local,DNS:qs-cap.local,DNS:api.qs-cap.bg,DNS:localhost,IP:127.0.0.1,IP:203.0.113.99
+subjectAltName=DNS:pqc-gw.local,DNS:qs-cap.local,DNS:api.qs-cap.bg,DNS:localhost,IP:127.0.0.1,IP:192.168.1.99
 crlDistributionPoints=URI:http://crl.pqc-gw.local/intermediate-ca.crl
 authorityInfoAccess=OCSP;URI:http://ocsp.pqc-gw.local,caIssuers;URI:http://crt.pqc-gw.local/intermediate-ca.crt
 [pol_srv]

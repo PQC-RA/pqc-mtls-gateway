@@ -1,4 +1,4 @@
-# start 2026-11-08T13:23:23Z on gateway-host (203.0.113.99), against the live gateway 203.0.113.99; end 2026-11-08T13:23:26Z
+# start 2026-11-08T13:23:23Z on gateway-host (192.168.1.99), against the live gateway 192.168.1.99; end 2026-11-08T13:23:26Z
 client	test	result
 curlimages/curl	8443 (verifies the gateway, no -k)	curl_user 404 exit=0 ssl_verify=0
 curlimages/curl	443-mTLS	curl_user 404 exit=0 ssl_verify=0

@@ -1,5 +1,5 @@
 ==> Bootstrapping PQC PKI (ML-DSA-65) at /root/rerun-stack-20261107/host/etc-pki-pqc-ca (server certs at /root/rerun-stack-20261107/host/etc-ssl-pqc)
-    Server cert SAN will include IP: 203.0.113.27
+    Server cert SAN will include IP: 192.168.1.27
 ==> Root CA
 ==> Intermediate CA
 Using configuration from /root/rerun-stack-20261107/host/etc-pki-pqc-ca/root/openssl-root.cnf
@@ -28,14 +28,14 @@ Certificate is to be certified until Nov  7 15:56:30 2027 GMT (365 days)
 Write out database with 1 new entries
 Database updated
 ==> Enrollment classical server certificate (:8443)
-==> Enrollment classical CA + leaf (ECDSA P-256); leaf SAN IP: 203.0.113.27
+==> Enrollment classical CA + leaf (ECDSA P-256); leaf SAN IP: 192.168.1.27
 Certificate request self-signature ok
 subject=C=BG, O=PQC-GW, OU=Enroll-Bootstrap, CN=pqc-gw.local
     Leaf : /root/rerun-stack-20261107/host/etc-ssl-pqc/enroll-classical.crt
     CA   : /root/rerun-stack-20261107/host/etc-pki-pqc-ca/enroll-classical-ca.crt  (import into the operator's browser trust store to reach :8443)
     subject=C=BG, O=PQC-GW, OU=Enroll-Bootstrap, CN=pqc-gw.local
     X509v3 Subject Alternative Name: 
-        DNS:pqc-gw.local, DNS:localhost, IP Address:127.0.0.1, IP Address:203.0.113.27
+        DNS:pqc-gw.local, DNS:localhost, IP Address:127.0.0.1, IP Address:192.168.1.27
 ==> OCSP responder certificate
 ==> OCSP responder key /root/rerun-stack-20261107/host/etc-pki-pqc-ca/ocsp/ocsp-pq.key: 640 root:1002 (readable by the ocsp-pq container's gid)
 Using configuration from /root/rerun-stack-20261107/host/etc-pki-pqc-ca/intermediate/openssl-intermediate.cnf

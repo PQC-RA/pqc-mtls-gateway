@@ -1,6 +1,6 @@
 # Re-measurement, 4 Nov 2026 (07:50–08:35 UTC)
 
-Gateway host (203.0.113.99 in these files), live repo HEAD 83a4f60 (after the ADR-024 CA-layout cut-over), OpenSSL 3.6.5, OpenResty 1.31.8.1.
+Gateway host (192.168.1.99 in these files), live repo HEAD 83a4f60 (after the ADR-024 CA-layout cut-over), OpenSSL 3.6.5, OpenResty 1.31.8.1.
 Device: MacBook, Homebrew OpenSSL 3.6.2 / curl 8.21. The real VPN RTT today is ~6 ms (31 Oct: ~34 ms), so RTT-dependent tests were run
 at ~6 ms (real) and at ~34 ms and ~70 ms (tc netem on the gateway's eth0, egress to the Mac's IP only, removed afterwards).
 

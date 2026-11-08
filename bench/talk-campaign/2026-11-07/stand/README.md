@@ -43,6 +43,3 @@ verified, SNI sent, one HTTP request after the handshake.
 
 The capture's timestamps are taken on loopback after the delay, so only client-to-server packets are used for
 timing. Private keys were deleted on the stand after the run; none is here.
-
-Not included: the three server certificates (`pki/*/server.crt`), because they name a lab host; `mkpki.sh`
-regenerates certificates of the same size (post-quantum 6,107 B, classical 981 B).
