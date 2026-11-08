@@ -1,0 +1,12 @@
+Using configuration from /root/rerun-stack-20261107/host/var-lib-pqc-ca/state/openssl-intermediate.cnf
+Check that the request matches the signature
+Signature ok
+The Subject's Distinguished Name is as follows
+countryName           :PRINTABLE:'BG'
+organizationName      :ASN.1 12:'PQC-GW'
+organizationalUnitName:ASN.1 12:'Admin'
+commonName            :ASN.1 12:'gateway-admin'
+Certificate is to be certified until Nov  7 15:56:30 2027 GMT (365 days)
+
+Write out database with 1 new entries
+Database updated

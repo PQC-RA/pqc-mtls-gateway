@@ -1,0 +1,16 @@
+2026-11-07T18:14:42Z setup-pki.sh
+2026-11-07T18:14:43Z admin certificate issued, sha256 42e40ca0ee7ea4d5...
+2026-11-07T18:14:43Z generate-gateway-secrets.sh
+secrets: all files named by docker-compose.yml are present
+2026-11-07T18:14:43Z building images
+2026-11-07T18:14:51Z pulling ghcr.io/pqc-ra/pqc-mtls-management-api@sha256:7787047a71a85e758abea267f69b062d48a366ebce1b5c73bb45244883f276d4
+2026-11-07T18:14:57Z compose up
+2026-11-07T18:15:05Z stack rs1107 healthy
+NAME                      IMAGE                                                                                                            COMMAND                  SERVICE            CREATED         STATUS                            PORTS
+pqc-ca-custodian          rs1107-ca-custodian:83a4f60                                                                                      "node custodian.js"      pqc-ca-custodian   7 seconds ago   Up 7 seconds (healthy)            8091/tcp
+pqc-gateway               rs1107-gateway:83a4f60                                                                                           "/usr/local/bin/entr…"   gateway            7 seconds ago   Up 3 seconds (healthy)            80/tcp, 8081/tcp, 127.0.0.1:39443->443/tcp, 127.0.0.1:38443->8443/tcp
+pqc-mtls-management-api   ghcr.io/pqc-ra/pqc-mtls-management-api@sha256:7787047a71a85e758abea267f69b062d48a366ebce1b5c73bb45244883f276d4   "node dist/main.js"      management-api     7 seconds ago   Up 4 seconds (healthy)            127.0.0.1:33000->3000/tcp
+pqc-ocsp-pq               rs1107-ocsp-pq:83a4f60                                                                                           "/opt/openssl/bin/op…"   ocsp-pq            7 seconds ago   Up 6 seconds (health: starting)   9080/tcp
+pqc-pki-dist              rs1107-pki-dist:83a4f60                                                                                          "nginx -g 'daemon of…"   pki-dist           7 seconds ago   Up 7 seconds (healthy)            80/tcp, 8090/tcp
+pqc-redis                 redis:7.4-alpine@sha256:6ab0b6e7381779332f97b8ca76193e45b0756f38d4c0dcda72dbb3c32061ab99                         "docker-entrypoint.s…"   redis              7 seconds ago   Up 6 seconds (healthy)            6379/tcp
+pqc-shadow-mock           nginx:alpine@sha256:4a73073bd557c65b759505da037898b61f1be6cbcc3c2c3aeac22d2a470c1752                             "/docker-entrypoint.…"   shadow-mock        7 seconds ago   Up 6 seconds                      80/tcp

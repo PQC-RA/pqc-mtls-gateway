@@ -1,0 +1,9 @@
+verify depth is 2, must return a certificate
+Using default temp DH parameters
+ACCEPT
+depth=2 C=BG, O=QS-CAP, OU=Certificate Authority Operations, CN=QS-CAP PQC Root CA G1
+verify return:1
+depth=1 C=BG, O=QS-CAP, OU=M2M Certificate Issuing CA, CN=QS-CAP PQC Intermediate CA G1
+verify return:1
+depth=0 CN=rerun-classical1
+verify return:1

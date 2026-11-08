@@ -9,7 +9,10 @@ MacBook device (Homebrew OpenSSL 3.6.2, curl 8.21) over a VPN.
 |---|---|---|
 | `2026-10-31/` | First campaign: live enrollment, hostile CSRs, sizes, issuance, bytes, CPU, latency, staple, header buffer, ECDSA leaf under a PQ CA, renewal (7 min), revocation (20 devices), client matrix. Its own `README.md` maps slides to files. | 086e235 |
 | `2026-11-03/` | Additions after an audit: classical client on the live gateway, issuance (two runs of 50), client leaf versus full chain, loopback arms, revocation after the custodian changes. | 086e235 / branch builds |
-| `2026-11-04/` | Full re-measurement after the ADR-024 cut-over, plus renewal semantics, expiry on an open connection, the 2x2 enforcement matrix and the issuance test with the key-type check removed. `RESULTS.md` compares every figure with the slide. | 83a4f60 |
+| `2026-11-04/` | Full re-measurement after the ADR-024 cut-over, plus renewal semantics, expiry on an open connection, the 2x2 enforcement matrix and the issuance test with the key-type check removed. `RESULTS.md` compares every figure with the slide; server-side files added later are in `server/`. | 83a4f60 |
+| `2026-11-05/` | Three checks: CPU per handshake with matched arms, a Mac client's full chain against the test stand, Java 25 and 27 against the live gateway. | 83a4f60 |
+| `2026-11-07/` | Re-measurement on the test stand with the live certificate profile (`stand/`); enrollment and revocation on a throwaway stack, with the `ssl_crl` backstop check (`stack/`); where the CPU goes and the header size (`cpu-split/`). | 83a4f60 (stack); stand image from 11a5422 |
+| `2026-11-08/` | Client re-check against the live gateway: Linux curl over mutual TLS and Java 21 (`clients/`), and why the 4 Nov curl row says `000`. | 83a4f60 |
 | `tools/` | Enrollment, revocation timing, renewal probe, matrix and issuance drivers (4 Nov versions). `tools/2026-10-31-original/` holds the first versions. `build-test8b-openssl.sh` builds the test-only patched OpenSSL client. | |
 
 ## Conditions to know before quoting a number

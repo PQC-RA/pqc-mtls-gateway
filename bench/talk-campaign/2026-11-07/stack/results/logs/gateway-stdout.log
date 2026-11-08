@@ -1,0 +1,80 @@
+2026-11-07T15:56:42.159614317Z Starting OpenResty PQ-TLS Gateway...
+2026-11-07T15:56:42.186176087Z writing RSA key
+2026-11-07T15:56:42.189223613Z writing RSA key
+2026-11-07T15:56:42.193681510Z   backend-v1: n length 256 bytes (2048 bits), e=65537
+2026-11-07T15:56:42.193688530Z   lookup-v1: n length 256 bytes (2048 bits), e=65537
+2026-11-07T15:56:42.193689994Z   admin-v2: ML-DSA-65, pub 1952 bytes, sha256 b394a828670aff514f4517ad51b8f82af0411019fa593f33e887e6277a1dfa86
+2026-11-07T15:56:42.193691316Z JWKS written to /tmp/jwks.json (3 key(s))
+2026-11-07T15:56:42.197421245Z Admin token signer: admin-v2; admin kids in the JWKS: admin-v2
+2026-11-07T15:56:42.197429682Z JWKS generated at /tmp/jwks.json
+2026-11-07T15:56:42.233118338Z nginx: [emerg] host not found in upstream "management-api" in /etc/nginx/nginx.conf:530
+2026-11-07T15:56:42.765116818Z Starting OpenResty PQ-TLS Gateway...
+2026-11-07T15:56:42.786907473Z writing RSA key
+2026-11-07T15:56:42.789357970Z writing RSA key
+2026-11-07T15:56:42.792546004Z   backend-v1: n length 256 bytes (2048 bits), e=65537
+2026-11-07T15:56:42.792552343Z   lookup-v1: n length 256 bytes (2048 bits), e=65537
+2026-11-07T15:56:42.792553939Z   admin-v2: ML-DSA-65, pub 1952 bytes, sha256 b394a828670aff514f4517ad51b8f82af0411019fa593f33e887e6277a1dfa86
+2026-11-07T15:56:42.792555372Z JWKS written to /tmp/jwks.json (3 key(s))
+2026-11-07T15:56:42.795365374Z Admin token signer: admin-v2; admin kids in the JWKS: admin-v2
+2026-11-07T15:56:42.795371950Z JWKS generated at /tmp/jwks.json
+2026-11-07T15:56:42.801128740Z nginx: [emerg] host not found in upstream "management-api" in /etc/nginx/nginx.conf:530
+2026-11-07T15:56:43.322108766Z Starting OpenResty PQ-TLS Gateway...
+2026-11-07T15:56:43.345538562Z writing RSA key
+2026-11-07T15:56:43.348513622Z writing RSA key
+2026-11-07T15:56:43.352122571Z   backend-v1: n length 256 bytes (2048 bits), e=65537
+2026-11-07T15:56:43.352132083Z   lookup-v1: n length 256 bytes (2048 bits), e=65537
+2026-11-07T15:56:43.352133927Z   admin-v2: ML-DSA-65, pub 1952 bytes, sha256 b394a828670aff514f4517ad51b8f82af0411019fa593f33e887e6277a1dfa86
+2026-11-07T15:56:43.352135597Z JWKS written to /tmp/jwks.json (3 key(s))
+2026-11-07T15:56:43.355551879Z Admin token signer: admin-v2; admin kids in the JWKS: admin-v2
+2026-11-07T15:56:43.355561443Z JWKS generated at /tmp/jwks.json
+2026-11-07T15:56:43.361742999Z nginx: [emerg] host not found in upstream "management-api" in /etc/nginx/nginx.conf:530
+2026-11-07T15:56:43.907910209Z Starting OpenResty PQ-TLS Gateway...
+2026-11-07T15:56:43.937026740Z writing RSA key
+2026-11-07T15:56:43.940800062Z writing RSA key
+2026-11-07T15:56:43.945203562Z   backend-v1: n length 256 bytes (2048 bits), e=65537
+2026-11-07T15:56:43.945212898Z   lookup-v1: n length 256 bytes (2048 bits), e=65537
+2026-11-07T15:56:43.945222546Z   admin-v2: ML-DSA-65, pub 1952 bytes, sha256 b394a828670aff514f4517ad51b8f82af0411019fa593f33e887e6277a1dfa86
+2026-11-07T15:56:43.945224434Z JWKS written to /tmp/jwks.json (3 key(s))
+2026-11-07T15:56:43.949221051Z Admin token signer: admin-v2; admin kids in the JWKS: admin-v2
+2026-11-07T15:56:43.949232243Z JWKS generated at /tmp/jwks.json
+2026-11-07T15:56:43.956174234Z nginx: [emerg] host not found in upstream "management-api" in /etc/nginx/nginx.conf:530
+2026-11-07T15:56:44.996704862Z Starting OpenResty PQ-TLS Gateway...
+2026-11-07T15:56:45.018803662Z writing RSA key
+2026-11-07T15:56:45.021375482Z writing RSA key
+2026-11-07T15:56:45.024671756Z   backend-v1: n length 256 bytes (2048 bits), e=65537
+2026-11-07T15:56:45.024674556Z   lookup-v1: n length 256 bytes (2048 bits), e=65537
+2026-11-07T15:56:45.024676150Z   admin-v2: ML-DSA-65, pub 1952 bytes, sha256 b394a828670aff514f4517ad51b8f82af0411019fa593f33e887e6277a1dfa86
+2026-11-07T15:56:45.024677764Z JWKS written to /tmp/jwks.json (3 key(s))
+2026-11-07T15:56:45.028106695Z Admin token signer: admin-v2; admin kids in the JWKS: admin-v2
+2026-11-07T15:56:45.028117718Z JWKS generated at /tmp/jwks.json
+2026-11-07T15:59:26.104427306Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:07:01.283840415Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:07:21.304555046Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:07:31.322308248Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:07:56.344405991Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:08:01.365564921Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:08:21.385988906Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:08:26.408603106Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:08:36.430523141Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:08:46.447210726Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:09:01.466346868Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:09:06.483065211Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:09:16.500842906Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:09:21.516292513Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:09:46.538020354Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:09:56.555161467Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:10:06.573238062Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:10:16.589151694Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:10:26.605927570Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:10:46.625833595Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:11:01.643902396Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:11:16.663065317Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:11:41.685272796Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:12:01.705789578Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:12:21.727636708Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:12:26.744310857Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:12:46.765258064Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:13:06.785171750Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:13:11.801254095Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:13:36.823163690Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded
+2026-11-07T16:13:41.838559522Z [reload-watcher] /etc/pki/pqc-ca/hybrid-combined-crl.pem changed: nginx reloaded

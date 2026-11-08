@@ -1,0 +1,4 @@
+verify depth is 2, must return a certificate
+Using default temp DH parameters
+ACCEPT
+80AB3E091A780000:error:0A0000C7:SSL routines:tls_process_client_certificate:peer did not return a certificate:ssl/statem/statem_srvr.c:3915:

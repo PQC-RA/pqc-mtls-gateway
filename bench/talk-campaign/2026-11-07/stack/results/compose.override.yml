@@ -1,0 +1,54 @@
+# Throwaway stack rs1107 from 83a4f60 (tools/bringup.sh). Every list is !override.
+name: rs1107
+services:
+ gateway:
+  image: rs1107-gateway:83a4f60
+  ports: !override
+   - "127.0.0.1:39443:443"
+   - "127.0.0.1:38443:8443"
+  volumes: !override
+   - /root/rerun-stack-20261107/host/var-lib-pqc-ca-public:/etc/pki/pqc-ca:ro
+   - /root/rerun-stack-20261107/host/etc-pki-pqc-trust:/etc/pki/pqc-trust:ro
+   - /root/rerun-stack-20261107/host/etc-ssl-pqc:/etc/ssl/pqc:ro
+   - ./config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+   - ./config/nginx/security-headers.conf:/etc/nginx/security-headers.conf:ro
+   - ./config/nginx/lua:/etc/nginx/lua:ro
+   - ./config/nginx/migration:/etc/nginx/migration:ro
+   - ./config/nginx/stream:/etc/nginx/stream:ro
+   - ./config/enroll-ui:/etc/nginx/enroll-ui:ro
+   - ./docker/gateway/entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
+   - ./secrets/enroll-hmac.key:/run/secrets/enroll-hmac:ro
+   - ./secrets/renew-hmac.key:/run/secrets/renew-hmac:ro
+   - pqc-logs-audit:/var/log/pqc-gw:rw
+   - pqc-routes-cache:/var/cache/pqc-gw/routes:rw
+   - pqc-logs-nginx:/var/log/nginx:rw
+ ocsp-pq:
+  image: rs1107-ocsp-pq:83a4f60
+  volumes: !override
+   - /root/rerun-stack-20261107/host/var-lib-pqc-ocsp:/var/lib/pqc-ocsp:ro
+   - /root/rerun-stack-20261107/host/var-lib-pqc-ca-status:/var/lib/pqc-ca-status:ro
+   - /root/rerun-stack-20261107/host/var-lib-pqc-ca-public:/var/lib/pqc-ca-public:ro
+ pki-dist:
+  image: rs1107-pki-dist:83a4f60
+  volumes: !override
+   - /root/rerun-stack-20261107/host/var-lib-pqc-ca-public:/var/www/pki:ro
+ pqc-ca-custodian:
+  image: rs1107-ca-custodian:83a4f60
+  volumes: !override
+   - /root/rerun-stack-20261107/host/var-lib-pqc-ca/key:/var/lib/pqc-ca/key:ro
+   - /root/rerun-stack-20261107/host/var-lib-pqc-ca/state:/var/lib/pqc-ca/state:rw
+   - /root/rerun-stack-20261107/host/var-lib-pqc-ca/inbox:/var/lib/pqc-ca/inbox:ro
+   - /root/rerun-stack-20261107/host/var-lib-pqc-ca-public:/var/lib/pqc-ca-public:rw
+   - /root/rerun-stack-20261107/host/var-lib-pqc-ca-status:/var/lib/pqc-ca-status:rw
+   - ./secrets/custodian-hmac.key:/run/secrets/custodian-hmac:ro
+ management-api:
+  ports: !override
+   - "127.0.0.1:33000:3000"
+  volumes: !override
+   - pqc-mgmt-data:/var/lib/pqc-mgmt:rw
+   - pqc-logs-audit:/var/log/pqc-gw:ro
+   - ./secrets/control-plane-hmac.key:/run/secrets/control-plane-hmac:ro
+   - ./secrets/custodian-hmac.key:/run/secrets/custodian-hmac:ro
+   - ./secrets/enroll-hmac.key:/run/secrets/enroll-hmac:ro
+   - ./secrets/renew-hmac.key:/run/secrets/renew-hmac:ro
+   - /root/rerun-stack-20261107/host/etc-pki-pqc-trust:/etc/pki/pqc-trust:ro

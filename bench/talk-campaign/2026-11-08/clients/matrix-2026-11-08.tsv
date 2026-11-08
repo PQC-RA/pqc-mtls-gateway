@@ -1,0 +1,9 @@
+# start 2026-11-08T13:23:23Z on gateway-host (203.0.113.99), against the live gateway 203.0.113.99; end 2026-11-08T13:23:26Z
+client	test	result
+curlimages/curl	8443 (verifies the gateway, no -k)	curl_user 404 exit=0 ssl_verify=0
+curlimages/curl	443-mTLS	curl_user 404 exit=0 ssl_verify=0
+host java	8443	FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 21.0.11
+host java	443	FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 21.0.11
+eclipse-temurin:21-jdk	8443	FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 21.0.12.1
+eclipse-temurin:21-jdk	443	FAIL SSLHandshakeException: (handshake_failure) Received fatal alert: handshake_failure java 21.0.12.1
+# curl: curl 8.21.0 (x86_64-pc-linux-musl) libcurl/8.21.0 OpenSSL/3.5.7 zlib/1.3.2 brotli/1.2.0 zstd/1.5.7 libidn2/2.3.8 libpsl/0.21.5 libssh2/1.11.1 nghttp2/1.69.0 mit-krb5/1.22.2

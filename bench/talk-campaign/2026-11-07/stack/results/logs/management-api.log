@@ -1,0 +1,404 @@
+2026-11-07T15:56:45.484821446Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [NestFactory] Starting Nest application...
+2026-11-07T15:56:45.517379790Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [InstanceLoader] OpenTelemetryModule dependencies initialized +33ms
+2026-11-07T15:56:45.518574275Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [JwtAuthGuard] Admin token kids accepted: admin-v2
+2026-11-07T15:56:45.518738568Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [InstanceLoader] OpenTelemetryCoreModule dependencies initialized +0ms
+2026-11-07T15:56:45.518955042Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [InstanceLoader] IdentityModule dependencies initialized +0ms
+2026-11-07T15:56:45.519421743Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [InstanceLoader] CrlModule dependencies initialized +1ms
+2026-11-07T15:56:45.519429475Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [InstanceLoader] TerminusModule dependencies initialized +0ms
+2026-11-07T15:56:45.519431162Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [InstanceLoader] PolicyModule dependencies initialized +0ms
+2026-11-07T15:56:45.519432535Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [InstanceLoader] AuditModule dependencies initialized +0ms
+2026-11-07T15:56:45.519546452Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [InstanceLoader] AdminAuditModule dependencies initialized +0ms
+2026-11-07T15:56:45.519548746Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [InstanceLoader] AppModule dependencies initialized +0ms
+2026-11-07T15:56:45.519789886Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [InstanceLoader] HealthModule dependencies initialized +0ms
+2026-11-07T15:56:45.519791585Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [InstanceLoader] CertLookupModule dependencies initialized +0ms
+2026-11-07T15:56:45.519911191Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [InstanceLoader] MonitoringModule dependencies initialized +0ms
+2026-11-07T15:56:45.519962574Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [InstanceLoader] CertsModule dependencies initialized +0ms
+2026-11-07T15:56:45.519996490Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [InstanceLoader] RenewModule dependencies initialized +0ms
+2026-11-07T15:56:45.524457466Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RoutesResolver] CertsController {/api/admin/certs}: +5ms
+2026-11-07T15:56:45.526575719Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/certs, GET} route +2ms
+2026-11-07T15:56:45.526811049Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/certs/expiring, GET} route +0ms
+2026-11-07T15:56:45.527201391Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/certs/enrollment-tokens, POST} route +1ms
+2026-11-07T15:56:45.527404307Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/certs/enrollment-tokens, GET} route +0ms
+2026-11-07T15:56:45.527807284Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/certs/enrollment-tokens/:token, DELETE} route +0ms
+2026-11-07T15:56:45.527943865Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/certs/:serial, GET} route +0ms
+2026-11-07T15:56:45.528120434Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/certs/validate-csr, POST} route +1ms
+2026-11-07T15:56:45.528355652Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/certs/sign, POST} route +0ms
+2026-11-07T15:56:45.528910025Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/certs/revoke, POST} route +0ms
+2026-11-07T15:56:45.528949598Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RoutesResolver] CrlController {/api/admin/crl}: +0ms
+2026-11-07T15:56:45.529205220Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/crl, GET} route +1ms
+2026-11-07T15:56:45.529353577Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/crl/renew, POST} route +0ms
+2026-11-07T15:56:45.529382176Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RoutesResolver] HealthController {/api/admin/health}: +0ms
+2026-11-07T15:56:45.529556557Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/health, GET} route +0ms
+2026-11-07T15:56:45.529582644Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RoutesResolver] PolicyController {/api/admin/policy}: +0ms
+2026-11-07T15:56:45.529735016Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/policy/routes, GET} route +0ms
+2026-11-07T15:56:45.529862274Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/policy/routes, POST} route +0ms
+2026-11-07T15:56:45.529992156Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/policy/routes/:cn, GET} route +0ms
+2026-11-07T15:56:45.530156780Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/policy/routes/:cn, PUT} route +1ms
+2026-11-07T15:56:45.530335888Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/policy/routes/:cn, DELETE} route +0ms
+2026-11-07T15:56:45.530464129Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/policy/orgs, GET} route +0ms
+2026-11-07T15:56:45.530587862Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/policy/orgs/:orgId, GET} route +0ms
+2026-11-07T15:56:45.530706132Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/policy/orgs/:orgId, PUT} route +0ms
+2026-11-07T15:56:45.530824739Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/policy/orgs/:orgId, DELETE} route +0ms
+2026-11-07T15:56:45.530868127Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RoutesResolver] AuditController {/api/admin/audit}: +0ms
+2026-11-07T15:56:45.531014026Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/audit/logs, GET} route +0ms
+2026-11-07T15:56:45.531049373Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RoutesResolver] MonitoringController {/api/admin/metrics}: +1ms
+2026-11-07T15:56:45.531218237Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/metrics, GET} route +0ms
+2026-11-07T15:56:45.531223803Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RoutesResolver] AdminAuditController {/api/admin/audit}: +0ms
+2026-11-07T15:56:45.531363055Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/audit/admin-actions, GET} route +0ms
+2026-11-07T15:56:45.531375873Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RoutesResolver] WhoamiController {/api/admin}: +0ms
+2026-11-07T15:56:45.531516234Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/admin/whoami, GET} route +0ms
+2026-11-07T15:56:45.531573436Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RoutesResolver] CertLookupController {/api/certs}: +0ms
+2026-11-07T15:56:45.532042342Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/certs/by-fingerprint/:fpr, GET} route +1ms
+2026-11-07T15:56:45.532128240Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RoutesResolver] RenewController {/api/renew}: +0ms
+2026-11-07T15:56:45.532291114Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [RouterExplorer] Mapped {/api/renew, POST} route +0ms
+2026-11-07T15:56:45.534755098Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [NestApplication] Nest application successfully started +2ms
+2026-11-07T15:56:45.537444662Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [Bootstrap] Management API listening at http://127.0.0.1:3000/api
+2026-11-07T15:56:45.543569141Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [TokenStoreService] Connected to Redis token store
+2026-11-07T15:56:45.544138657Z [Nest] 1  - 11/07/2026, 3:56:45 PM     LOG [PolicyService] Connected to Redis routing policy store
+2026-11-07T15:56:45.548331035Z [Nest] 1  - 11/07/2026, 3:56:45 PM    WARN [PolicyService] No routing policy persisted in Redis; skipping startup republish so the gateway keeps the routes it reloaded from its own store
+2026-11-07T15:56:46.519896583Z [Nest] 1  - 11/07/2026, 3:56:46 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T15:57:16.551597186Z [Nest] 1  - 11/07/2026, 3:57:16 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T15:57:46.579655039Z [Nest] 1  - 11/07/2026, 3:57:46 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T15:58:16.607041483Z [Nest] 1  - 11/07/2026, 3:58:16 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T15:58:34.343612481Z [Nest] 1  - 11/07/2026, 3:58:34 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067174
+2026-11-07T15:58:34.347558437Z [Nest] 1  - 11/07/2026, 3:58:34 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-smoke-1, profile=client-30d)
+2026-11-07T15:58:34.385573427Z [Nest] 1  - 11/07/2026, 3:58:34 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T15:58:34.399491408Z [Nest] 1  - 11/07/2026, 3:58:34 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T15:58:34.444882452Z [Nest] 1  - 11/07/2026, 3:58:34 PM     LOG [CertsService] Certificate signed: serial=1003, expires=2026-12-07T15:58:34.000Z
+2026-11-07T15:58:46.634848584Z [Nest] 1  - 11/07/2026, 3:58:46 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T15:59:16.662824823Z [Nest] 1  - 11/07/2026, 3:59:16 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T15:59:23.905449377Z [Nest] 1  - 11/07/2026, 3:59:23 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067223
+2026-11-07T15:59:23.906961323Z [Nest] 1  - 11/07/2026, 3:59:23 PM     LOG [CertsService] Revoking certificate with serial: 1003, reason: cessationOfOperation
+2026-11-07T15:59:23.907076078Z [Nest] 1  - 11/07/2026, 3:59:23 PM     LOG [CertsService] Fetching certificate with serial: 1003 (normalized: 1003)
+2026-11-07T15:59:23.907162261Z [Nest] 1  - 11/07/2026, 3:59:23 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T15:59:23.911068725Z [Nest] 1  - 11/07/2026, 3:59:23 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-TDvZXk/index.txt
+2026-11-07T15:59:46.690636904Z [Nest] 1  - 11/07/2026, 3:59:46 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T15:59:54.650399517Z [Nest] 1  - 11/07/2026, 3:59:54 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067254
+2026-11-07T15:59:54.651906690Z [Nest] 1  - 11/07/2026, 3:59:54 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-01, profile=client-30d)
+2026-11-07T15:59:54.681850489Z [Nest] 1  - 11/07/2026, 3:59:54 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T15:59:54.690087323Z [Nest] 1  - 11/07/2026, 3:59:54 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T15:59:54.720252019Z [Nest] 1  - 11/07/2026, 3:59:54 PM     LOG [CertsService] Certificate signed: serial=1004, expires=2026-12-07T15:59:54.000Z
+2026-11-07T15:59:55.777515683Z [Nest] 1  - 11/07/2026, 3:59:55 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067255
+2026-11-07T15:59:55.778966015Z [Nest] 1  - 11/07/2026, 3:59:55 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-02, profile=client-30d)
+2026-11-07T15:59:55.809051371Z [Nest] 1  - 11/07/2026, 3:59:55 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T15:59:55.817269010Z [Nest] 1  - 11/07/2026, 3:59:55 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T15:59:55.845415346Z [Nest] 1  - 11/07/2026, 3:59:55 PM     LOG [CertsService] Certificate signed: serial=1005, expires=2026-12-07T15:59:55.000Z
+2026-11-07T15:59:56.902510719Z [Nest] 1  - 11/07/2026, 3:59:56 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067256
+2026-11-07T15:59:56.912785762Z [Nest] 1  - 11/07/2026, 3:59:56 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-03, profile=client-30d)
+2026-11-07T15:59:56.944687944Z [Nest] 1  - 11/07/2026, 3:59:56 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T15:59:56.952954028Z [Nest] 1  - 11/07/2026, 3:59:56 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T15:59:56.980814545Z [Nest] 1  - 11/07/2026, 3:59:56 PM     LOG [CertsService] Certificate signed: serial=1006, expires=2026-12-07T15:59:56.000Z
+2026-11-07T15:59:58.039800194Z [Nest] 1  - 11/07/2026, 3:59:58 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067258
+2026-11-07T15:59:58.050289954Z [Nest] 1  - 11/07/2026, 3:59:58 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-04, profile=client-30d)
+2026-11-07T15:59:58.082271541Z [Nest] 1  - 11/07/2026, 3:59:58 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T15:59:58.090786654Z [Nest] 1  - 11/07/2026, 3:59:58 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T15:59:58.118082470Z [Nest] 1  - 11/07/2026, 3:59:58 PM     LOG [CertsService] Certificate signed: serial=1007, expires=2026-12-07T15:59:58.000Z
+2026-11-07T15:59:59.176110167Z [Nest] 1  - 11/07/2026, 3:59:59 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067259
+2026-11-07T15:59:59.186582511Z [Nest] 1  - 11/07/2026, 3:59:59 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-05, profile=client-30d)
+2026-11-07T16:00:16.718690972Z [Nest] 1  - 11/07/2026, 4:00:16 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:00:46.751141483Z [Nest] 1  - 11/07/2026, 4:00:46 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:01:16.779940941Z [Nest] 1  - 11/07/2026, 4:01:16 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:01:27.106099164Z [Nest] 1  - 11/07/2026, 4:01:27 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067347
+2026-11-07T16:01:27.107054418Z [Nest] 1  - 11/07/2026, 4:01:27 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-05, profile=client-30d)
+2026-11-07T16:01:27.139268098Z [Nest] 1  - 11/07/2026, 4:01:27 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:01:27.147744952Z [Nest] 1  - 11/07/2026, 4:01:27 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:01:27.176457368Z [Nest] 1  - 11/07/2026, 4:01:27 PM     LOG [CertsService] Certificate signed: serial=1008, expires=2026-12-07T16:01:27.000Z
+2026-11-07T16:01:40.148234429Z [Nest] 1  - 11/07/2026, 4:01:40 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067360
+2026-11-07T16:01:40.148959302Z [Nest] 1  - 11/07/2026, 4:01:40 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-06, profile=client-30d)
+2026-11-07T16:01:40.179740716Z [Nest] 1  - 11/07/2026, 4:01:40 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:01:40.188510332Z [Nest] 1  - 11/07/2026, 4:01:40 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:01:40.217630000Z [Nest] 1  - 11/07/2026, 4:01:40 PM     LOG [CertsService] Certificate signed: serial=1009, expires=2026-12-07T16:01:40.000Z
+2026-11-07T16:01:46.807990697Z [Nest] 1  - 11/07/2026, 4:01:46 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:01:53.189155940Z [Nest] 1  - 11/07/2026, 4:01:53 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067373
+2026-11-07T16:01:53.199463170Z [Nest] 1  - 11/07/2026, 4:01:53 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-07, profile=client-30d)
+2026-11-07T16:01:53.229940388Z [Nest] 1  - 11/07/2026, 4:01:53 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:01:53.237884742Z [Nest] 1  - 11/07/2026, 4:01:53 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:01:53.265934792Z [Nest] 1  - 11/07/2026, 4:01:53 PM     LOG [CertsService] Certificate signed: serial=100A, expires=2026-12-07T16:01:53.000Z
+2026-11-07T16:02:06.235967568Z [Nest] 1  - 11/07/2026, 4:02:06 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067386
+2026-11-07T16:02:06.247000875Z [Nest] 1  - 11/07/2026, 4:02:06 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-08, profile=client-30d)
+2026-11-07T16:02:06.277874201Z [Nest] 1  - 11/07/2026, 4:02:06 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:02:06.286607665Z [Nest] 1  - 11/07/2026, 4:02:06 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:02:06.315920399Z [Nest] 1  - 11/07/2026, 4:02:06 PM     LOG [CertsService] Certificate signed: serial=100B, expires=2026-12-07T16:02:06.000Z
+2026-11-07T16:02:16.836347294Z [Nest] 1  - 11/07/2026, 4:02:16 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:02:19.288049826Z [Nest] 1  - 11/07/2026, 4:02:19 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067399
+2026-11-07T16:02:19.288931864Z [Nest] 1  - 11/07/2026, 4:02:19 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-09, profile=client-30d)
+2026-11-07T16:02:19.320852311Z [Nest] 1  - 11/07/2026, 4:02:19 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:02:19.329383076Z [Nest] 1  - 11/07/2026, 4:02:19 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:02:19.356873826Z [Nest] 1  - 11/07/2026, 4:02:19 PM     LOG [CertsService] Certificate signed: serial=100C, expires=2026-12-07T16:02:19.000Z
+2026-11-07T16:02:32.327317930Z [Nest] 1  - 11/07/2026, 4:02:32 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067412
+2026-11-07T16:02:32.337418833Z [Nest] 1  - 11/07/2026, 4:02:32 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-10, profile=client-30d)
+2026-11-07T16:02:32.367033874Z [Nest] 1  - 11/07/2026, 4:02:32 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:02:32.375489995Z [Nest] 1  - 11/07/2026, 4:02:32 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:02:32.404251323Z [Nest] 1  - 11/07/2026, 4:02:32 PM     LOG [CertsService] Certificate signed: serial=100D, expires=2026-12-07T16:02:32.000Z
+2026-11-07T16:02:45.374330712Z [Nest] 1  - 11/07/2026, 4:02:45 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067425
+2026-11-07T16:02:45.384703429Z [Nest] 1  - 11/07/2026, 4:02:45 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-11, profile=client-30d)
+2026-11-07T16:02:45.414457113Z [Nest] 1  - 11/07/2026, 4:02:45 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:02:45.422611347Z [Nest] 1  - 11/07/2026, 4:02:45 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:02:45.450469632Z [Nest] 1  - 11/07/2026, 4:02:45 PM     LOG [CertsService] Certificate signed: serial=100E, expires=2026-12-07T16:02:45.000Z
+2026-11-07T16:02:46.862887581Z [Nest] 1  - 11/07/2026, 4:02:46 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:02:58.422421738Z [Nest] 1  - 11/07/2026, 4:02:58 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067438
+2026-11-07T16:02:58.432597795Z [Nest] 1  - 11/07/2026, 4:02:58 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-12, profile=client-30d)
+2026-11-07T16:02:58.463573502Z [Nest] 1  - 11/07/2026, 4:02:58 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:02:58.471757994Z [Nest] 1  - 11/07/2026, 4:02:58 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:02:58.499850240Z [Nest] 1  - 11/07/2026, 4:02:58 PM     LOG [CertsService] Certificate signed: serial=100F, expires=2026-12-07T16:02:58.000Z
+2026-11-07T16:03:11.470146910Z [Nest] 1  - 11/07/2026, 4:03:11 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067451
+2026-11-07T16:03:11.480579057Z [Nest] 1  - 11/07/2026, 4:03:11 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-13, profile=client-30d)
+2026-11-07T16:03:11.510996060Z [Nest] 1  - 11/07/2026, 4:03:11 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:03:11.519109256Z [Nest] 1  - 11/07/2026, 4:03:11 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:03:11.548401476Z [Nest] 1  - 11/07/2026, 4:03:11 PM     LOG [CertsService] Certificate signed: serial=1010, expires=2026-12-07T16:03:11.000Z
+2026-11-07T16:03:16.890076240Z [Nest] 1  - 11/07/2026, 4:03:16 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:03:24.519876658Z [Nest] 1  - 11/07/2026, 4:03:24 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067464
+2026-11-07T16:03:24.530177957Z [Nest] 1  - 11/07/2026, 4:03:24 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-14, profile=client-30d)
+2026-11-07T16:03:24.570161623Z [Nest] 1  - 11/07/2026, 4:03:24 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:03:24.582588508Z [Nest] 1  - 11/07/2026, 4:03:24 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:03:24.627121805Z [Nest] 1  - 11/07/2026, 4:03:24 PM     LOG [CertsService] Certificate signed: serial=1011, expires=2026-12-07T16:03:24.000Z
+2026-11-07T16:03:37.583639170Z [Nest] 1  - 11/07/2026, 4:03:37 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067477
+2026-11-07T16:03:37.584505919Z [Nest] 1  - 11/07/2026, 4:03:37 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-15, profile=client-30d)
+2026-11-07T16:03:37.615768759Z [Nest] 1  - 11/07/2026, 4:03:37 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:03:37.623801685Z [Nest] 1  - 11/07/2026, 4:03:37 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:03:37.651995852Z [Nest] 1  - 11/07/2026, 4:03:37 PM     LOG [CertsService] Certificate signed: serial=1012, expires=2026-12-07T16:03:37.000Z
+2026-11-07T16:03:46.920831720Z [Nest] 1  - 11/07/2026, 4:03:46 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:03:50.622763352Z [Nest] 1  - 11/07/2026, 4:03:50 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067490
+2026-11-07T16:03:50.633104901Z [Nest] 1  - 11/07/2026, 4:03:50 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-16, profile=client-30d)
+2026-11-07T16:03:50.661699215Z [Nest] 1  - 11/07/2026, 4:03:50 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:03:50.670142898Z [Nest] 1  - 11/07/2026, 4:03:50 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:03:50.698457141Z [Nest] 1  - 11/07/2026, 4:03:50 PM     LOG [CertsService] Certificate signed: serial=1013, expires=2026-12-07T16:03:50.000Z
+2026-11-07T16:04:03.670176114Z [Nest] 1  - 11/07/2026, 4:04:03 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067503
+2026-11-07T16:04:03.681146423Z [Nest] 1  - 11/07/2026, 4:04:03 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-17, profile=client-30d)
+2026-11-07T16:04:03.711880392Z [Nest] 1  - 11/07/2026, 4:04:03 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:04:03.720113047Z [Nest] 1  - 11/07/2026, 4:04:03 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:04:03.748622001Z [Nest] 1  - 11/07/2026, 4:04:03 PM     LOG [CertsService] Certificate signed: serial=1014, expires=2026-12-07T16:04:03.000Z
+2026-11-07T16:04:16.727820664Z [Nest] 1  - 11/07/2026, 4:04:16 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067516
+2026-11-07T16:04:16.728516214Z [Nest] 1  - 11/07/2026, 4:04:16 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-18, profile=client-30d)
+2026-11-07T16:04:16.757266378Z [Nest] 1  - 11/07/2026, 4:04:16 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:04:16.765513190Z [Nest] 1  - 11/07/2026, 4:04:16 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:04:16.791443475Z [Nest] 1  - 11/07/2026, 4:04:16 PM     LOG [CertsService] Certificate signed: serial=1015, expires=2026-12-07T16:04:16.000Z
+2026-11-07T16:04:16.951022325Z [Nest] 1  - 11/07/2026, 4:04:16 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:04:29.764624877Z [Nest] 1  - 11/07/2026, 4:04:29 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067529
+2026-11-07T16:04:29.774757276Z [Nest] 1  - 11/07/2026, 4:04:29 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-19, profile=client-30d)
+2026-11-07T16:04:29.808506877Z [Nest] 1  - 11/07/2026, 4:04:29 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:04:29.816913854Z [Nest] 1  - 11/07/2026, 4:04:29 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:04:29.846195309Z [Nest] 1  - 11/07/2026, 4:04:29 PM     LOG [CertsService] Certificate signed: serial=1016, expires=2026-12-07T16:04:29.000Z
+2026-11-07T16:04:42.814362161Z [Nest] 1  - 11/07/2026, 4:04:42 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067542
+2026-11-07T16:04:42.824537630Z [Nest] 1  - 11/07/2026, 4:04:42 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-20, profile=client-30d)
+2026-11-07T16:04:42.854117771Z [Nest] 1  - 11/07/2026, 4:04:42 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:04:42.862598752Z [Nest] 1  - 11/07/2026, 4:04:42 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:04:42.891673394Z [Nest] 1  - 11/07/2026, 4:04:42 PM     LOG [CertsService] Certificate signed: serial=1017, expires=2026-12-07T16:04:42.000Z
+2026-11-07T16:04:46.978190980Z [Nest] 1  - 11/07/2026, 4:04:46 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:04:55.859649890Z [Nest] 1  - 11/07/2026, 4:04:55 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067555
+2026-11-07T16:04:55.869755662Z [Nest] 1  - 11/07/2026, 4:04:55 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-21, profile=client-30d)
+2026-11-07T16:04:55.900431322Z [Nest] 1  - 11/07/2026, 4:04:55 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:04:55.908595109Z [Nest] 1  - 11/07/2026, 4:04:55 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:04:55.936596845Z [Nest] 1  - 11/07/2026, 4:04:55 PM     LOG [CertsService] Certificate signed: serial=1018, expires=2026-12-07T16:04:55.000Z
+2026-11-07T16:05:08.906218086Z [Nest] 1  - 11/07/2026, 4:05:08 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067568
+2026-11-07T16:05:08.916400420Z [Nest] 1  - 11/07/2026, 4:05:08 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-22, profile=client-30d)
+2026-11-07T16:05:08.945384461Z [Nest] 1  - 11/07/2026, 4:05:08 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:05:08.953666741Z [Nest] 1  - 11/07/2026, 4:05:08 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:05:08.981716400Z [Nest] 1  - 11/07/2026, 4:05:08 PM     LOG [CertsService] Certificate signed: serial=1019, expires=2026-12-07T16:05:08.000Z
+2026-11-07T16:05:17.005753675Z [Nest] 1  - 11/07/2026, 4:05:17 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:05:21.954224209Z [Nest] 1  - 11/07/2026, 4:05:21 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067581
+2026-11-07T16:05:21.964545465Z [Nest] 1  - 11/07/2026, 4:05:21 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-23, profile=client-30d)
+2026-11-07T16:05:21.995849878Z [Nest] 1  - 11/07/2026, 4:05:21 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:05:22.004427893Z [Nest] 1  - 11/07/2026, 4:05:22 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:05:22.034210839Z [Nest] 1  - 11/07/2026, 4:05:22 PM     LOG [CertsService] Certificate signed: serial=101A, expires=2026-12-07T16:05:22.000Z
+2026-11-07T16:05:35.001834891Z [Nest] 1  - 11/07/2026, 4:05:35 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067594
+2026-11-07T16:05:35.011948126Z [Nest] 1  - 11/07/2026, 4:05:35 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-24, profile=client-30d)
+2026-11-07T16:05:35.040414368Z [Nest] 1  - 11/07/2026, 4:05:35 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:05:35.048789935Z [Nest] 1  - 11/07/2026, 4:05:35 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:05:35.078601978Z [Nest] 1  - 11/07/2026, 4:05:35 PM     LOG [CertsService] Certificate signed: serial=101B, expires=2026-12-07T16:05:35.000Z
+2026-11-07T16:05:47.033445768Z [Nest] 1  - 11/07/2026, 4:05:47 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:05:48.063200225Z [Nest] 1  - 11/07/2026, 4:05:48 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067608
+2026-11-07T16:05:48.064778804Z [Nest] 1  - 11/07/2026, 4:05:48 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-25, profile=client-30d)
+2026-11-07T16:05:48.107122992Z [Nest] 1  - 11/07/2026, 4:05:48 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:05:48.119622692Z [Nest] 1  - 11/07/2026, 4:05:48 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:05:48.155079061Z [Nest] 1  - 11/07/2026, 4:05:48 PM     LOG [CertsService] Certificate signed: serial=101C, expires=2026-12-07T16:05:48.000Z
+2026-11-07T16:06:01.110757523Z [Nest] 1  - 11/07/2026, 4:06:01 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067621
+2026-11-07T16:06:01.121523664Z [Nest] 1  - 11/07/2026, 4:06:01 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-26, profile=client-30d)
+2026-11-07T16:06:01.151750939Z [Nest] 1  - 11/07/2026, 4:06:01 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:06:01.160211844Z [Nest] 1  - 11/07/2026, 4:06:01 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:06:01.188764740Z [Nest] 1  - 11/07/2026, 4:06:01 PM     LOG [CertsService] Certificate signed: serial=101D, expires=2026-12-07T16:06:01.000Z
+2026-11-07T16:06:14.157481895Z [Nest] 1  - 11/07/2026, 4:06:14 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067634
+2026-11-07T16:06:14.167502846Z [Nest] 1  - 11/07/2026, 4:06:14 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-27, profile=client-30d)
+2026-11-07T16:06:14.197771561Z [Nest] 1  - 11/07/2026, 4:06:14 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:06:14.205895554Z [Nest] 1  - 11/07/2026, 4:06:14 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:06:14.235155793Z [Nest] 1  - 11/07/2026, 4:06:14 PM     LOG [CertsService] Certificate signed: serial=101E, expires=2026-12-07T16:06:14.000Z
+2026-11-07T16:06:17.060930011Z [Nest] 1  - 11/07/2026, 4:06:17 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:06:27.202410306Z [Nest] 1  - 11/07/2026, 4:06:27 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067647
+2026-11-07T16:06:27.212744334Z [Nest] 1  - 11/07/2026, 4:06:27 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-28, profile=client-30d)
+2026-11-07T16:06:27.242617844Z [Nest] 1  - 11/07/2026, 4:06:27 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:06:27.250690314Z [Nest] 1  - 11/07/2026, 4:06:27 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:06:27.278462950Z [Nest] 1  - 11/07/2026, 4:06:27 PM     LOG [CertsService] Certificate signed: serial=101F, expires=2026-12-07T16:06:27.000Z
+2026-11-07T16:06:40.248058682Z [Nest] 1  - 11/07/2026, 4:06:40 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067660
+2026-11-07T16:06:40.249194896Z [Nest] 1  - 11/07/2026, 4:06:40 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-29, profile=client-30d)
+2026-11-07T16:06:40.278753281Z [Nest] 1  - 11/07/2026, 4:06:40 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:06:40.287082991Z [Nest] 1  - 11/07/2026, 4:06:40 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:06:40.316390997Z [Nest] 1  - 11/07/2026, 4:06:40 PM     LOG [CertsService] Certificate signed: serial=1020, expires=2026-12-07T16:06:40.000Z
+2026-11-07T16:06:47.089021971Z [Nest] 1  - 11/07/2026, 4:06:47 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:06:53.284730749Z [Nest] 1  - 11/07/2026, 4:06:53 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067673
+2026-11-07T16:06:53.294864026Z [Nest] 1  - 11/07/2026, 4:06:53 PM     LOG [CertsService] Created enrollment token (ttl=600s, allowedCn=rs1107-dev-30, profile=client-30d)
+2026-11-07T16:06:53.323295553Z [Nest] 1  - 11/07/2026, 4:06:53 PM     LOG [CertsService] Received CSR signing request
+2026-11-07T16:06:53.331544903Z [Nest] 1  - 11/07/2026, 4:06:53 PM     LOG [CertsService] CSR key algorithm accepted: ML-DSA-65
+2026-11-07T16:06:53.359582552Z [Nest] 1  - 11/07/2026, 4:06:53 PM     LOG [CertsService] Certificate signed: serial=1021, expires=2026-12-07T16:06:53.000Z
+2026-11-07T16:07:01.165504741Z [Nest] 1  - 11/07/2026, 4:07:01 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067681
+2026-11-07T16:07:01.166225767Z [Nest] 1  - 11/07/2026, 4:07:01 PM     LOG [CertsService] Revoking certificate with serial: 1004, reason: cessationOfOperation
+2026-11-07T16:07:01.166240848Z [Nest] 1  - 11/07/2026, 4:07:01 PM     LOG [CertsService] Fetching certificate with serial: 1004 (normalized: 1004)
+2026-11-07T16:07:01.166243490Z [Nest] 1  - 11/07/2026, 4:07:01 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:07:01.168508452Z [Nest] 1  - 11/07/2026, 4:07:01 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-4p681X/index.txt
+2026-11-07T16:07:17.117045561Z [Nest] 1  - 11/07/2026, 4:07:17 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:07:17.461239339Z [Nest] 1  - 11/07/2026, 4:07:17 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067697
+2026-11-07T16:07:17.461615500Z [Nest] 1  - 11/07/2026, 4:07:17 PM     LOG [CertsService] Revoking certificate with serial: 1005, reason: cessationOfOperation
+2026-11-07T16:07:17.461630485Z [Nest] 1  - 11/07/2026, 4:07:17 PM     LOG [CertsService] Fetching certificate with serial: 1005 (normalized: 1005)
+2026-11-07T16:07:17.461635344Z [Nest] 1  - 11/07/2026, 4:07:17 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:07:17.463763853Z [Nest] 1  - 11/07/2026, 4:07:17 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-3wEKjp/index.txt
+2026-11-07T16:07:30.067069200Z [Nest] 1  - 11/07/2026, 4:07:30 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067710
+2026-11-07T16:07:30.067446003Z [Nest] 1  - 11/07/2026, 4:07:30 PM     LOG [CertsService] Revoking certificate with serial: 1006, reason: cessationOfOperation
+2026-11-07T16:07:30.067456520Z [Nest] 1  - 11/07/2026, 4:07:30 PM     LOG [CertsService] Fetching certificate with serial: 1006 (normalized: 1006)
+2026-11-07T16:07:30.067461747Z [Nest] 1  - 11/07/2026, 4:07:30 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:07:30.069765126Z [Nest] 1  - 11/07/2026, 4:07:30 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-KQ78f5/index.txt
+2026-11-07T16:07:47.152104224Z [Nest] 1  - 11/07/2026, 4:07:47 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:07:51.225669962Z [Nest] 1  - 11/07/2026, 4:07:51 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067731
+2026-11-07T16:07:51.226074764Z [Nest] 1  - 11/07/2026, 4:07:51 PM     LOG [CertsService] Revoking certificate with serial: 1007, reason: cessationOfOperation
+2026-11-07T16:07:51.226117336Z [Nest] 1  - 11/07/2026, 4:07:51 PM     LOG [CertsService] Fetching certificate with serial: 1007 (normalized: 1007)
+2026-11-07T16:07:51.226132917Z [Nest] 1  - 11/07/2026, 4:07:51 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:07:51.228039701Z [Nest] 1  - 11/07/2026, 4:07:51 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-f4F1vA/index.txt
+2026-11-07T16:07:59.225318605Z [Nest] 1  - 11/07/2026, 4:07:59 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067739
+2026-11-07T16:07:59.225660395Z [Nest] 1  - 11/07/2026, 4:07:59 PM     LOG [CertsService] Revoking certificate with serial: 1008, reason: cessationOfOperation
+2026-11-07T16:07:59.225662671Z [Nest] 1  - 11/07/2026, 4:07:59 PM     LOG [CertsService] Fetching certificate with serial: 1008 (normalized: 1008)
+2026-11-07T16:07:59.225664132Z [Nest] 1  - 11/07/2026, 4:07:59 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:07:59.227743499Z [Nest] 1  - 11/07/2026, 4:07:59 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-7Wt11i/index.txt
+2026-11-07T16:08:16.391115790Z [Nest] 1  - 11/07/2026, 4:08:16 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067756
+2026-11-07T16:08:16.391452661Z [Nest] 1  - 11/07/2026, 4:08:16 PM     LOG [CertsService] Revoking certificate with serial: 1009, reason: cessationOfOperation
+2026-11-07T16:08:16.391477971Z [Nest] 1  - 11/07/2026, 4:08:16 PM     LOG [CertsService] Fetching certificate with serial: 1009 (normalized: 1009)
+2026-11-07T16:08:16.391479569Z [Nest] 1  - 11/07/2026, 4:08:16 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:08:16.393622475Z [Nest] 1  - 11/07/2026, 4:08:16 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-HRwqc5/index.txt
+2026-11-07T16:08:17.180667743Z [Nest] 1  - 11/07/2026, 4:08:17 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:08:26.278600153Z [Nest] 1  - 11/07/2026, 4:08:26 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067766
+2026-11-07T16:08:26.279081509Z [Nest] 1  - 11/07/2026, 4:08:26 PM     LOG [CertsService] Revoking certificate with serial: 100A, reason: cessationOfOperation
+2026-11-07T16:08:26.279100780Z [Nest] 1  - 11/07/2026, 4:08:26 PM     LOG [CertsService] Fetching certificate with serial: 100A (normalized: 100A)
+2026-11-07T16:08:26.279124045Z [Nest] 1  - 11/07/2026, 4:08:26 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:08:26.281967622Z [Nest] 1  - 11/07/2026, 4:08:26 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-Y9ySfY/index.txt
+2026-11-07T16:08:35.624601964Z [Nest] 1  - 11/07/2026, 4:08:35 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067775
+2026-11-07T16:08:35.624914723Z [Nest] 1  - 11/07/2026, 4:08:35 PM     LOG [CertsService] Revoking certificate with serial: 100B, reason: cessationOfOperation
+2026-11-07T16:08:35.624919550Z [Nest] 1  - 11/07/2026, 4:08:35 PM     LOG [CertsService] Fetching certificate with serial: 100B (normalized: 100B)
+2026-11-07T16:08:35.624923737Z [Nest] 1  - 11/07/2026, 4:08:35 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:08:35.626742431Z [Nest] 1  - 11/07/2026, 4:08:35 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-XFhejE/index.txt
+2026-11-07T16:08:42.053076869Z [Nest] 1  - 11/07/2026, 4:08:42 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067782
+2026-11-07T16:08:42.053412424Z [Nest] 1  - 11/07/2026, 4:08:42 PM     LOG [CertsService] Revoking certificate with serial: 100C, reason: cessationOfOperation
+2026-11-07T16:08:42.053421981Z [Nest] 1  - 11/07/2026, 4:08:42 PM     LOG [CertsService] Fetching certificate with serial: 100C (normalized: 100C)
+2026-11-07T16:08:42.053426230Z [Nest] 1  - 11/07/2026, 4:08:42 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:08:42.055759647Z [Nest] 1  - 11/07/2026, 4:08:42 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-o3dJ67/index.txt
+2026-11-07T16:08:47.215115625Z [Nest] 1  - 11/07/2026, 4:08:47 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:08:58.200089228Z [Nest] 1  - 11/07/2026, 4:08:58 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067798
+2026-11-07T16:08:58.200407421Z [Nest] 1  - 11/07/2026, 4:08:58 PM     LOG [CertsService] Revoking certificate with serial: 100D, reason: cessationOfOperation
+2026-11-07T16:08:58.200423051Z [Nest] 1  - 11/07/2026, 4:08:58 PM     LOG [CertsService] Fetching certificate with serial: 100D (normalized: 100D)
+2026-11-07T16:08:58.200430842Z [Nest] 1  - 11/07/2026, 4:08:58 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:08:58.202196855Z [Nest] 1  - 11/07/2026, 4:08:58 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-xwPfO2/index.txt
+2026-11-07T16:09:04.493733576Z [Nest] 1  - 11/07/2026, 4:09:04 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067804
+2026-11-07T16:09:04.494081562Z [Nest] 1  - 11/07/2026, 4:09:04 PM     LOG [CertsService] Revoking certificate with serial: 100E, reason: cessationOfOperation
+2026-11-07T16:09:04.494084780Z [Nest] 1  - 11/07/2026, 4:09:04 PM     LOG [CertsService] Fetching certificate with serial: 100E (normalized: 100E)
+2026-11-07T16:09:04.494086763Z [Nest] 1  - 11/07/2026, 4:09:04 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:09:04.495952503Z [Nest] 1  - 11/07/2026, 4:09:04 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-wV7lho/index.txt
+2026-11-07T16:09:13.762526885Z [Nest] 1  - 11/07/2026, 4:09:13 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067813
+2026-11-07T16:09:13.762816024Z [Nest] 1  - 11/07/2026, 4:09:13 PM     LOG [CertsService] Revoking certificate with serial: 100F, reason: cessationOfOperation
+2026-11-07T16:09:13.762829719Z [Nest] 1  - 11/07/2026, 4:09:13 PM     LOG [CertsService] Fetching certificate with serial: 100F (normalized: 100F)
+2026-11-07T16:09:13.762840949Z [Nest] 1  - 11/07/2026, 4:09:13 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:09:13.764648757Z [Nest] 1  - 11/07/2026, 4:09:13 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-6GYZyQ/index.txt
+2026-11-07T16:09:17.241938008Z [Nest] 1  - 11/07/2026, 4:09:17 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:09:20.264939917Z [Nest] 1  - 11/07/2026, 4:09:20 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067820
+2026-11-07T16:09:20.265821878Z [Nest] 1  - 11/07/2026, 4:09:20 PM     LOG [CertsService] Revoking certificate with serial: 1010, reason: cessationOfOperation
+2026-11-07T16:09:20.265834244Z [Nest] 1  - 11/07/2026, 4:09:20 PM     LOG [CertsService] Fetching certificate with serial: 1010 (normalized: 1010)
+2026-11-07T16:09:20.265836216Z [Nest] 1  - 11/07/2026, 4:09:20 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:09:20.267680400Z [Nest] 1  - 11/07/2026, 4:09:20 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-XgIZos/index.txt
+2026-11-07T16:09:44.979872486Z [Nest] 1  - 11/07/2026, 4:09:44 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067844
+2026-11-07T16:09:44.980157301Z [Nest] 1  - 11/07/2026, 4:09:44 PM     LOG [CertsService] Revoking certificate with serial: 1011, reason: cessationOfOperation
+2026-11-07T16:09:44.980166898Z [Nest] 1  - 11/07/2026, 4:09:44 PM     LOG [CertsService] Fetching certificate with serial: 1011 (normalized: 1011)
+2026-11-07T16:09:44.980178811Z [Nest] 1  - 11/07/2026, 4:09:44 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:09:44.982191280Z [Nest] 1  - 11/07/2026, 4:09:44 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-GEpF4o/index.txt
+2026-11-07T16:09:47.268593706Z [Nest] 1  - 11/07/2026, 4:09:47 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:09:53.720905349Z [Nest] 1  - 11/07/2026, 4:09:53 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067853
+2026-11-07T16:09:53.721282131Z [Nest] 1  - 11/07/2026, 4:09:53 PM     LOG [CertsService] Revoking certificate with serial: 1012, reason: cessationOfOperation
+2026-11-07T16:09:53.721285689Z [Nest] 1  - 11/07/2026, 4:09:53 PM     LOG [CertsService] Fetching certificate with serial: 1012 (normalized: 1012)
+2026-11-07T16:09:53.721287400Z [Nest] 1  - 11/07/2026, 4:09:53 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:09:53.723459262Z [Nest] 1  - 11/07/2026, 4:09:53 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-UOcWfe/index.txt
+2026-11-07T16:10:02.069847572Z [Nest] 1  - 11/07/2026, 4:10:02 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067862
+2026-11-07T16:10:02.070172640Z [Nest] 1  - 11/07/2026, 4:10:02 PM     LOG [CertsService] Revoking certificate with serial: 1013, reason: cessationOfOperation
+2026-11-07T16:10:02.070195480Z [Nest] 1  - 11/07/2026, 4:10:02 PM     LOG [CertsService] Fetching certificate with serial: 1013 (normalized: 1013)
+2026-11-07T16:10:02.070724277Z [Nest] 1  - 11/07/2026, 4:10:02 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:10:02.072425407Z [Nest] 1  - 11/07/2026, 4:10:02 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-B3hVgd/index.txt
+2026-11-07T16:10:11.793201680Z [Nest] 1  - 11/07/2026, 4:10:11 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067871
+2026-11-07T16:10:11.793544990Z [Nest] 1  - 11/07/2026, 4:10:11 PM     LOG [CertsService] Revoking certificate with serial: 1014, reason: cessationOfOperation
+2026-11-07T16:10:11.793557263Z [Nest] 1  - 11/07/2026, 4:10:11 PM     LOG [CertsService] Fetching certificate with serial: 1014 (normalized: 1014)
+2026-11-07T16:10:11.793559080Z [Nest] 1  - 11/07/2026, 4:10:11 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:10:11.795843474Z [Nest] 1  - 11/07/2026, 4:10:11 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-EXzzAM/index.txt
+2026-11-07T16:10:17.296401331Z [Nest] 1  - 11/07/2026, 4:10:17 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:10:22.559331840Z [Nest] 1  - 11/07/2026, 4:10:22 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067882
+2026-11-07T16:10:22.559694486Z [Nest] 1  - 11/07/2026, 4:10:22 PM     LOG [CertsService] Revoking certificate with serial: 1015, reason: cessationOfOperation
+2026-11-07T16:10:22.559709771Z [Nest] 1  - 11/07/2026, 4:10:22 PM     LOG [CertsService] Fetching certificate with serial: 1015 (normalized: 1015)
+2026-11-07T16:10:22.559711939Z [Nest] 1  - 11/07/2026, 4:10:22 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:10:22.561902202Z [Nest] 1  - 11/07/2026, 4:10:22 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-zhXpVu/index.txt
+2026-11-07T16:10:43.209115494Z [Nest] 1  - 11/07/2026, 4:10:43 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067903
+2026-11-07T16:10:43.209485716Z [Nest] 1  - 11/07/2026, 4:10:43 PM     LOG [CertsService] Revoking certificate with serial: 1016, reason: cessationOfOperation
+2026-11-07T16:10:43.209501316Z [Nest] 1  - 11/07/2026, 4:10:43 PM     LOG [CertsService] Fetching certificate with serial: 1016 (normalized: 1016)
+2026-11-07T16:10:43.209503764Z [Nest] 1  - 11/07/2026, 4:10:43 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:10:43.211530089Z [Nest] 1  - 11/07/2026, 4:10:43 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-RCkYuE/index.txt
+2026-11-07T16:10:47.332063734Z [Nest] 1  - 11/07/2026, 4:10:47 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:10:56.734583158Z [Nest] 1  - 11/07/2026, 4:10:56 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067916
+2026-11-07T16:10:56.734889193Z [Nest] 1  - 11/07/2026, 4:10:56 PM     LOG [CertsService] Revoking certificate with serial: 1017, reason: cessationOfOperation
+2026-11-07T16:10:56.736017016Z [Nest] 1  - 11/07/2026, 4:10:56 PM     LOG [CertsService] Fetching certificate with serial: 1017 (normalized: 1017)
+2026-11-07T16:10:56.736036751Z [Nest] 1  - 11/07/2026, 4:10:56 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:10:56.737051698Z [Nest] 1  - 11/07/2026, 4:10:56 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-gYPpJM/index.txt
+2026-11-07T16:11:14.323388506Z [Nest] 1  - 11/07/2026, 4:11:14 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067934
+2026-11-07T16:11:14.323745406Z [Nest] 1  - 11/07/2026, 4:11:14 PM     LOG [CertsService] Revoking certificate with serial: 1018, reason: cessationOfOperation
+2026-11-07T16:11:14.323752859Z [Nest] 1  - 11/07/2026, 4:11:14 PM     LOG [CertsService] Fetching certificate with serial: 1018 (normalized: 1018)
+2026-11-07T16:11:14.323762348Z [Nest] 1  - 11/07/2026, 4:11:14 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:11:14.325660601Z [Nest] 1  - 11/07/2026, 4:11:14 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-NSjLPV/index.txt
+2026-11-07T16:11:17.360297116Z [Nest] 1  - 11/07/2026, 4:11:17 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:11:38.316546742Z [Nest] 1  - 11/07/2026, 4:11:38 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067958
+2026-11-07T16:11:38.316865871Z [Nest] 1  - 11/07/2026, 4:11:38 PM     LOG [CertsService] Revoking certificate with serial: 1019, reason: cessationOfOperation
+2026-11-07T16:11:38.316875248Z [Nest] 1  - 11/07/2026, 4:11:38 PM     LOG [CertsService] Fetching certificate with serial: 1019 (normalized: 1019)
+2026-11-07T16:11:38.316877329Z [Nest] 1  - 11/07/2026, 4:11:38 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:11:38.319005715Z [Nest] 1  - 11/07/2026, 4:11:38 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-7VUVLF/index.txt
+2026-11-07T16:11:47.396539327Z [Nest] 1  - 11/07/2026, 4:11:47 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:11:59.550396836Z [Nest] 1  - 11/07/2026, 4:11:59 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067979
+2026-11-07T16:11:59.550744527Z [Nest] 1  - 11/07/2026, 4:11:59 PM     LOG [CertsService] Revoking certificate with serial: 101A, reason: cessationOfOperation
+2026-11-07T16:11:59.550751366Z [Nest] 1  - 11/07/2026, 4:11:59 PM     LOG [CertsService] Fetching certificate with serial: 101A (normalized: 101A)
+2026-11-07T16:11:59.550761724Z [Nest] 1  - 11/07/2026, 4:11:59 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:11:59.552565617Z [Nest] 1  - 11/07/2026, 4:11:59 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-bP5VnC/index.txt
+2026-11-07T16:12:17.424714543Z [Nest] 1  - 11/07/2026, 4:12:17 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:12:19.911324661Z [Nest] 1  - 11/07/2026, 4:12:19 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794067999
+2026-11-07T16:12:19.911593154Z [Nest] 1  - 11/07/2026, 4:12:19 PM     LOG [CertsService] Revoking certificate with serial: 101B, reason: cessationOfOperation
+2026-11-07T16:12:19.911614920Z [Nest] 1  - 11/07/2026, 4:12:19 PM     LOG [CertsService] Fetching certificate with serial: 101B (normalized: 101B)
+2026-11-07T16:12:19.911623723Z [Nest] 1  - 11/07/2026, 4:12:19 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:12:19.913445842Z [Nest] 1  - 11/07/2026, 4:12:19 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-heSyK1/index.txt
+2026-11-07T16:12:26.428470248Z [Nest] 1  - 11/07/2026, 4:12:26 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794068006
+2026-11-07T16:12:26.428920258Z [Nest] 1  - 11/07/2026, 4:12:26 PM     LOG [CertsService] Revoking certificate with serial: 101C, reason: cessationOfOperation
+2026-11-07T16:12:26.428937600Z [Nest] 1  - 11/07/2026, 4:12:26 PM     LOG [CertsService] Fetching certificate with serial: 101C (normalized: 101C)
+2026-11-07T16:12:26.428950534Z [Nest] 1  - 11/07/2026, 4:12:26 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:12:26.431203773Z [Nest] 1  - 11/07/2026, 4:12:26 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-JFfzda/index.txt
+2026-11-07T16:12:44.487905048Z [Nest] 1  - 11/07/2026, 4:12:44 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794068024
+2026-11-07T16:12:44.488243965Z [Nest] 1  - 11/07/2026, 4:12:44 PM     LOG [CertsService] Revoking certificate with serial: 101D, reason: cessationOfOperation
+2026-11-07T16:12:44.488279811Z [Nest] 1  - 11/07/2026, 4:12:44 PM     LOG [CertsService] Fetching certificate with serial: 101D (normalized: 101D)
+2026-11-07T16:12:44.488291485Z [Nest] 1  - 11/07/2026, 4:12:44 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:12:44.490218541Z [Nest] 1  - 11/07/2026, 4:12:44 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-XUZX53/index.txt
+2026-11-07T16:12:47.451910272Z [Nest] 1  - 11/07/2026, 4:12:47 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:13:02.019981019Z [Nest] 1  - 11/07/2026, 4:13:02 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794068042
+2026-11-07T16:13:02.020286149Z [Nest] 1  - 11/07/2026, 4:13:02 PM     LOG [CertsService] Revoking certificate with serial: 101E, reason: cessationOfOperation
+2026-11-07T16:13:02.020293389Z [Nest] 1  - 11/07/2026, 4:13:02 PM     LOG [CertsService] Fetching certificate with serial: 101E (normalized: 101E)
+2026-11-07T16:13:02.020319974Z [Nest] 1  - 11/07/2026, 4:13:02 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:13:02.022212865Z [Nest] 1  - 11/07/2026, 4:13:02 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-NrgLQJ/index.txt
+2026-11-07T16:13:11.664276191Z [Nest] 1  - 11/07/2026, 4:13:11 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794068051
+2026-11-07T16:13:11.664646535Z [Nest] 1  - 11/07/2026, 4:13:11 PM     LOG [CertsService] Revoking certificate with serial: 101F, reason: cessationOfOperation
+2026-11-07T16:13:11.664652988Z [Nest] 1  - 11/07/2026, 4:13:11 PM     LOG [CertsService] Fetching certificate with serial: 101F (normalized: 101F)
+2026-11-07T16:13:11.664654788Z [Nest] 1  - 11/07/2026, 4:13:11 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:13:11.666992184Z [Nest] 1  - 11/07/2026, 4:13:11 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-YTOX6b/index.txt
+2026-11-07T16:13:17.486389228Z [Nest] 1  - 11/07/2026, 4:13:17 PM    WARN [JwtAuthGuard] Missing or malformed Authorization header
+2026-11-07T16:13:33.427295873Z [Nest] 1  - 11/07/2026, 4:13:33 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794068073
+2026-11-07T16:13:33.427621215Z [Nest] 1  - 11/07/2026, 4:13:33 PM     LOG [CertsService] Revoking certificate with serial: 1020, reason: cessationOfOperation
+2026-11-07T16:13:33.427645471Z [Nest] 1  - 11/07/2026, 4:13:33 PM     LOG [CertsService] Fetching certificate with serial: 1020 (normalized: 1020)
+2026-11-07T16:13:33.427655190Z [Nest] 1  - 11/07/2026, 4:13:33 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:13:33.429556164Z [Nest] 1  - 11/07/2026, 4:13:33 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-s0azQB/index.txt
+2026-11-07T16:13:39.675877905Z [Nest] 1  - 11/07/2026, 4:13:39 PM   DEBUG [JwtAuthGuard] Admin token verified & authorized: kid=admin-v2 sub=gateway-admin fpr=8b9d0c149f47b6a3d6eae7a40b9f241773aed9d1865582c5b94b37a3e1e30ce4 role=admin exp=1794068079
+2026-11-07T16:13:39.676163453Z [Nest] 1  - 11/07/2026, 4:13:39 PM     LOG [CertsService] Revoking certificate with serial: 1021, reason: cessationOfOperation
+2026-11-07T16:13:39.676202795Z [Nest] 1  - 11/07/2026, 4:13:39 PM     LOG [CertsService] Fetching certificate with serial: 1021 (normalized: 1021)
+2026-11-07T16:13:39.676212628Z [Nest] 1  - 11/07/2026, 4:13:39 PM     LOG [CertsService] Fetching all certificates
+2026-11-07T16:13:39.678563017Z [Nest] 1  - 11/07/2026, 4:13:39 PM   DEBUG [IndexParserService] Parsing index file at /tmp/pqc-index-2m7b9z/index.txt

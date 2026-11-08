@@ -1,0 +1,13 @@
+961 samples.tsv
+=== pq window 1 2026-11-07T14:47:17Z
+2760 connections in 5.84s; 472.60 connections/user sec, bytes read 0
+=== cl window 1 2026-11-07T14:47:28Z
+9333 connections in 6.33s; 1474.41 connections/user sec, bytes read 0
+=== pq window 2 2026-11-07T14:47:39Z
+2960 connections in 6.31s; 469.10 connections/user sec, bytes read 0
+=== cl window 2 2026-11-07T14:47:50Z
+9184 connections in 6.32s; 1453.16 connections/user sec, bytes read 0
+=== pq window 3 2026-11-07T14:48:01Z
+3130 connections in 6.29s; 497.62 connections/user sec, bytes read 0
+=== cl window 3 2026-11-07T14:48:12Z
+9245 connections in 6.32s; 1462.82 connections/user sec, bytes read 0

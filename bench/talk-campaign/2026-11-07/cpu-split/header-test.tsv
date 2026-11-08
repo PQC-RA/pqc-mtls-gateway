@@ -1,0 +1,9 @@
+header	value_bytes	http
+X-SSL-Client-Cert (URL-encoded, min of 200)	8276	400
+X-SSL-Client-Cert (URL-encoded, max of 200)	8426	400
+X-SSL-Client-Fingerprint (SHA-256)	64	200
+synthetic	8000	200
+synthetic	8150	200
+synthetic	8170	200
+synthetic	8180	200
+synthetic	8200	400
