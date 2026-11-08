@@ -29,9 +29,9 @@ MacBook device (Homebrew OpenSSL 3.6.2, curl 8.21) over a VPN.
 
 ## Addresses
 
-Lab addresses are replaced by documentation addresses (RFC 5737) that keep the last number: `203.0.113.99`
-is the gateway host, `203.0.113.10` the test device's VPN address and `203.0.113.27` the test stand. Packet
-captures were rewritten the same way, with their checksums adjusted; nothing else in them changed.
+The files keep the lab's own private addresses (RFC 1918): `192.168.1.99` is the gateway host, `192.168.1.27`
+the test stand, and `192.168.1.10` the virtualisation host, which forwards the test device's VPN connections, so
+they arrive from that address. Packet captures are published as recorded.
 
 ## Deliberately not included
 

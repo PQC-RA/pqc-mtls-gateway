@@ -1,7 +1,7 @@
 # 2026-11-08: client re-check against the live gateway (Linux curl, Java 21)
 
 Same method as the 4 Nov matrix (`../../tools/matrix_server.sh`): containers with `--network host` on the gateway
-host, against the live gateway (203.0.113.99), with the 4 Nov client folder mounted read-only (client certificate
+host, against the live gateway (192.168.1.99), with the 4 Nov client folder mounted read-only (client certificate
 CN=talk-probe-01). Nothing on the gateway changed; no image was pulled.
 
 | client | :8443, verifies the gateway | :443, mutual TLS |

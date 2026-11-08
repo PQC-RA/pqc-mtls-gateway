@@ -17,7 +17,7 @@ required, tickets off (`setup.sh`, `run.sh`). Delay: `tc netem` on the stand for
 round trips of 5, 34 and 70 ms. 20 samples per arm per delay, arms interleaved. Time to the first response byte
 (`time_starttransfer`), so the client's own flight is included. Result: sending the full chain instead of the
 leaf costs about one round trip once the round trip is long enough (+32 ms at 34 ms, +69 ms at 70 ms); the leaf
-alone does not. `cap.pcap` is the stand's capture (addresses rewritten, see `../README.md`).
+alone does not. `cap.pcap` is the stand's capture.
 
 ## `java-25-27/`: Java 25 and 27 against the live gateway
 

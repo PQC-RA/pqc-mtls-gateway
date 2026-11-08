@@ -1,6 +1,6 @@
 #!/bin/bash
 # Client matrix, run from containers on the gateway host against the live gateway (8443 enrol port: server verification; 443: full mTLS).
-C=/root/talk-campaign-20261104/clients; GW=203.0.113.99; cd $C
+C=/root/talk-campaign-20261104/clients; GW=192.168.1.99; cd $C
 echo -e "client\ttest\tresult"
 run() { # name port-label image cmd...
   :
