@@ -975,6 +975,15 @@ The value-less template is `.env.example`; `deploy.sh` copies it for you.
 
 ---
 
+## Contributing
+
+Every contribution, by a person or an AI agent, follows [ENGINEERING-RULES.md](ENGINEERING-RULES.md):
+fix the cause rather than the symptom, design from the applicable standard, least privilege, a
+negative test for every control, and evidence for every number. Pull requests answer the checklist
+at its end.
+
+---
+
 ## Licence
 
 **AGPL-3.0-only.** Full text in [LICENSE](LICENSE).
