@@ -4,7 +4,7 @@ T2 second, different key        -> refused (one successor per certificate)
 T3 keep-alive connection opened with the OLD certificate -> refused on the first request after notAfter
 T4 request with the old certificate on a NEW connection after notAfter -> refused"""
 import json, os, subprocess, sys, time, hashlib, base64, socket, ssl, threading, tempfile, re, calendar
-D=sys.argv[1]; GW='192.168.1.99'
+D=sys.argv[1]; GW='203.0.113.99'
 O='/opt/homebrew/opt/openssl@3/bin/openssl'; CURL='/opt/homebrew/opt/curl/bin/curl'
 def sh(*a, **k): return subprocess.run(a, capture_output=True, text=True, **k)
 def enddate(crt):

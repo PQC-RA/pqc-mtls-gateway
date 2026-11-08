@@ -2,7 +2,7 @@
 
 Raw measurements, scripts and results behind the slides of "Making ML-DSA Work for Machine-to-Machine mTLS"
 (PKI Consortium PQC Conference, Amsterdam, 3 December 2026). Everything here was produced against this
-repository's gateway (QS-GW-LXC5, Intel i9-11950H, LXC, Ubuntu 24.04, OpenSSL 3.6.5, OpenResty 1.31.8.1) and a
+repository's gateway (an LXC container on an Intel i9-11950H host, Ubuntu 24.04, OpenSSL 3.6.5, OpenResty 1.31.8.1) and a
 MacBook device (Homebrew OpenSSL 3.6.2, curl 8.21) over a VPN.
 
 | Folder | What | Gateway commit |
@@ -23,6 +23,12 @@ MacBook device (Homebrew OpenSSL 3.6.2, curl 8.21) over a VPN.
   The live CA only issued and revoked clearly named test certificates (`talk-*`, `adr024-*`).
 - `2026-11-04/server-scripts/a24/patch.diff` shows the single change used to switch off the key-type check in a
   copy of the management API bundle for the "issuance check removed" cells. It is a test aid, never a deployment.
+
+## Addresses
+
+Lab addresses are replaced by documentation addresses (RFC 5737) that keep the last number: `203.0.113.99`
+is the gateway host, `203.0.113.10` the test device's VPN address and `203.0.113.27` the test stand. Packet
+captures were rewritten the same way, with their checksums adjusted; nothing else in them changed.
 
 ## Deliberately not included
 

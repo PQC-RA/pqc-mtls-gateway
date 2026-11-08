@@ -1,5 +1,5 @@
 import sys,ssl,socket,time,re,calendar,subprocess,json
-D=sys.argv[1]; GW='192.168.1.99'; O='/opt/homebrew/opt/openssl@3/bin/openssl'; CURL='/opt/homebrew/opt/curl/bin/curl'
+D=sys.argv[1]; GW='203.0.113.99'; O='/opt/homebrew/opt/openssl@3/bin/openssl'; CURL='/opt/homebrew/opt/curl/bin/curl'
 s=subprocess.run([O,'x509','-in',f'{D}/client.crt','-noout','-enddate'],capture_output=True,text=True).stdout.strip().split('=')[1]
 na=calendar.timegm(time.strptime(' '.join(s.split()),'%b %d %H:%M:%S %Y %Z'))
 ctx=ssl.create_default_context(cafile=f'{D}/ca-chain.crt'); ctx.check_hostname=False; ctx.load_cert_chain(f'{D}/client.crt',f'{D}/client.key')

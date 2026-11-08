@@ -1,4 +1,4 @@
-# Benchmark Provenance, QS-GW-LXC5
+# Benchmark Provenance, gateway host
 
 **Generated:** 2026-10-31T14:46:32Z
 
@@ -9,7 +9,7 @@
 
 | Field | Value |
 |---|---|
-| Host | QS-GW-LXC5 |
+| Host | gateway host |
 | CPU | 11th Gen Intel(R) Core(TM) i9-11950H @ 2.60GHz |
 | Cores visible | 8 |
 | RAM | 16192 MiB |

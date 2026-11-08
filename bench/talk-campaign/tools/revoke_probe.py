@@ -11,7 +11,7 @@ Prints one TSV row: run cn serial t0 freshA_s keepaliveB_s A_last_ok_s B_last_ok
 import json, os, socket, ssl, subprocess, sys, threading, time
 
 cn, d, serial, run = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
-GW = '192.168.1.99'
+GW = '203.0.113.99'
 CURL = '/opt/homebrew/opt/curl/bin/curl'
 CTL = os.environ['SSH_CTL']
 stop = threading.Event()

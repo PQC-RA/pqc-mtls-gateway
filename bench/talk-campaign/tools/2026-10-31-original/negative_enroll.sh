@@ -4,7 +4,7 @@
 # Every certificate issued here is revoked at the end.
 set -uo pipefail
 OUT=$1; mkdir -p "$OUT"; cd "$OUT"; umask 077
-GW=192.168.1.99; O=/opt/homebrew/opt/openssl@3/bin/openssl; CURL=/opt/homebrew/opt/curl/bin/curl
+GW=203.0.113.99; O=/opt/homebrew/opt/openssl@3/bin/openssl; CURL=/opt/homebrew/opt/curl/bin/curl
 CHAIN=$(dirname "$0")/../2026-10-31/device/ca-chain.crt; cp "$CHAIN" ca-chain.crt
 ADM="cd /root/pqc-gw-live && curl -sS --cacert /etc/pki/pqc-ca/ca-chain.crt --cert admin-cert/gateway-admin.crt --key admin-cert/gateway-admin.key -H X-PQC-CSRF:1"
 token() { ssh -o BatchMode=yes root@$GW "$ADM -X POST 'https://127.0.0.1/admin/certs/enrollment-tokens?cn=$1&ttl=600&profile=client-30d'" | python3 -I -c 'import json,sys;print(json.load(sys.stdin)["token"])'; }

@@ -2,7 +2,7 @@
 
 Every number in `deck/PQC-mTLS-Amsterdam-2026.pptx` comes from this folder (via `deck/data.js`).
 
-- **Gateway:** QS-GW-LXC5 (192.168.1.99), i9-11950H, LXC, Ubuntu 24.04, OpenSSL 3.6.5, OpenResty 1.31.8.1, public commit 086e235.
+- **Gateway:** the gateway host (203.0.113.99 in these files), i9-11950H, LXC, Ubuntu 24.04, OpenSSL 3.6.5, OpenResty 1.31.8.1, public commit 086e235.
 - **Device:** MacBook, Homebrew OpenSSL 3.6.2, curl 8.21, over the VPN (RTT ≈ 34 ms median, MSS 1,380 B).
 
 | Slide | What | Files |

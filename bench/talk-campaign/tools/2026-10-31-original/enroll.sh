@@ -5,7 +5,7 @@
 # Writes OUTDIR/{client.key,client.crt,ca-chain.crt,enroll.tsv}. The token is never printed.
 set -euo pipefail
 CN=$1 PROFILE=$2 OUT=$3
-GW=${GW:-192.168.1.99}
+GW=${GW:-203.0.113.99}
 O=${OPENSSL:-/opt/homebrew/opt/openssl@3/bin/openssl}
 CURL=${CURL:-/opt/homebrew/opt/curl/bin/curl}
 CHAIN=${CHAIN:-$(dirname "$0")/../2026-10-31/device/ca-chain.crt}
